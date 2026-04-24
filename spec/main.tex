@@ -1,0 +1,84 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usepackage{booktabs}
+\usepackage{longtable}
+
+\geometry{margin=1in}
+
+\title{Generation Two: Complete Specification}
+\author{WorldQuant Alpha Mining System}
+\date{\today}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    pdftitle={Generation Two Specification},
+    pdfauthor={WorldQuant Alpha Mining System}
+}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red},
+}
+
+\usetikzlibrary{shapes,arrows,positioning}
+
+\newcommand{\status}[1]{\textbf{#1}}
+\newcommand{\done}{\status{✅ DONE}}
+\newcommand{\partial}{\status{⚠️ PARTIAL}}
+\newcommand{\todo}{\status{❌ TODO}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This document provides a complete specification for Generation Two, a configurable alpha mining system designed for WorldQuant Brain. It includes comprehensive architecture documentation, code logic flows, requirements assessment, and implementation status. The system emphasizes modularity, reusability, and adaptability for alpha mining optimization. For complete user documentation, see \texttt{DOCUMENTATION.md}. The system features self-optimization, genetic algorithm-based evolution, continuous mining, template validation with error learning, and a modern cyberpunk GUI interface.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+Generation Two is a modular, configurable alpha mining system designed for WorldQuant Brain. This specification document provides comprehensive documentation of:
+
+\begin{itemize}
+    \item System architecture and component design
+    \item Code logic and data flow
+    \item Requirements assessment and implementation status
+    \item Gaps and future work
+\end{itemize}
+
+\input{architecture}
+
+\newpage
+
+\input{smart_search}
+
+\newpage
+
+\input{expression_compiler}
+
+\newpage
+
+\input{requirements}
+
+\end{document}

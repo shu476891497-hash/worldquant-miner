@@ -1,0 +1,539 @@
+% Architecture Specification
+% This file is included in main.tex
+% Do not compile standalone - use main.tex instead
+
+\section{Introduction}
+
+This document describes the architecture and implementation of Generation Two, a configurable alpha mining system designed for WorldQuant Brain. The system emphasizes modularity, reusability, and adaptability for optimization. For complete user documentation including installation, usage, and troubleshooting, refer to \texttt{DOCUMENTATION.md}. This specification focuses on technical architecture, implementation details, and system design.
+
+\section{System Overview}
+
+Generation Two is a modular alpha mining system that combines:
+\begin{itemize}
+    \item Template generation using AI/LLM (Ollama or API-based)
+    \item Simulation testing with retry logic
+    \item Genetic algorithm-based evolution
+    \item Quality monitoring and retrospective analysis
+    \item Configurable components for optimization
+\end{itemize}
+
+\section{Architecture}
+
+\subsection{Directory Structure}
+
+The system is organized into logical tool-based folders:
+
+\begin{lstlisting}[language=bash]
+generation_two/
+├── core/                    # Core generation components
+│   ├── utils/              # Reusable utilities
+│   │   ├── retry_handler.py
+│   │   └── request_handler.py
+│   ├── config/             # Configuration system
+│   │   ├── config_manager.py
+│   │   └── config_loader.py
+│   ├── recorder/           # Recording system
+│   │   ├── decision_recorder.py
+│   │   └── audit_logger.py
+│   ├── template_generator.py
+│   ├── simulator_tester.py
+│   └── enhanced_template_generator_v3.py
+├── evolution/               # Evolution components
+│   ├── self_optimizer.py
+│   ├── alpha_evolution_engine.py
+│   ├── alpha_quality_monitor.py
+│   └── on_the_fly_tester.py
+├── storage/                 # Storage components
+│   ├── backtest_storage.py
+│   ├── regroup.py
+│   └── retrospect.py
+├── ollama/                  # Ollama integration
+│   ├── ollama_manager.py
+│   ├── region_theme_manager.py
+│   └── duplicate_detector.py
+├── data_fetcher/            # Data fetching and search
+│   ├── operator_fetcher.py
+│   ├── data_field_fetcher.py
+│   └── smart_search.py
+├── self_evolution/          # Self-evolution engine
+│   ├── code_generator.py
+│   ├── code_evaluator.py
+│   └── evolution_executor.py
+├── gui/                     # Cyberpunk GUI
+│   ├── main_window.py
+│   ├── theme.py
+│   └── components/
+│       ├── dashboard.py
+│       ├── evolution_panel.py
+│       ├── config_panel.py
+│       ├── monitor_panel.py
+│       └── database_panel.py
+└── tests/                   # Test files
+\end{lstlisting}
+
+\subsection{Component Architecture}
+
+\begin{tikzpicture}[
+    node distance=2cm,
+    auto,
+    block/.style={rectangle, draw, fill=blue!20, text width=5em, text centered, rounded corners, minimum height=3em},
+    util/.style={rectangle, draw, fill=green!20, text width=5em, text centered, rounded corners, minimum height=3em},
+    config/.style={rectangle, draw, fill=yellow!20, text width=5em, text centered, rounded corners, minimum height=3em},
+    arrow/.style={->,>=stealth}
+]
+
+\node [block] (main) {EnhancedTemplateGeneratorV3};
+\node [block, below left=of main] (template) {TemplateGenerator};
+\node [block, below right=of main] (simulator) {SimulatorTester};
+\node [block, right=of main] (evolution) {Evolution Engine};
+\node [block, above=of main] (storage) {BacktestStorage};
+
+\node [util, below=of template] (retry) {RetryHandler};
+\node [util, below=of simulator] (request) {RequestHandler};
+\node [config, left=of main] (config) {ConfigManager};
+\node [util, below=of config] (recorder) {DecisionRecorder};
+
+\draw [arrow] (main) -- (template);
+\draw [arrow] (main) -- (simulator);
+\draw [arrow] (main) -- (evolution);
+\draw [arrow] (main) -- (storage);
+\draw [arrow] (template) -- (retry);
+\draw [arrow] (simulator) -- (request);
+\draw [arrow] (retry) -- (config);
+\draw [arrow] (request) -- (config);
+\draw [arrow] (main) -- (config);
+\draw [arrow] (main) -- (recorder);
+
+\end{tikzpicture}
+
+\section{Module Relationships}
+
+\subsection{Dependency Graph}
+
+The system follows a layered architecture with clear dependencies:
+
+\begin{enumerate}
+    \item \textbf{Core Layer}: \texttt{EnhancedTemplateGeneratorV3} orchestrates all components
+    \item \textbf{Service Layer}: \texttt{TemplateGenerator}, \texttt{SimulatorTester}, evolution components
+    \item \textbf{Utility Layer}: \texttt{RetryHandler}, \texttt{RequestHandler}, \texttt{ConfigManager}
+    \item \textbf{Storage Layer}: \texttt{BacktestStorage}, \texttt{DecisionRecorder}
+    \item \textbf{Integration Layer}: \texttt{OllamaManager}, \texttt{DataFetcher}, \texttt{SmartSearchEngine}
+    \item \textbf{Presentation Layer}: \texttt{CyberpunkGUI} with modular panels
+\end{enumerate}
+
+\subsection{Component Interactions}
+
+\begin{itemize}
+    \item \texttt{EnhancedTemplateGeneratorV3} $\rightarrow$ \texttt{TemplateGenerator} $\rightarrow$ \texttt{OllamaManager}
+    \item \texttt{EnhancedTemplateGeneratorV3} $\rightarrow$ \texttt{SimulatorTester} $\rightarrow$ \texttt{RequestHandler}
+    \item \texttt{SimulatorTester} $\rightarrow$ \texttt{ThreadPoolExecutor} (concurrent execution)
+    \item \texttt{TemplateGenerator} $\rightarrow$ \texttt{DataFetcher} $\rightarrow$ \texttt{SmartSearchEngine}
+    \item \texttt{EnhancedTemplateGeneratorV3} $\rightarrow$ \texttt{BacktestStorage} (persistence)
+    \item \texttt{CyberpunkGUI} $\rightarrow$ \texttt{EnhancedTemplateGeneratorV3} (control and monitoring)
+\end{itemize}
+
+\section{Concurrent Architecture}
+
+\subsection{Threading Model}
+
+The system uses \texttt{ThreadPoolExecutor} for concurrent operations:
+
+\begin{itemize}
+    \item \textbf{SimulatorTester}: Manages concurrent simulation submissions
+    \begin{itemize}
+        \item ThreadPoolExecutor with configurable max\_workers (default: 8)
+        \item Each simulation runs in separate thread
+        \item Futures tracked in \texttt{active\_simulations} dictionary
+    \end{itemize}
+    
+    \item \textbf{Concurrent Operations}:
+    \begin{itemize}
+        \item Multiple simulations submitted simultaneously
+        \item Independent monitoring of each simulation
+        \item Rate limiting to prevent API overload
+        \item Result collection via \texttt{wait\_for\_results()}
+    \end{itemize}
+    
+    \item \textbf{Thread Safety}:
+    \begin{itemize}
+        \item \texttt{OllamaManager} uses \texttt{threading.Lock()} for thread-safe operations
+        \item Session objects are thread-safe (requests.Session)
+        \item Database operations use SQLite's built-in thread safety
+    \end{itemize}
+\end{itemize}
+
+\subsection{Concurrent Execution Flow}
+
+\begin{enumerate}
+    \item \texttt{simulate\_batch()} creates multiple \texttt{Future} objects
+    \item Each future runs \texttt{simulate\_template\_concurrent()} in thread pool
+    \item \texttt{submit\_simulation()} submits to API (non-blocking)
+    \item \texttt{monitor\_simulation()} polls progress URL until complete
+    \item Results collected via \texttt{wait\_for\_results()} with timeout
+\end{enumerate}
+
+\subsection{Thread Pool Configuration}
+
+\begin{lstlisting}[language=Python]
+# SimulatorTester initialization
+self.executor = ThreadPoolExecutor(max_workers=8)
+
+# Configurable via ConfigManager
+config.set('simulation', 'concurrent_limit', 8)
+config.set('simulation', 'rate_limit_delay', 0.5)
+\end{lstlisting}
+
+\section{Database Architecture}
+
+\subsection{Database Configuration}
+
+The system supports multiple database backends:
+
+\begin{itemize}
+    \item \textbf{Local SQLite}: Default, file-based database
+    \item \textbf{Local JSON}: File-based JSON storage
+    \item \textbf{Remote URL}: HTTP/HTTPS endpoint for database API
+\end{itemize}
+
+\subsection{Database Components}
+
+\begin{itemize}
+    \item \texttt{BacktestStorage}: SQLite-based storage for backtest results
+    \begin{itemize}
+        \item Stores simulation results with all metrics
+        \item Supports PnL data, correlations, checks
+        \item Indexed for fast queries
+    \end{itemize}
+    
+    \item \texttt{DecisionRecorder}: Records system decisions
+    \begin{itemize}
+        \item Stores decision context and parameters
+        \item Tracks optimization history
+        \item Provides analytics and statistics
+    \end{itemize}
+    
+    \item \texttt{DatabasePanel} (GUI): Configuration and visualization
+    \begin{itemize}
+        \item Configure database type and connection
+        \item Test database connections
+        \item Visualize database contents
+        \item Export/import data
+    \end{itemize}
+\end{itemize}
+
+\subsection{Database Schema}
+
+\begin{lstlisting}[language=SQL]
+-- Backtest results table
+CREATE TABLE backtest_results (
+    id INTEGER PRIMARY KEY,
+    alpha_id TEXT,
+    template TEXT,
+    region TEXT,
+    sharpe REAL,
+    fitness REAL,
+    returns REAL,
+    turnover REAL,
+    margin REAL,
+    pnl_data TEXT,
+    raw_data TEXT,
+    timestamp REAL,
+    ...
+);
+
+-- Decision records table
+CREATE TABLE decision_records (
+    id INTEGER PRIMARY KEY,
+    decision_type TEXT,
+    context TEXT,
+    parameters TEXT,
+    result TEXT,
+    timestamp REAL
+);
+\end{lstlisting}
+
+\section{Core Components}
+
+\subsection{Reusable Utilities}
+
+\subsubsection{RetryHandler}
+
+The \texttt{RetryHandler} provides configurable retry logic with multiple strategies:
+
+\begin{itemize}
+    \item \textbf{Linear}: Fixed delay between retries
+    \item \textbf{Exponential}: Exponential backoff ($delay = base \times multiplier^{attempt}$)
+    \item \textbf{Fibonacci}: Fibonacci sequence delays
+    \item \textbf{Custom}: User-defined delay function
+\end{itemize}
+
+\textbf{Key Features:}
+\begin{itemize}
+    \item Configurable retryable error codes
+    \item Maximum delay capping
+    \item Statistics tracking
+    \item Hot-reload support via configuration
+\end{itemize}
+
+\subsubsection{RequestHandler}
+
+The \texttt{RequestHandler} wraps HTTP requests with built-in retry logic:
+
+\begin{lstlisting}[language=Python]
+handler = RequestHandler(session, RequestConfig(timeout=30))
+response = handler.get('https://api.example.com/data')
+\end{lstlisting}
+
+\textbf{Features:}
+\begin{itemize}
+    \item Automatic retry on configurable errors
+    \item Session management
+    \item Request statistics
+    \item Configuration-driven behavior
+\end{itemize}
+
+\subsection{Configuration System}
+
+\subsubsection{ConfigManager}
+
+Central configuration management with:
+
+\begin{itemize}
+    \item \textbf{Load/Save}: JSON-based configuration files
+    \item \textbf{Hot Reload}: Configuration changes take effect immediately
+    \item \textbf{Change Tracking}: History of all configuration changes
+    \item \textbf{Listeners}: Callbacks for configuration changes
+    \item \textbf{GUI-Ready}: Structure designed for GUI integration
+\end{itemize}
+
+\textbf{Configuration Sections:}
+\begin{enumerate}
+    \item \texttt{retry}: Retry logic parameters
+    \item \texttt{request}: HTTP request settings
+    \item \texttt{simulation}: Simulation testing parameters
+    \item \texttt{evolution}: Genetic algorithm settings
+    \item \texttt{template\_generation}: Template generation options
+    \item \texttt{recording}: Recording and audit settings
+\end{enumerate}
+
+\subsection{Recording System}
+
+\subsubsection{DecisionRecorder}
+
+Records all system decisions for optimization analysis:
+
+\begin{itemize}
+    \item \textbf{Decision Type}: Categorization of decisions
+    \item \textbf{Context}: Situation in which decision was made
+    \item \textbf{Parameters}: Parameters used for the decision
+    \item \textbf{Result}: Outcome of the decision
+    \item \textbf{Success Status}: Whether decision was successful
+\end{itemize}
+
+\textbf{Storage:} SQLite database with indexed queries
+
+\textbf{Features:}
+\begin{itemize}
+    \item Query by decision type, success status, time range
+    \item Statistics and analytics
+    \item JSON export
+    \item Performance tracking
+\end{itemize}
+
+\section{Code Logic Flow}
+
+\subsection{Template Generation Flow}
+
+\begin{enumerate}
+    \item User provides prompt or hypothesis
+    \item System checks configuration for generation strategy
+    \item If Ollama enabled and available:
+    \begin{enumerate}
+        \item Generate template using Ollama
+        \item Record decision with parameters
+    \end{enumerate}
+    \item Else if API key available:
+    \begin{enumerate}
+        \item Generate template using API
+        \item Record decision with parameters
+    \end{enumerate}
+    \item Else: Use fallback template generation
+    \item Record result and success status
+\end{enumerate}
+
+\subsection{Simulation Submission Flow}
+
+\begin{enumerate}
+    \item Receive template and region
+    \item Load simulation settings from configuration
+    \item Prepare simulation data:
+    \begin{lstlisting}[language=Python]
+    simulation_data = {
+        'type': 'REGULAR',
+        'settings': settings_dict,
+        'regular': template
+    }
+    \end{lstlisting}
+    \item Submit via RequestHandler (with retry logic)
+    \item Receive progress URL from Location header
+    \item Record submission decision
+    \item Monitor progress URL until completion
+    \item Fetch alpha details from /alphas endpoint
+    \item Record result
+\end{enumerate}
+
+\subsection{Evolution Flow}
+
+\begin{enumerate}
+    \item Collect successful alphas (Sharpe > threshold)
+    \item Initialize population if needed
+    \item For each generation:
+    \begin{enumerate}
+        \item Tournament selection for parents
+        \item Crossover to create offspring
+        \item Mutation with configurable rate
+        \item Elitism: preserve top performers
+    \end{enumerate}
+    \item Test evolved alphas on-the-fly
+    \item Record evolution decisions and results
+    \item Update population based on fitness
+\end{enumerate}
+
+\section{Current State vs Requirements}
+
+\subsection{Reusable Stable Functionalities}
+
+\textbf{Current State:} ✅ \textbf{IMPLEMENTED}
+
+\begin{itemize}
+    \item \textbf{RetryHandler}: Fully reusable across components
+    \item \textbf{RequestHandler}: Wraps all HTTP requests
+    \item \textbf{ConfigManager}: Central configuration for all components
+    \item \textbf{DecisionRecorder}: Records all decisions uniformly
+\end{itemize}
+
+\textbf{Stability:}
+\begin{itemize}
+    \item Well-defined interfaces
+    \item Comprehensive error handling
+    \item Statistics and monitoring
+    \item Test coverage
+\end{itemize}
+
+\subsection{Changeable Logic for Optimization}
+
+\textbf{Current State:} ✅ \textbf{IMPLEMENTED}
+
+\begin{itemize}
+    \item \textbf{Strategy Pattern}: Retry strategies are swappable
+    \item \textbf{Configuration-Driven}: Logic changes via config files
+    \item \textbf{Plugin Architecture}: Components can be swapped
+    \item \textbf{Hot Reload}: Changes take effect without restart
+\end{itemize}
+
+\textbf{Areas for Change:}
+\begin{enumerate}
+    \item \textbf{Retry Logic}: Multiple strategies (Linear, Exponential, Fibonacci, Custom)
+    \item \textbf{Template Generation}: Ollama-first, API-first, Hybrid
+    \item \textbf{Evolution Parameters}: Mutation rate, crossover rate, elitism
+    \item \textbf{Evaluation Criteria}: Fitness functions, selection methods
+    \item \textbf{Monitoring Intervals}: Polling frequency, timeout values
+\end{enumerate}
+
+\subsection{GUI Integration Readiness}
+
+\textbf{Current State:} ✅ \textbf{IMPLEMENTED}
+
+\begin{itemize}
+    \item ✅ Configuration structure is GUI-ready
+    \item ✅ Change listeners for real-time updates
+    \item ✅ Validation framework in place
+    \item ✅ Cyberpunk GUI implemented with modular panels
+    \item ✅ Database configuration and visualization
+    \item ✅ Real-time monitoring dashboard
+    \item ✅ Evolution control panel
+    \item ✅ Configuration editor
+\end{itemize}
+
+\textbf{GUI Components:}
+\begin{itemize}
+    \item \textbf{DashboardPanel}: Real-time statistics and metrics
+    \item \textbf{EvolutionPanel}: Self-evolution control and monitoring
+    \item \textbf{ConfigPanel}: Configuration editor with JSON support
+    \item \textbf{MonitorPanel}: Live system logs and monitoring
+    \item \textbf{DatabasePanel}: Database configuration (SQLite/JSON/URL) and visualization
+\end{itemize}
+
+\subsection{Recording and Optimization}
+
+\textbf{Current State:} ✅ \textbf{IMPLEMENTED}
+
+\begin{itemize}
+    \item ✅ All decisions are recorded
+    \item ✅ Parameters and results stored
+    \item ✅ Queryable database
+    \item ✅ Statistics and analytics
+    \item ⚠️ Auto-optimization not yet implemented
+    \item ⚠️ ML-based parameter tuning not yet implemented
+\end{itemize}
+
+\section{Gaps and Future Work}
+
+\subsection{High Priority}
+
+\begin{enumerate}
+    \item \textbf{GUI Implementation}
+    \begin{itemize}
+        \item Visual configuration editor
+        \item Real-time monitoring dashboard
+        \item Strategy builder interface
+    \end{itemize}
+    
+    \item \textbf{Auto-Optimization}
+    \begin{itemize}
+        \item ML-based parameter tuning
+        \item Strategy recommendation engine
+        \item Performance-based strategy selection
+    \end{itemize}
+    
+    \item \textbf{Advanced Recording}
+    \begin{itemize}
+        \item Real-time analytics
+        \item Performance visualization
+        \item A/B testing framework
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Medium Priority}
+
+\begin{enumerate}
+    \item \textbf{Additional Strategies}
+    \begin{itemize}
+        \item More retry strategies
+        \item Alternative evolution algorithms
+        \item Custom fitness functions
+    \end{itemize}
+    
+    \item \textbf{Distributed Execution}
+    \begin{itemize}
+        \item Multi-machine support
+        \item Load balancing
+        \item Distributed recording
+    \end{itemize}
+\end{enumerate}
+
+\section{Conclusion}
+
+Generation Two provides a solid foundation for configurable alpha mining with:
+
+\begin{itemize}
+    \item ✅ Reusable stable functionalities
+    \item ✅ Changeable logic for optimization
+    \item ✅ Comprehensive recording system
+    \item ✅ GUI integration with cyberpunk theme
+    \item ✅ Database configuration and visualization
+    \item ✅ Concurrent threading architecture
+    \item ⚠️ Auto-optimization pending
+\end{itemize}
+
+The architecture is designed to accommodate future enhancements while maintaining stability and reusability of core components.

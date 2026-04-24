@@ -1,0 +1,301 @@
+% Smart Search Algorithm Specification
+% This file is included in main.tex
+% Do not compile standalone - use main.tex instead
+
+\section{Smart Search Engine}
+
+The smart search engine provides advanced search capabilities for operators and data fields using mathematical and statistical concepts.
+
+\subsection{Mathematical Foundations}
+
+\subsubsection{Term Frequency-Inverse Document Frequency (TF-IDF)}
+
+TF-IDF is used to measure the relevance of search terms in documents:
+
+\begin{equation}
+\text{TF-IDF}(t, d) = \text{TF}(t, d) \times \text{IDF}(t)
+\end{equation}
+
+Where:
+\begin{itemize}
+    \item $\text{TF}(t, d) = \frac{\text{count of term } t \text{ in document } d}{\text{total terms in } d}$
+    \item $\text{IDF}(t) = \log\left(\frac{N}{df(t)}\right)$
+    \item $N$ = total number of documents
+    \item $df(t)$ = number of documents containing term $t$
+\end{itemize}
+
+\textbf{Implementation:}
+\begin{lstlisting}[language=Python]
+def _calculate_relevance(query_tokens, document_tokens, document_text):
+    # Term Frequency
+    tf_scores = {}
+    doc_words = document_text.split()
+    total_words = len(doc_words)
+    
+    for token in query_tokens:
+        if token in document_tokens:
+            count = doc_words.count(token)
+            tf_scores[token] = count / total_words
+    
+    # Inverse Document Frequency
+    idf_scores = {}
+    for token in query_tokens:
+        doc_count = count_documents_with_token(token)
+        idf_scores[token] = log(1.0 / (doc_count + 1))
+    
+    # TF-IDF score
+    tfidf_score = sum(tf_scores.get(t, 0) * idf_scores.get(t, 0) 
+                      for t in query_tokens)
+    
+    return tfidf_score
+\end{lstlisting}
+
+\subsubsection{Cosine Similarity}
+
+Cosine similarity measures the angle between query and document vectors:
+
+\begin{equation}
+\text{similarity}(Q, D) = \frac{Q \cdot D}{\|Q\| \times \|D\|} = \frac{\sum_{i} Q_i D_i}{\sqrt{\sum_{i} Q_i^2} \times \sqrt{\sum_{i} D_i^2}}
+\end{equation}
+
+For token-based similarity:
+
+\begin{equation}
+\text{cosine\_sim}(Q, D) = \frac{|Q \cap D|}{|Q \cup D|}
+\end{equation}
+
+Where $Q$ and $D$ are sets of tokens.
+
+\subsubsection{Combined Relevance Score}
+
+The final relevance score combines TF-IDF and cosine similarity:
+
+\begin{equation}
+\text{relevance} = 0.6 \times \text{TF-IDF} + 0.4 \times \text{cosine\_sim}
+\end{equation}
+
+\subsection{Statistical Ranking Methods}
+
+\subsubsection{Z-Score Normalization}
+
+Z-scores normalize metrics for fair comparison:
+
+\begin{equation}
+z = \frac{x - \mu}{\sigma}
+\end{equation}
+
+Where:
+\begin{itemize}
+    \item $x$ = metric value
+    \item $\mu$ = mean of all values
+    \item $\sigma$ = standard deviation
+\end{itemize}
+
+\textbf{Application:} Ranking data fields by usage statistics (userCount, alphaCount) using z-scores to identify outliers and popular fields.
+
+\subsubsection{Percentile Ranking}
+
+Percentiles provide relative ranking:
+
+\begin{equation}
+P_k = \frac{\text{number of values} < k}{\text{total number of values}} \times 100\%
+\end{equation}
+
+\subsection{Multi-Criteria Optimization}
+
+The search engine supports weighted multi-criteria scoring:
+
+\begin{equation}
+\text{total\_score} = \sum_{i} w_i \times s_i
+\end{equation}
+
+Where:
+\begin{itemize}
+    \item $w_i$ = weight for criterion $i$
+    \item $s_i$ = score for criterion $i$
+    \item $\sum_{i} w_i = 1$ (normalized weights)
+\end{itemize}
+
+\textbf{Example Criteria:}
+\begin{itemize}
+    \item \textbf{Relevance}: TF-IDF + cosine similarity (weight: 0.4)
+    \item \textbf{Usage}: User count and alpha count (weight: 0.3)
+    \item \textbf{Coverage}: Data coverage percentage (weight: 0.3)
+\end{itemize}
+
+\subsection{Usage-Based Boosting}
+
+Fields are boosted based on usage statistics using normalized scoring:
+
+\begin{equation}
+\text{usage\_boost} = 0.3 \times \frac{\text{userCount}}{1000} + 0.3 \times \frac{\text{alphaCount}}{1000} + 0.4 \times \text{coverage}
+\end{equation}
+
+This provides a balance between popularity and data quality.
+
+\subsection{Search Algorithm}
+
+\subsubsection{Operator Search Algorithm}
+
+\textbf{Input:} Query string $q$, optional category filter $c$, result limit $l$
+
+\textbf{Output:} List of $(operator, score)$ tuples
+
+\begin{enumerate}
+    \item Tokenize query: $Q \gets \{t_1, t_2, \ldots, t_n\}$ where $t_i$ are tokens
+    \item Initialize empty score list: $S \gets []$
+    \item For each operator $op$ in operator index:
+    \begin{enumerate}
+        \item If category filter $c$ is specified and $op.category \neq c$, skip
+        \item Calculate relevance: $score \gets \text{TF-IDF}(Q, op) \times 0.6 + \text{cosine\_sim}(Q, op) \times 0.4$
+        \item Append $(op, score)$ to $S$
+    \end{enumerate}
+    \item Sort $S$ by score in descending order
+    \item Return first $l$ elements of $S$
+\end{enumerate}
+
+\subsubsection{Data Field Search Algorithm}
+
+\textbf{Input:} Query string $q$, region $r$, optional category filter $c$, result limit $l$
+
+\textbf{Output:} List of $(field, score)$ tuples
+
+\begin{enumerate}
+    \item Tokenize query: $Q \gets \{t_1, t_2, \ldots, t_n\}$
+    \item Initialize empty score list: $S \gets []$
+    \item For each field $f$ in region $r$:
+    \begin{enumerate}
+        \item If category filter $c$ is specified and $f.category \neq c$, skip
+        \item Calculate base relevance: $base \gets \text{TF-IDF}(Q, f) \times 0.6 + \text{cosine\_sim}(Q, f) \times 0.4$
+        \item Calculate usage boost: $boost \gets 0.3 \times \frac{f.userCount}{1000} + 0.3 \times \frac{f.alphaCount}{1000} + 0.4 \times f.coverage$
+        \item Calculate final score: $score \gets base \times (1.0 + boost)$
+        \item Append $(f, score)$ to $S$
+    \end{enumerate}
+    \item Sort $S$ by score in descending order
+    \item Return first $l$ elements of $S$
+\end{enumerate}
+
+\subsection{Performance Characteristics}
+
+\subsubsection{Time Complexity}
+
+\begin{itemize}
+    \item \textbf{Index Building}: $O(n \times m)$ where $n$ = number of items, $m$ = average tokens per item
+    \item \textbf{Search}: $O(n \times k)$ where $k$ = query tokens
+    \item \textbf{Sorting}: $O(n \log n)$
+    \item \textbf{Total}: $O(n \times (k + \log n))$
+\end{itemize}
+
+\subsubsection{Space Complexity}
+
+\begin{itemize}
+    \item \textbf{Index Storage}: $O(n \times m)$ for token sets
+    \item \textbf{Search Results}: $O(\text{limit})$
+    \item \textbf{Total}: $O(n \times m)$
+\end{itemize}
+
+\subsection{Advanced Features}
+
+\subsubsection{Relevance Feedback}
+
+The system can learn from user interactions:
+
+\begin{equation}
+\text{updated\_score} = \alpha \times \text{original\_score} + \beta \times \text{feedback\_score}
+\end{equation}
+
+Where $\alpha + \beta = 1$ and feedback\_score is based on user selections.
+
+\subsubsection{Collaborative Filtering Concepts}
+
+For recommendations, the system uses collaborative filtering principles:
+
+\begin{equation}
+\text{recommendation\_score}(f) = \sum_{u \in \text{similar\_users}} \text{weight}(u) \times \text{usage}(u, f)
+\end{equation}
+
+Where similar users are those who use similar operators/fields.
+
+\subsection{Implementation Details}
+
+\subsubsection{Tokenization}
+
+\begin{itemize}
+    \item Lowercase conversion
+    \item Whitespace splitting
+    \item Stop word removal (optional)
+    \item Stemming (optional, for future enhancement)
+\end{itemize}
+
+\subsubsection{Caching Strategy}
+
+\begin{itemize}
+    \item Operators cached in \texttt{constants/operatorRAW.json}
+    \item Data fields cached per region: \texttt{constants/data\_fields\_cache\_\{region\}\_1.json}
+    \item Cache refreshed on cold start or when forced
+    \item Cache validation: Check file existence and validity
+\end{itemize}
+
+\subsubsection{Cold Start Procedure}
+
+\begin{enumerate}
+    \item Check for cached operators/data fields
+    \item If cache exists and valid, load from cache
+    \item Otherwise, fetch from WorldQuant Brain API
+    \item Build search indices
+    \item Initialize SmartSearchEngine
+\end{enumerate}
+
+\subsection{Mathematical Properties}
+
+\subsubsection{Score Normalization}
+
+All scores are normalized to $[0, 1]$ range:
+
+\begin{equation}
+\text{normalized\_score} = \frac{\text{raw\_score} - \min}{\max - \min}
+\end{equation}
+
+This ensures consistent scoring across different metrics.
+
+\subsubsection{Weighted Combination}
+
+Multi-criteria scores use weighted linear combination:
+
+\begin{equation}
+S = \sum_{i=1}^{n} w_i \times s_i, \quad \text{where } \sum_{i=1}^{n} w_i = 1
+\end{equation}
+
+This satisfies the convex combination property, ensuring scores remain in valid ranges.
+
+\subsection{Statistical Significance}
+
+\subsubsection{Confidence Intervals}
+
+For ranking, we can compute confidence intervals:
+
+\begin{equation}
+CI = \bar{x} \pm z_{\alpha/2} \times \frac{\sigma}{\sqrt{n}}
+\end{equation}
+
+Where $z_{\alpha/2}$ is the z-score for confidence level $\alpha$.
+
+\subsubsection{Outlier Detection}
+
+Using z-scores for outlier detection:
+
+\begin{equation}
+\text{outlier if } |z| > 2.5
+\end{equation}
+
+Fields with extreme z-scores may be flagged for special handling.
+
+\subsection{Future Enhancements}
+
+\begin{itemize}
+    \item \textbf{Word Embeddings}: Use vector embeddings for semantic search
+    \item \textbf{Learning to Rank}: Machine learning-based ranking
+    \item \textbf{Query Expansion}: Automatically expand queries with synonyms
+    \item \textbf{Personalization}: User-specific ranking based on history
+    \item \textbf{Real-time Updates}: Incremental index updates
+\end{itemize}

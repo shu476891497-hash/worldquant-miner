@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "generation-two"
+version = "1.0.0"
+description = "WorldQuant Brain Alpha Mining System - Generation Two"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+authors = [
+    {name = "WorldQuant Miner", email = "your-email@example.com"}
+]
+keywords = ["worldquant", "alpha", "mining", "quantitative", "trading"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "requests>=2.28.0",
+    "tkinter",  # Usually included with Python
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+]
+
+[project.scripts]
+generation-two = "generation_two.gui.run_gui:main"
+
+[tool.setuptools]
+packages = ["generation_two"]
+
+[tool.setuptools.package-data]
+generation_two = [
+    "constants/*.json",
+    "gui/**/*.py",
+    "core/**/*.py",
+    "ollama/**/*.py",
+    "data_fetcher/**/*.py",
+    "storage/**/*.py",
+]

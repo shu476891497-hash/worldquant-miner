@@ -1,0 +1,81 @@
+# Credentials and secrets
+credential.txt
+credentials.txt
+credential.json
+credentials.json
+*.pem
+*.key
+.env
+.env.local
+
+# Alpha mining results (competitive secrets, do not share)
+discovered_alphas.txt
+discovered_alphas_*.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Database
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+generation_two_backtests.db*
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build artifacts
+dist/
+build/
+*.spec
+*.exe
+*.deb
+*.dmg
+*.rpm
+*.tar.gz
+*.zip
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.cache
