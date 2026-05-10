@@ -1,0 +1,1016 @@
+[
+  {
+    "source": "WQ-Competition",
+    "title": "Challenge",
+    "text": "Challenge",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "Data Creation Challenge 2026",
+    "text": "Data Creation Challenge 2026",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "AI Alphas Competition 2.0",
+    "text": "AI Alphas Competition 2.0",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "Osmosis Competition 2025",
+    "text": "Osmosis Competition 2025",
+    "type": "text"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.13 Fitness=0.44",
+    "text": "group_rank(rank(ts_rank(implied_volatility_call_120, 30)) + rank(-1*ts_sum(close / ts_delay(close, 1) - 1, 20)), industry)",
+    "sharpe": 1.13,
+    "fitness": 0.44,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=10.15 Fitness=28.46",
+    "text": "-1 * (group_neutralize(ts_zscore(growth_potential_rank_derivative, 5), industry))",
+    "sharpe": 10.15,
+    "fitness": 28.46,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.47 Fitness=1.23",
+    "text": "rank(group_zscore(ts_mean(winsorize(log(divide(debt_lt, equity)), std=4), 180), industry)) * rank(group_neutralize(-ts_zscore(close, 5), subindustry))",
+    "sharpe": 2.47,
+    "fitness": 1.23,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.46 Fitness=1.13",
+    "text": "rank(group_neutralize(-ts_zscore(close, 5), subindustry)) * rank(ts_rank(operating_income, 252))",
+    "sharpe": 2.46,
+    "fitness": 1.13,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.34 Fitness=3.04",
+    "text": "ts_sum(group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=5), 5), subindustry), 30)",
+    "sharpe": 2.34,
+    "fitness": 3.04,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.31 Fitness=0.92",
+    "text": "group_rank(rank(ts_mean(anl4_adjusted_netincome_ft, 5)) + rank(ts_decay_linear((vwap - close) / close, 2)), subindustry)",
+    "sharpe": 2.31,
+    "fitness": 0.92,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.24 Fitness=1.08",
+    "text": "rank(group_rank(ts_zscore(ts_delta(divide(assets, cap), 2), 20), sector)) * rank(group_neutralize(trade_when(ts_rank(ts_std_dev(implied_volatility_call_30,13),327)<0.11, anl4_bvps_flag, -1), subindustry))",
+    "sharpe": 2.24,
+    "fitness": 1.08,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.22 Fitness=0.81",
+    "text": "rank(group_neutralize(rank(vwap * volume - close * volume), sector)) * rank(group_neutralize(trade_when(ts_rank(ts_std_dev(implied_volatility_call_30,13),327)<0.11, anl4_bvps_flag, -1), subindustry))",
+    "sharpe": 2.22,
+    "fitness": 0.81,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.18 Fitness=1.48",
+    "text": "group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=4), 6), subindustry)",
+    "sharpe": 2.18,
+    "fitness": 1.48,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.13 Fitness=1.40",
+    "text": "group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=5), 5), subindustry)",
+    "sharpe": 2.13,
+    "fitness": 1.4,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.12 Fitness=1.28",
+    "text": "group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=4), 4), subindustry)",
+    "sharpe": 2.12,
+    "fitness": 1.28,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.10 Fitness=1.02",
+    "text": "ts_zscore(group_neutralize(rank(ts_decay_linear(volume, 80)) - rank(close), subindustry), 10)",
+    "sharpe": 2.1,
+    "fitness": 1.02,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.10 Fitness=2.67",
+    "text": "ts_sum(group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=6), 6), subindustry), 39)",
+    "sharpe": 2.1,
+    "fitness": 2.67,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.10 Fitness=1.59",
+    "text": "group_rank(rank(0.42 * (group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=4), 4), subindustry)) + 0.58 * (0.38 * (group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=5), 5), subindustry)) + 0.62 * (ts_sum(group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=6), 6), subindustry), 39)))) + rank(group_neutralize(rank(fnd6_fopo / pcr_oi_90), subindustry)), subindustry)",
+    "sharpe": 2.1,
+    "fitness": 1.59,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.02 Fitness=2.54",
+    "text": "0.38 * (group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=5), 5), subindustry)) + 0.62 * (ts_sum(group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=6), 6), subindustry), 39))",
+    "sharpe": 2.02,
+    "fitness": 2.54,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.02 Fitness=2.54",
+    "text": "0.42 * (group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=4), 4), subindustry)) + 0.58 * (0.38 * (group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=5), 5), subindustry)) + 0.62 * (ts_sum(group_neutralize(ts_decay_linear(winsorize(implied_volatility_call_120 - implied_volatility_put_120, std=6), 6), subindustry), 39)))",
+    "sharpe": 2.02,
+    "fitness": 2.54,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=2.00 Fitness=0.84",
+    "text": "group_neutralize(-ts_zscore(close, 5), subindustry)",
+    "sharpe": 2.0,
+    "fitness": 0.84,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.98 Fitness=0.77",
+    "text": "group_rank(ts_rank(0.5 * (capex)/cap + 0.3 * (cashflow_dividends)/cap, 6), subindustry)",
+    "sharpe": 1.98,
+    "fitness": 0.77,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.86 Fitness=0.58",
+    "text": "ts_zscore(group_rank(ts_rank(0.6 * (capex)/cap + 0.4 * (cashflow_dividends)/cap, 5), subindustry), 10)",
+    "sharpe": 1.86,
+    "fitness": 0.58,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.84 Fitness=0.79",
+    "text": "group_neutralize(ts_decay_linear((vwap - close) / close, 2), subindustry)",
+    "sharpe": 1.84,
+    "fitness": 0.79,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.84 Fitness=1.92",
+    "text": "rank(group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 30))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,10),252)<0.9, anl4_bvps_flag, -1), 6), subindustry)), sector)) * rank(group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,15),252)<0.9, anl4_bvps_flag, -1), sector)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 60))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(pcr_vol_10,20),252)<0.9, anl4_bvps_flag, -1), 12), sector)), sector))",
+    "sharpe": 1.84,
+    "fitness": 1.92,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.83 Fitness=1.73",
+    "text": "group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), sector)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 30))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,10),252)<0.9, anl4_bvps_flag, -1), 6), sector)), sector)",
+    "sharpe": 1.83,
+    "fitness": 1.73,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.79 Fitness=0.62",
+    "text": "group_rank(rank(group_rank(ts_zscore(ts_delta(divide(assets, cap), 2), 20), sector)) + rank(group_neutralize(ts_decay_linear(group_rank(trade_when(volume > ts_mean(volume, 20), -1 * ts_av_diff(fnd6_teq / income, 10), -1), subindustry), 6), subindustry)), subindustry)",
+    "sharpe": 1.79,
+    "fitness": 0.62,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.77 Fitness=1.44",
+    "text": "group_neutralize(ts_sum(-scl12_buzz, 8), subindustry)",
+    "sharpe": 1.77,
+    "fitness": 1.44,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.77 Fitness=1.66",
+    "text": "group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 30))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,10),252)<0.9, anl4_bvps_flag, -1), 6), subindustry)), sector)",
+    "sharpe": 1.77,
+    "fitness": 1.66,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.76 Fitness=0.74",
+    "text": "group_rank(rank(fn_oth_income_loss_fx_transaction_and_tax_translation_adj_a) + rank(group_neutralize(-ts_zscore(close, 5), subindustry)), sector)",
+    "sharpe": 1.76,
+    "fitness": 0.74,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.75 Fitness=1.62",
+    "text": "group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 20))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,10),252)<0.9, anl4_bvps_flag, -1), 5), subindustry)), sector)",
+    "sharpe": 1.75,
+    "fitness": 1.62,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.75 Fitness=1.64",
+    "text": "group_rank(rank(0.59 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,13),327)<0.7, anl4_bvps_flag, -1), subindustry)) + 0.70 * (-2*ts_sum(close / ts_delay(close, 2) - 1, 21))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,7),327)<0.7, anl4_bvps_flag, -2), 7), subindustry)), sector)",
+    "sharpe": 1.75,
+    "fitness": 1.64,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.71 Fitness=0.58",
+    "text": "group_rank(ts_rank(0.6 * (capex)/cap + 0.4 * (fn_assets_fair_val_l2_a)/cap, 5), subindustry)",
+    "sharpe": 1.71,
+    "fitness": 0.58,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.67 Fitness=0.74",
+    "text": "group_rank(rank(ts_mean(actual_eps_value_quarterly, 5)) + rank(ts_decay_linear((vwap - close) / close, 2)), industry)",
+    "sharpe": 1.67,
+    "fitness": 0.74,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.65 Fitness=0.59",
+    "text": "ts_av_diff(group_rank(ts_zscore(ts_delta(divide(assets, cap), 2), 20), sector), 15)",
+    "sharpe": 1.65,
+    "fitness": 0.59,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.65 Fitness=0.57",
+    "text": "group_rank(rank(group_neutralize(implied_volatility_call_120 - implied_volatility_put_120, bucket(rank(cap), range='0.1,1,0.1'))) + rank(ts_rank(operating_income, 252)), industry)",
+    "sharpe": 1.65,
+    "fitness": 0.57,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.65 Fitness=1.51",
+    "text": "ts_decay_linear(group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 30))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,10),252)<0.9, anl4_bvps_flag, -1), 6), subindustry)), sector), 10)",
+    "sharpe": 1.65,
+    "fitness": 1.51,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.62 Fitness=0.49",
+    "text": "group_rank(ts_zscore(ts_delta(divide(assets, cap), 1), 26), sector)",
+    "sharpe": 1.62,
+    "fitness": 0.49,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.59 Fitness=0.42",
+    "text": "group_neutralize(rank(vwap * volume - close * volume), sector)",
+    "sharpe": 1.59,
+    "fitness": 0.42,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.59 Fitness=0.42",
+    "text": "group_neutralize(rank(vwap * volume - close * volume), industry)",
+    "sharpe": 1.59,
+    "fitness": 0.42,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.59 Fitness=1.41",
+    "text": "group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 30))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(pcr_vol_10,10),252)<0.9, anl4_bvps_flag, -1), 6), subindustry)), sector)",
+    "sharpe": 1.59,
+    "fitness": 1.41,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.55 Fitness=1.35",
+    "text": "group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,15),252)<0.9, anl4_bvps_flag, -1), sector)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 30))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(pcr_vol_10,20),252)<0.9, anl4_bvps_flag, -1), 6), sector)), sector)",
+    "sharpe": 1.55,
+    "fitness": 1.35,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.53 Fitness=1.05",
+    "text": "ts_decay_linear(ts_zscore(group_neutralize(rank(ts_decay_linear(volume, 80)) - rank(close), subindustry), 10), 15)",
+    "sharpe": 1.53,
+    "fitness": 1.05,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.53 Fitness=1.32",
+    "text": "trade_when(rank(group_neutralize(-2*ts_sum(close / ts_delay(close, 1) - 2, 26), subindustry)) > 0.5, group_rank(rank(0.59 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,13),327)<0.7, anl4_bvps_flag, -1), subindustry)) + 0.70 * (-2*ts_sum(close / ts_delay(close, 2) - 1, 21))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,7),327)<0.7, anl4_bvps_flag, -2), 7), subindustry)), sector), -1)",
+    "sharpe": 1.53,
+    "fitness": 1.32,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.51 Fitness=0.69",
+    "text": "ts_mean(group_neutralize(rank(vwap * volume - close * volume), sector), 8)",
+    "sharpe": 1.51,
+    "fitness": 0.69,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.51 Fitness=0.49",
+    "text": "ts_zscore(group_rank(ts_zscore(ts_delta(divide(assets, cap), 2), 20), sector), 10)",
+    "sharpe": 1.51,
+    "fitness": 0.49,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.50 Fitness=0.97",
+    "text": "group_neutralize(rank(fnd6_fopo / pcr_oi_90), subindustry)",
+    "sharpe": 1.5,
+    "fitness": 0.97,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.49 Fitness=0.40",
+    "text": "group_neutralize(-ts_rank(returns, 15), subindustry)",
+    "sharpe": 1.49,
+    "fitness": 0.4,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.49 Fitness=0.72",
+    "text": "group_rank(-1*ts_mean(returns, 5), subindustry)",
+    "sharpe": 1.49,
+    "fitness": 0.72,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.46 Fitness=0.53",
+    "text": "group_rank(rank(group_neutralize(ts_decay_linear(rank(rank(implied_volatility_call_30) * rank(operating_income / sales)), 8), subindustry)) + rank(group_neutralize(implied_volatility_call_120 - implied_volatility_put_120, bucket(rank(cap), range='0.1,1,0.1'))), industry)",
+    "sharpe": 1.46,
+    "fitness": 0.53,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.44 Fitness=1.47",
+    "text": "group_neutralize(trade_when(ts_rank(ts_std_dev(returns,13),327)<0.11, anl4_bvps_flag, -1), subindustry)",
+    "sharpe": 1.44,
+    "fitness": 1.47,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.44 Fitness=1.39",
+    "text": "0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), industry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 20))",
+    "sharpe": 1.44,
+    "fitness": 1.39,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.43 Fitness=0.99",
+    "text": "group_rank(rank(group_zscore(sales, industry)) - rank(group_zscore(cashflow_dividends, industry)), subindustry)",
+    "sharpe": 1.43,
+    "fitness": 0.99,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.42 Fitness=1.35",
+    "text": "0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 20))",
+    "sharpe": 1.42,
+    "fitness": 1.35,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.41 Fitness=1.17",
+    "text": "group_neutralize(group_zscore(ts_mean(winsorize(log(divide(debt_lt, equity)), std=3), 126), industry), subindustry)",
+    "sharpe": 1.41,
+    "fitness": 1.17,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.41 Fitness=0.97",
+    "text": "group_rank(rank(group_zscore(sales, industry)) - rank(group_zscore(cashflow_dividends, industry)), subindustry)",
+    "sharpe": 1.41,
+    "fitness": 0.97,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.38 Fitness=0.54",
+    "text": "ts_mean(group_neutralize(rank(vwap * volume - close * volume), industry), 5)",
+    "sharpe": 1.38,
+    "fitness": 0.54,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.36 Fitness=1.44",
+    "text": "group_neutralize(-1*ts_sum(close / ts_delay(close, 2) - 2, 26), subindustry)",
+    "sharpe": 1.36,
+    "fitness": 1.44,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.35 Fitness=0.55",
+    "text": "ts_zscore(group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,15),252)<0.9, anl4_bvps_flag, -1), sector)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 30))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(pcr_vol_10,20),252)<0.9, anl4_bvps_flag, -1), 6), sector)), sector), 10)",
+    "sharpe": 1.35,
+    "fitness": 0.55,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.34 Fitness=1.35",
+    "text": "group_neutralize(-2*ts_sum(close / ts_delay(close, 1) - 2, 26), subindustry)",
+    "sharpe": 1.34,
+    "fitness": 1.35,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.32 Fitness=1.22",
+    "text": "group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), subindustry)",
+    "sharpe": 1.32,
+    "fitness": 1.22,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.32 Fitness=0.53",
+    "text": "ts_zscore(group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,15),252)<0.9, anl4_bvps_flag, -1), sector)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 60))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(pcr_vol_10,20),252)<0.9, anl4_bvps_flag, -1), 12), sector)), sector), 10)",
+    "sharpe": 1.32,
+    "fitness": 0.53,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.31 Fitness=1.17",
+    "text": "group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,10),252)<0.9, anl4_bvps_flag, -1), 5), subindustry)",
+    "sharpe": 1.31,
+    "fitness": 1.17,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.29 Fitness=0.41",
+    "text": "trade_when(rank(group_rank(ts_rank(0.6 * (capex)/cap + 0.4 * (cashflow_dividends)/cap, 5), subindustry)) > 0.5, ts_rank(implied_volatility_call_120, 30), -1)",
+    "sharpe": 1.29,
+    "fitness": 0.41,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.29 Fitness=1.15",
+    "text": "-1 * ((group_neutralize(rank(vwap * volume - close * volume), sector)) - (group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,10),252)<0.9, anl4_bvps_flag, -1), 5), subindustry)))",
+    "sharpe": 1.29,
+    "fitness": 1.15,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.29 Fitness=0.84",
+    "text": "group_rank(rank(group_rank(rank(0.59 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,13),327)<0.7, anl4_bvps_flag, -1), subindustry)) + 0.70 * (-2*ts_sum(close / ts_delay(close, 2) - 1, 21))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,7),327)<0.7, anl4_bvps_flag, -2), 7), subindustry)), sector)) + rank(-ts_rank(fn_liab_fair_val_l1_a, 252)), subindustry)",
+    "sharpe": 1.29,
+    "fitness": 0.84,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.29 Fitness=0.57",
+    "text": "trade_when(rank(group_neutralize(ts_decay_linear(group_rank(trade_when(volume > ts_mean(volume, 20), -1 * ts_av_diff(fnd6_teq / income, 10), -1), subindustry), 6), subindustry)) > 0.5, -scl12_buzz, -1)",
+    "sharpe": 1.29,
+    "fitness": 0.57,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.28 Fitness=1.12",
+    "text": "group_neutralize(trade_when(rank(ts_rank(operating_income, 252)) > 0.5, ts_mean(anl4_adjusted_netincome_ft, 5), -1), subindustry)",
+    "sharpe": 1.28,
+    "fitness": 1.12,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.28 Fitness=0.50",
+    "text": "group_rank(rank(group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 30))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,10),252)<0.9, anl4_bvps_flag, -1), 6), subindustry)), sector)) + rank(group_neutralize(rank(implied_volatility_mean_skew_20/cap) + rank(sales/cap), subindustry)), subindustry)",
+    "sharpe": 1.28,
+    "fitness": 0.5,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.28 Fitness=0.52",
+    "text": "(ts_zscore(group_neutralize(rank(ts_decay_linear(volume, 80)) - rank(close), subindustry), 10)) - (group_neutralize(rank(ts_decay_linear(systematic_risk_last_360_days, 100)) - rank(close), industry))",
+    "sharpe": 1.28,
+    "fitness": 0.52,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.27 Fitness=0.45",
+    "text": "group_rank(rank(group_neutralize(implied_volatility_call_120 - implied_volatility_put_120, bucket(rank(cap), range='0.1,1,0.1'))) + rank(-1*ts_sum(close / ts_delay(close, 1) - 1, 20)), subindustry)",
+    "sharpe": 1.27,
+    "fitness": 0.45,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.27 Fitness=0.44",
+    "text": "ts_decay_linear(group_rank(ts_zscore(ts_delta(divide(put_breakeven_150, cap), 2), 20), sector), 5)",
+    "sharpe": 1.27,
+    "fitness": 0.44,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.26 Fitness=1.17",
+    "text": "group_neutralize(trade_when(ts_rank(ts_std_dev(implied_volatility_call_30,13),327)<0.11, anl4_bvps_flag, -1), subindustry)",
+    "sharpe": 1.26,
+    "fitness": 1.17,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.25 Fitness=1.16",
+    "text": "group_neutralize(trade_when(ts_rank(ts_std_dev(implied_volatility_call_30,13),327)<0.11, anl4_bvps_flag, -1), industry)",
+    "sharpe": 1.25,
+    "fitness": 1.16,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.24 Fitness=0.61",
+    "text": "0.32 * (ts_zscore(group_neutralize(rank(ts_decay_linear(volume, 80)) - rank(close), subindustry), 10)) + 0.68 * (group_neutralize(rank(ts_decay_linear(volume, 80)) - rank(close), subindustry))",
+    "sharpe": 1.24,
+    "fitness": 0.61,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.23 Fitness=1.13",
+    "text": "group_neutralize(trade_when(ts_rank(ts_std_dev(implied_volatility_call_30,13),327)<0.11, anl4_bvps_flag, -1), industry)",
+    "sharpe": 1.23,
+    "fitness": 1.13,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.22 Fitness=1.06",
+    "text": "0.64 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.36 * (group_rank(ts_zscore(ts_delta(divide(assets, cap), 2), 20), sector))",
+    "sharpe": 1.22,
+    "fitness": 1.06,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.22 Fitness=1.07",
+    "text": "0.64 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.36 * (group_rank(ts_zscore(ts_delta(divide(assets, cap), 2), 20), sector))",
+    "sharpe": 1.22,
+    "fitness": 1.07,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.22 Fitness=0.86",
+    "text": "group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,15),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 30))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(est_fcf_ps,20),252)<0.9, anl4_bvps_flag, -1), 6), subindustry)), sector)",
+    "sharpe": 1.22,
+    "fitness": 0.86,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.22 Fitness=0.86",
+    "text": "group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,15),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 30))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(est_fcf_ps,20),252)<0.9, anl4_bvps_flag, -1), 6), subindustry)), sector)",
+    "sharpe": 1.22,
+    "fitness": 0.86,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.21 Fitness=1.11",
+    "text": "group_neutralize(ts_mean(anl4_capex_flag, 5), subindustry)",
+    "sharpe": 1.21,
+    "fitness": 1.11,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.20 Fitness=1.18",
+    "text": "group_rank(rank(parkinson_volatility_180) * rank(assets), sector)",
+    "sharpe": 1.2,
+    "fitness": 1.18,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.19 Fitness=0.23",
+    "text": "group_rank(ts_rank(ts_delta(implied_volatility_call_30, 5), 60), subindustry)",
+    "sharpe": 1.19,
+    "fitness": 0.23,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.18 Fitness=0.99",
+    "text": "0.68 * (0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), industry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 20))) + 0.32 * (group_neutralize(ts_zscore(ts_rank(operating_income, 365), 20), subindustry))",
+    "sharpe": 1.18,
+    "fitness": 0.99,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.18 Fitness=0.99",
+    "text": "0.68 * (0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), industry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 20))) + 0.32 * (group_neutralize(ts_zscore(ts_rank(operating_income, 365), 20), subindustry))",
+    "sharpe": 1.18,
+    "fitness": 0.99,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.18 Fitness=0.50",
+    "text": "group_rank(ts_rank(ts_delta(liabilities_curr, 5), 15), subindustry)",
+    "sharpe": 1.18,
+    "fitness": 0.5,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.17 Fitness=0.42",
+    "text": "group_neutralize(-ts_av_diff(scl12_buzz, 20), subindustry)",
+    "sharpe": 1.17,
+    "fitness": 0.42,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.11 Fitness=0.40",
+    "text": "group_rank(rank(group_neutralize(implied_volatility_call_120 - implied_volatility_put_120, bucket(rank(cap), range='0.1,1,0.1'))) + rank(group_neutralize(-1*ts_sum(close / ts_delay(close, 2) - 2, 26), subindustry)), subindustry)",
+    "sharpe": 1.11,
+    "fitness": 0.4,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.11 Fitness=0.42",
+    "text": "ts_zscore(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), industry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 20)), 10)",
+    "sharpe": 1.11,
+    "fitness": 0.42,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.11 Fitness=0.67",
+    "text": "group_neutralize(rank(-ts_rank(fn_liab_fair_val_l1_a, 252)) * rank(group_zscore(ts_mean(winsorize(log(divide(debt_lt, equity)), std=4), 180), industry)), subindustry)",
+    "sharpe": 1.11,
+    "fitness": 0.67,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.10 Fitness=0.25",
+    "text": "group_neutralize(-log(ts_delta(ts_rank(vwap, 12), 18)), subindustry)",
+    "sharpe": 1.1,
+    "fitness": 0.25,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.06 Fitness=0.34",
+    "text": "ts_zscore(group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 30))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,10),252)<0.9, anl4_bvps_flag, -1), 6), subindustry)), sector), 15)",
+    "sharpe": 1.06,
+    "fitness": 0.34,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.04 Fitness=0.70",
+    "text": "0.68 * (group_neutralize(-1*ts_sum(close / ts_delay(close, 2) - 2, 26), subindustry)) + 0.32 * (ts_decay_linear(group_rank(ts_zscore(ts_delta(divide(assets, cap), 2), 20), sector), 5))",
+    "sharpe": 1.04,
+    "fitness": 0.7,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.04 Fitness=0.67",
+    "text": "group_rank(rank(group_rank(rank(0.46 * (group_neutralize(trade_when(ts_rank(ts_std_dev(cap,10),252)<0.9, anl4_bvps_flag, -1), subindustry)) + 0.54 * (-1*ts_sum(close / ts_delay(close, 1) - 1, 30))) + rank(group_neutralize(ts_sum(trade_when(ts_rank(ts_std_dev(returns,10),252)<0.9, anl4_bvps_flag, -1), 6), subindustry)), sector)) + rank(fn_oth_income_loss_fx_transaction_and_tax_translation_adj_a), subindustry)",
+    "sharpe": 1.04,
+    "fitness": 0.67,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.03 Fitness=0.56",
+    "text": "group_neutralize(0.51 * (-ts_rank(fn_liab_fair_val_l1_a, 252)) + 0.49 * (ts_decay_linear((vwap - close) / close, 2)), subindustry)",
+    "sharpe": 1.03,
+    "fitness": 0.56,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.01 Fitness=1.08",
+    "text": "group_neutralize(ts_sum(-1*ts_sum(close / ts_delay(close, 1) - 1, 20), 8), subindustry)",
+    "sharpe": 1.01,
+    "fitness": 1.08,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.01 Fitness=1.08",
+    "text": "group_neutralize(ts_sum(-1*ts_sum(close / ts_delay(close, 1) - 1, 20), 8), subindustry)",
+    "sharpe": 1.01,
+    "fitness": 1.08,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-LocalDB",
+    "title": "Sharpe=1.00 Fitness=0.40",
+    "text": "group_neutralize(ts_rank(divide(cashflow_dividends, sales), 20), subindustry)",
+    "sharpe": 1.0,
+    "fitness": 0.4,
+    "type": "expression"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "International Quant Championship 2026 Stage 1",
+    "text": "International Quant Championship 2026 Stage 1",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "Data Science Indonesia - Alphathon 2025",
+    "text": "<div lang=\"en\"><h4>Opportunity</h4>  <ul>     <li>Top performers may be eligible for one-time stipends and can apply to join WorldQuant BRAIN's Consultant Program</li>  <li>       <p>One-time special stipends for top performers in the alphathon*</p>  <ul>         <li>1st Place - 500 USD</li>  <li>2nd Place - 300 USD</li>  <li>3rd Place - 200 USD</li>  <li>4th to 10th Place - 100 USD</li>  <li>11th to 20th Place - 50 USD</li>   </ul>       <p><small>* subject to successfully becoming a research consultant with BRAIN</small></p>  </li>  </ul></br>  <p>Please refer to the official guidelines for ",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "Yerevan State University Alphathon 2025",
+    "text": "<div lang=\"en\"><h4>Opportunity</h4>  <ul>     <li>Top performers may be eligible for one-time stipends and can apply to join WorldQuant BRAIN's Consultant Program</li>  <li>       <p>One-time special stipends for top performers in the alphathon*</p>  <ul>         <li>1st Place - 500 USD</li>  <li>2nd Place - 300 USD</li>  <li>3rd Place - 200 USD</li>  <li>4th to 10th Place - 100 USD</li>  <li>11th to 20th Place - 50 USD</li>   </ul>       <p><small>* subject to successfully becoming a research consultant with BRAIN</small></p>  </li>  </ul></br>  <p>Please refer to the official guidelines for ",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "Sunway Alphathon 2025",
+    "text": "<div lang=\"en\"><h4>Opportunity</h4>  <ul>     <li>Top performers may be eligible for one-time stipends and can apply to join WorldQuant BRAIN's Consultant Program</li>  <li>       <p>One-time special stipends for top performers in the alphathon*</p>  <ul>         <li>1st Place - 1000 USD</li>  <li>2nd Place - 700 USD</li>  <li>3rd Place - 400 USD</li>  <li>4th to 5th Place - 200 USD</li>  <li>6th to 10th Place - 100 USD</li>   </ul>       <p><small>* subject to successfully becoming a research consultant with BRAIN</small></p>  </li>  </ul></br>  <p>Please refer to the official guidelines for ",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "University of Nottingham Malaysia Alphathon 2025",
+    "text": "<div lang=\"en\"><h4>Opportunity</h4>  <ul>     <li>Top performers may be eligible for one-time stipends and can apply to join WorldQuant BRAIN's Consultant Program</li>  <li>       <p>One-time special stipends for top performers in the alphathon*</p>  <ul>         <li>1st Place - 1000 USD</li>  <li>2nd Place - 700 USD</li>  <li>3rd Place - 400 USD</li>  <li>4th to 5th Place - 200 USD</li>  <li>6th to 10th Place - 100 USD</li>   </ul>       <p><small>* subject to successfully becoming a research consultant with BRAIN</small></p>  </li>  </ul></br>  <p>Please refer to the official guidelines for ",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "APU Alphathon 2025",
+    "text": "<div lang=\"en\"><h4>Opportunity</h4>  <ul>     <li>Top performers may be eligible for one-time stipends and can apply to join WorldQuant BRAIN's Consultant Program</li>  <li>       <p>One-time special stipends for top performers in the alphathon*</p>  <ul>         <li>1st Place - 1000 USD</li>  <li>2nd Place - 700 USD</li>  <li>3rd Place - 400 USD</li>  <li>4th to 5th Place - 200 USD</li>  <li>6th to 10th Place - 100 USD</li>   </ul>       <p><small>* subject to successfully becoming a research consultant with BRAIN</small></p>  </li>  </ul></br>  <p>Please refer to the official guidelines for ",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "Thailand - Quant Finance Explorer Program – Q4 2025",
+    "text": "Thailand - Quant Finance Explorer Program August 2025",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "UM Alphathon 2025",
+    "text": "<div lang=\"en\"><h4>Opportunity</h4>  <ul>     <li>Top performers may be eligible for one-time stipends and can apply to join WorldQuant BRAIN's Consultant Program</li>  <li>       <p>One-time special stipends for top performers in the alphathon*</p>  <ul>         <li>1st Place - 1000 USD</li>  <li>2nd Place - 700 USD</li>  <li>3rd Place - 400 USD</li>  <li>4th to 5th Place - 200 USD</li>  <li>6th to 10th Place - 100 USD</li>   </ul>       <p><small>* subject to successfully becoming a research consultant with BRAIN</small></p>  </li>  </ul></br>  <p>Please refer to the official guidelines for ",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "Merged Alpha Performance Competition 2025",
+    "text": "Merged Alpha Performance Competition 2025",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "International Quant Championship 2025 Stage 3",
+    "text": "International Quant Championship 2025 Stage 3",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "Thailand - Quant Finance Explorer Program August 2025",
+    "text": "Thailand - Quant Finance Explorer Program August 2025",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "Summer Experience Challenge 2025",
+    "text": "Summer Experience Challenge 2025",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "International Quant Championship 2025 Stage 2",
+    "text": "International Quant Championship 2025 Stage 2",
+    "type": "text"
+  },
+  {
+    "source": "WQ-Competition",
+    "title": "International Quant Championship 2025 Stage 1",
+    "text": "International Quant Championship 2025 Stage 1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Signal or Noise in Multi-Agent LLM-based Stock Recommendations?",
+    "text": "We present the first portfolio-level validation of MarketSenseAI, a deployed multi-agent LLM equity system. All signals are generated live at each observation date, eliminating look-ahead bias. The system routes four specialist agents (News, Fundamentals, Dynamics, and Macro) through a synthesis agent that issues a monthly equity thesis and recommendation for each stock in its coverage universe, and we ask two questions: do its buy recommendations add value over both passive benchmarks and random selection, and what does the internal agent structure reveal about the source of the edge? On the ",
+    "url": "https://arxiv.org/abs/2604.17327v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Risk-Sensitive Investment Management via Free Energy-Entropy Duality",
+    "text": "We study a benchmarked risk-sensitive portfolio problem in a factor-based setting to bring together three strands of the literature: benchmarked risk-sensitive investment management, the Kuroda-Nagai change-of-measure method, and the free energy-entropy duality of Dai Pra et al. (1996). We show that the duality yields a direct solution of the benchmarked problem by reformulating it as a linear-quadratic-Gaussian stochastic differential game under a suitable equivalent probability measure, with an entropic regularization. The resulting value function is quadratic, the optimal controls are expli",
+    "url": "https://arxiv.org/abs/2604.15463v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Interpretable Systematic Risk around the Clock",
+    "text": "In this paper, I present the first comprehensive, around-the-clock analysis of systematic jump risk by combining high-frequency market data with contemporaneous news narratives identified as the underlying causes of market jumps. These narratives are retrieved and classified using a state-of-the-art open-source reasoning LLM. Decomposing market risk into interpretable jump categories reveals significant heterogeneity in risk premia, with macroeconomic news commanding the largest and most persistent premium. Leveraging this insight, I construct an annually rebalanced real-time Fama-MacBeth fact",
+    "url": "https://arxiv.org/abs/2604.13458v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Temperature Anomalies and Climate Physical Risk in Portfolio Construction",
+    "text": "Driven by the increasing frequency and intensity of natural disasters and chronic climate threats, we investigate the impact of physical climate risk on global equity portfolios. By employing a panel regression analysis on sectoral returns, we provide statistical evidence that extreme temperature events exert a negative effect on most sectors. We introduce two novel metrics based on these temperature anomalies, Climate Risk Exposure and Climate Exposure Volatility, in order to measure the environmental vulnerability of a portfolio. Unlike available static country-level indices, these metrics i",
+    "url": "https://arxiv.org/abs/2604.11143v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Investing Is Compression",
+    "text": "In 1956 John Kelly wrote a paper at Bell Labs describing the relationship between gambling and Information Theory. What came to be known as the Kelly Criterion is both an objective and a closed-form solution to sizing wagers when odds and edge are known. Samuelson argued it was arbitrary and subjective, and successfully kept it out of mainstream economics. Luckily it lived on in computer science, mostly because of Tom Cover's work at Stanford. He showed that it is the uniquely optimal way to invest: it maximizes long-term wealth, minimizes the risk of ruin, and is competitively optimal in a ga",
+    "url": "https://arxiv.org/abs/2604.10758v3",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Global Persistence, Local Residual Structure: Forecasting Heterogeneous Investment Panels",
+    "text": "On a 93-actor quarterly panel mixing macro indicators, institutional data, and firm-level investment ratios, global factor augmentation degrades prediction for actor subgroups whose dynamics are misrepresented by the shared basis. A two-stage architecture -- global pooled AR(1) for shared persistence, block-specific local models for residual dynamics -- improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($Δ= +0.047$, CI $[+0.036, +0.058]$, 10/10 windows, placebo $p \\leq 0.001$). A held-out decade test -- block partition frozen on 2005--2014 data, evaluated on unseen 2015--2024 windows",
+    "url": "https://arxiv.org/abs/2604.09821v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Measuring Strategy-Decay Risk: Minimum Regime Performance and the Durability of Systematic Investing",
+    "text": "Systematic investment strategies are exposed to a subtle but pervasive vulnerability: the progressive erosion of their effectiveness as market regimes change. Traditional risk measures, designed to capture volatility or drawdowns, overlook this form of structural fragility. This article introduces a quantitative framework for assessing the durability of systematic strategies through minimum regime performance (MRP), defined as the lowest realized risk-adjusted return across distinct historical regimes. MRP serves as a lower bound on a strategy's robustness, capturing how performance deteriorat",
+    "url": "https://arxiv.org/abs/2604.08356v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Portfolio Optimization Proxies under Label Scarcity and Regime Shifts via Bayesian and Deterministic Students under Semi-Supervised Sandwich Training",
+    "text": "This paper proposes a machine learning assisted portfolio optimization framework designed for low data environments and regime uncertainty. We construct a teacher student learning pipeline in which a Conditional Value at Risk (CVaR) optimizer generates supervisory labels, and neural models (Bayesian and deterministic) are trained using both real and synthetically augmented data. The synthetic data is generated using a factor based model with t copula residuals, enabling training beyond the limited real sample of 104 labeled observations. We evaluate four student models under a structured exper",
+    "url": "https://arxiv.org/abs/2604.14206v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Optimal Parlay Wagering and Whitrow Asymptotics: A State-Price and Implicit-Cash Treatment",
+    "text": "For independent multi-outcome events under multiplicative parlay pricing, we give a short exact proof of the optimal Kelly strategy using the implicit-cash viewpoint. The proof is entirely eventwise. One first solves each event in isolation. The full simultaneous optimizer over the entire menu of singles, doubles, triples, and higher parlays is then obtained by taking the outer product of the one-event Kelly strategies. Equivalently, the optimal terminal wealth factorizes across events. This yields an immediate active-leg criterion: a parlay is active if and only if each of its legs is active ",
+    "url": "https://arxiv.org/abs/2603.26620v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "The Geometry of Risk: Path-Dependent Regulation and Anticipatory Hedging via the SigSwap",
+    "text": "This paper introduces a transformative framework for managing path-dependent financial risk by shifting from traditional distribution-centric models to a geometry-based approach. We propose the SigSwap as a new regulatory instrument that allows market participants to decompose complex risk into terminal price law and the underlying texture of the price path. By utilising the mathematical properties of the path-signature, we demonstrate how previously unmodellable risks, such as lead-lag dynamics and flash-crash spiralling, can be converted into transparent and linear risk factors. Central to t",
+    "url": "https://arxiv.org/abs/2603.24154v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Mislearning of Factor Risk Premia under Structural Breaks: A Misspecified Bayesian Learning Framework",
+    "text": "While asset-pricing models increasingly recognize that factor risk premia are subject to structural change, existing literature typically assumes that investors correctly account for such instability. This paper studies how investors instead learn under a misspecified model that underestimates structural breaks. We propose a minimal Bayesian framework in which this misspecification generates persistent prediction errors and pricing distortions, and we introduce an empirically tractable measure of mislearning intensity $(Δ_t)$ based on predictive likelihood ratios.   The empirical results yield",
+    "url": "https://arxiv.org/abs/2603.21672v3",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Optimal Hedge Ratio for Delta-Neutral Liquidity Provision under Liquidation Constraints",
+    "text": "We study the problem of optimally hedging the price exposure of liquidity positions in constant-product automated market makers (AMMs) when the hedge is funded by collateralized borrowing. A liquidity provider (LP) who borrows tokens to construct a delta-neutral position faces a trade-off: higher hedge ratios reduce price exposure but increase liquidation risk through tighter collateral utilization. We model token prices as correlated geometric Brownian motions and derive the hedge ratio h that maximizes risk-adjusted return subject to a liquidation-probability constraint expressed via a first",
+    "url": "https://arxiv.org/abs/2603.19716v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Implementation Risk in Portfolio Backtesting: A Previously Unquantified Source of Error",
+    "text": "Portfolio backtesting is the primary tool for evaluating investment strategies before deployment, yet practitioners implicitly assume that different engines produce identical results for the same strategy. we formalise implementation risk, the systematic divergence in backtested portfolio metrics arising solely from differences in how engines implement the same logical strategy, and propose four metrics grounded in metrology to quantify it: engine sensitivity, implementation uncertainty interval, divergence amplification factor, and conclusion stability index. we execute 15 benchmark strategie",
+    "url": "https://arxiv.org/abs/2603.20319v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Probabilistic Forecasting for Day-ahead Electricity Prices, Battery Trading Strategies and the Economic Evaluation of Predictive Accuracy",
+    "text": "Electricity price forecasting supports decision-making in energy markets and asset operation. Probabilistic forecasts are increasingly adopted to explicitly quantify uncertainty, typically issued as quantile predictions or ensembles of the full predictive distribution. However, how improvements in statistical forecast quality translate into economic value remains unclear. Battery storage arbitrage in day-ahead markets is a popular application-based benchmark for this purpose. We analyze quantile-based trading strategies (QBTS) and identify two critical flaws: they do not incentivize honest pro",
+    "url": "https://arxiv.org/abs/2604.19580v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Structural Dynamics of G5 Stock Markets During Exogenous Shocks: A Random Matrix Theory-Based Complexity Gap Approach",
+    "text": "We identify a robust structural signature of stock markets during exogenous shock events by analyzing collective return dynamics across G5 countries. Using Random Matrix Theory, we introduce the complexity gap, defined as the difference between the normalized largest eigenvalue and the average pairwise correlation, to quantify changes in market structure. This measure reveals a consistent three-phase pattern across multiple shocks, including the 2025 U.S. tariff event, the COVID-19 crisis, and country-specific shocks in Japan and China during 2024. Before a shock, markets show a positive compl",
+    "url": "https://arxiv.org/abs/2604.19107v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Signal or Noise in Multi-Agent LLM-based Stock Recommendations?",
+    "text": "We present the first portfolio-level validation of MarketSenseAI, a deployed multi-agent LLM equity system. All signals are generated live at each observation date, eliminating look-ahead bias. The system routes four specialist agents (News, Fundamentals, Dynamics, and Macro) through a synthesis agent that issues a monthly equity thesis and recommendation for each stock in its coverage universe, and we ask two questions: do its buy recommendations add value over both passive benchmarks and random selection, and what does the internal agent structure reveal about the source of the edge? On the ",
+    "url": "https://arxiv.org/abs/2604.17327v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Spurious Predictability in Financial Machine Learning",
+    "text": "Adaptive specification search generates statistically significant backtests even under martingale-difference nulls. We introduce a falsification audit testing complete predictive workflows against synthetic reference classes, including zero-predictability environments and microstructure placebos. Workflows generating significant walk-forward evidence in these environments are falsified. For passing workflows, we quantify selection-induced performance inflation using an absolute magnitude gap linking optimized in-sample evidence to disjoint walk-forward realizations, adjusted for effective mult",
+    "url": "https://arxiv.org/abs/2604.15531v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "A Herding-Based Model of Technological Transfer and Economic Convergence: Evidence from Central and Eastern Europe",
+    "text": "The long-run convergence of developing economies toward advanced countries exhibits robust empirical regularities, yet the mechanisms underlying technological diffusion remain insufficiently specified in standard growth models. In this paper, we extend the neoclassical framework by introducing a micro-founded mechanism of technological transfer as a driver of total factor productivity. Rather than treating technological progress as exogenous or purely innovation-driven, we model productivity growth as a process of adopting existing technologies from the global frontier. The diffusion process i",
+    "url": "https://arxiv.org/abs/2604.11413v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Global Persistence, Local Residual Structure: Forecasting Heterogeneous Investment Panels",
+    "text": "On a 93-actor quarterly panel mixing macro indicators, institutional data, and firm-level investment ratios, global factor augmentation degrades prediction for actor subgroups whose dynamics are misrepresented by the shared basis. A two-stage architecture -- global pooled AR(1) for shared persistence, block-specific local models for residual dynamics -- improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($Δ= +0.047$, CI $[+0.036, +0.058]$, 10/10 windows, placebo $p \\leq 0.001$). A held-out decade test -- block partition frozen on 2005--2014 data, evaluated on unseen 2015--2024 windows",
+    "url": "https://arxiv.org/abs/2604.09821v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Reliability-Aware ETF Tail-Risk Monitoring",
+    "text": "Daily ETF risk monitoring can become unreliable when market data quality degrades, market conditions shift, or predictive performance becomes unstable. This paper develops a reliability-aware risk monitoring service for next-day tail-risk surveillance. The proposed framework combines service-time quality checks, lower-tail prediction, uncertainty scoring, and risk-aware adjustment of the tail-risk estimate. We evaluate the system on a daily panel of multiple ETFs augmented with VIX and yield-curve information under a rolling walk-forward design. Empirically, the framework improves tail-risk mo",
+    "url": "https://arxiv.org/abs/2604.08765v2",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Climate-Aware Copula Models for Sovereign Rating Migration Risk",
+    "text": "This paper develops a copula-based time-series framework for modelling sovereign credit rating activity and its dependence dynamics, with extensions incorporating climate risk. We introduce a mixed-difference transformation that maps discrete annual counts of sovereign rating actions into a continuous domain, enabling flexible copula modelling. Building on a MAG(1) copula process, we extend the framework to a MAGMAR(1,1) specification combining moving-aggregate and autoregressive dependence, and establish consistency and asymptotic normality of the associated maximum likelihood estimators. The",
+    "url": "https://arxiv.org/abs/2604.07567v1",
+    "type": "text"
+  },
+  {
+    "source": "arXiv",
+    "title": "Anticipatory Reinforcement Learning: From Generative Path-Laws to Distributional Value Functions",
+    "text": "This paper introduces Anticipatory Reinforcement Learning (ARL), a novel framework designed to bridge the gap between non-Markovian decision processes and classical reinforcement learning architectures, specifically under the constraint of a single observed trajectory. In environments characterised by jump-diffusions and structural breaks, traditional state-based methods often fail to capture the essential path-dependent geometry required for accurate foresight. We resolve this by lifting the state space into a signature-augmented manifold, where the history of the process is embedded as a dyn",
+    "url": "https://arxiv.org/abs/2604.04662v1",
+    "type": "text"
+  }
+]

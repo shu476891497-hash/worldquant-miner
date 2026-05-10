@@ -1,0 +1,7 @@
+{
+  "provider": "deepseek",
+  "api_key": "sk-1fd28ae50d4d445bbf23b2024ab143d4",
+  "model": "deepseek-v4-flash",
+  "timeout": 60,
+  "max_retries": 3
+}
