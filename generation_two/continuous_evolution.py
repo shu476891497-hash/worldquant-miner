@@ -2769,11 +2769,6 @@ def main(mode: str = "d0"):
                     logging.info(f"  🤖 [预加载] 消耗后台AI缓冲: {len(prefetched_d1)} 个 D1 因子")
                     _prefetch_ai_pool.clear()
 
-        logging.info(
-            f"  📊 D0腿={len(d0_candidates)} | 裂变腿={len(d1_genetic)} | 蓝海腿={len(d1_blueocean)} | 遍历腿={len(d1_sweep)} | 模式={mode.upper()}\n"
-            f"  🔥 探索覆盖: {_tracker_operator.stats()} | {_tracker_template.stats()}"
-        )
-
         # 旧逻辑兼容：把所有 D1 因子合并打包
         # Phase 1: Systematic sweep (GrandMaster strategy)
         d1_sweep = []
@@ -2783,6 +2778,11 @@ def main(mode: str = "d0"):
                 n=20, fund_fields=None
             )
             d1_sweep = [inject_neutralization(a) for a in d1_sweep]
+
+        logging.info(
+            f"  📊 D0腿={len(d0_candidates)} | 裂变腿={len(d1_genetic)} | 蓝海腿={len(d1_blueocean)} | 遍历腿={len(d1_sweep)} | 模式={mode.upper()}\n"
+            f"  🔥 探索覆盖: {_tracker_operator.stats()} | {_tracker_template.stats()}"
+        )
 
         d1_combined = d1_genetic + d1_blueocean + d1_sweep
         alphas_to_test = d1_combined  # 留给下方 validator 使用
