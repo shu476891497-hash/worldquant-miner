@@ -1,0 +1,23 @@
+# Credentials & secrets
+auth.json
+credential.txt
+server_credentials.txt
+credentials.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# DB & logs
+*.db
+*.log
+*.bak
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
