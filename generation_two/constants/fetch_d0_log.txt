@@ -1,0 +1,24 @@
+认证: 2263721154@qq.com
+
+拉取 D0 (delay=0, TOP1000)...
+D0: 1225 个字段
+拉取 D1 (delay=1, TOP3000)...
+D1: 5905 个字段
+D0专属: 133 | D1专属(D0禁用): 4813 | 共有: 1092
+
+D0 字段分类:
+  fundamental                660 个
+  news                       336 个
+  analyst                     90 个
+  pv                          64 个
+  option                      64 个
+  socialmedia                 11 个
+
+保存完成: generation_two\constants\d0_fields_whitelist.json (1225 字段)
+引擎分类:
+  fundamental: 660
+  analyst: 90
+  news: 336
+  sentiment: 11
+  option: 64
+  pv: 64

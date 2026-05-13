@@ -105,6 +105,59 @@ def _load_wq_fields_from_cache(region: str = "USA", delay: int = 1,
 
 
 # =========================================================
+# ④-B 蓝海字段池构建（userCount低、alphaCount低、但覆盖率够的字段）
+#     这些字段竞争度极低，生成的因子更不容易 SELF_CORRELATION
+# =========================================================
+def _build_blue_ocean_pool(cache_path: str, max_users: int = 30,
+                           max_alphas: int = 50, min_coverage: float = 0.30) -> list:
+    """
+    从 data_fields_cache JSON 中筛选蓝海字段。
+    筛选条件：userCount < max_users AND alphaCount < max_alphas AND coverage >= min_coverage
+    返回: list[dict] 每个元素含 id, category, userCount, alphaCount, coverage
+    """
+    try:
+        if not os.path.exists(cache_path) or os.path.getsize(cache_path) < 10:
+            return []
+        with open(cache_path, 'r', encoding='utf-8') as f:
+            raw = json.load(f)
+        if not isinstance(raw, list) or not raw or not isinstance(raw[0], dict):
+            return []
+
+        pool = []
+        # 排除纯标识符/布尔字段
+        _SKIP_PREFIXES = ('top', 'isin', 'cusip', 'sedol', 'ticker', 'currency',
+                          'exchange', 'country', 'is_')
+        for item in raw:
+            fid = item.get('id', '')
+            if not fid or any(fid.startswith(p) for p in _SKIP_PREFIXES):
+                continue
+            uc = item.get('userCount', 9999)
+            ac = item.get('alphaCount', 9999)
+            cov = item.get('coverage', 0)
+            if uc < max_users and ac < max_alphas and cov >= min_coverage:
+                cat_raw = item.get('category', {})
+                cat_name = cat_raw.get('name', '?') if isinstance(cat_raw, dict) else str(cat_raw)
+                pool.append({
+                    'id': fid,
+                    'category': cat_name,
+                    'userCount': uc,
+                    'alphaCount': ac,
+                    'coverage': cov,
+                })
+        # 按 userCount 升序（最冷门的优先）
+        pool.sort(key=lambda x: (x['userCount'], x['alphaCount']))
+        if pool:
+            logging.info(
+                f"🌊 蓝海字段池: {len(pool)} 个 (users<{max_users}, alphas<{max_alphas}, cov>={min_coverage}) | "
+                f"头部: {[p['id'] for p in pool[:5]]}"
+            )
+        return pool
+    except Exception as e:
+        logging.warning(f"蓝海字段池构建失败: {e}")
+        return []
+
+
+# =========================================================
 # ⑤ 优质因子发现报告（解决"看不到 Ollama 生成了什么"的问题）
 # =========================================================
 _discovery_log_path = os.path.join(
@@ -424,7 +477,59 @@ _RESEARCH_THEMES = [
         "hint": "使用 sales, ebitda, net_income 字段，使用 ts_delta(x, 252), ts_delta(x, 504) 等长窗口，"
                 "研究同比增速的加速/减速"
     },
+    # ════════════════════════════════════════════════════════════════
+    # 🌊 蓝海研究主题（覆盖 News/Sentiment/Social/Model/Event 等低竞争数据集）
+    # ════════════════════════════════════════════════════════════════
+    {
+        "name": "📰 新闻情绪动量 (News Sentiment Momentum)",
+        "hypothesis": "新闻发布密度和情绪极值包含短期方向性信息，新闻VWAP的变化速度预示价格趋势",
+        "hint": "使用 nws12_afterhsz_prevwap, news_all_vwap, news_mov_vol, nws12_afterhsz_nstories 字段，"
+                "研究新闻VWAP的时序动量、新闻数量异常、新闻波动率极值信号"
+    },
+    {
+        "name": "📱 社交媒体热度异常 (Social Buzz Anomaly)",
+        "hypothesis": "社交媒体讨论量的突然变化揭示零售投资者情绪极端，可作反转信号",
+        "hint": "使用 scl12_buzz, scl12_buzzvec, scl12_alltype_buzzvec 字段，"
+                "研究buzz的时序z-score、buzz与returns的负相关、buzz极值反转"
+    },
+    {
+        "name": "🎭 复合情绪信号 (Composite Sentiment Signal)",
+        "hypothesis": "多来源情绪指标（新闻+社媒+分析师）的分歧或共振包含alpha信息",
+        "hint": "使用 snt5_* 情绪字段和 news_* 新闻字段，研究情绪指标之间的相关性变化、"
+                "情绪极端值与基本面的背离"
+    },
+    {
+        "name": "🤖 模型因子交互 (Model-Derived Factor Interaction)",
+        "hypothesis": "WQ预构建的模型因子（如多因子模型残差）与原始基本面的偏差揭示定价错误",
+        "hint": "使用 mdl3_* 模型字段，研究模型信号的时序排名、模型信号与行业内排名的交互"
+    },
+    {
+        "name": "📋 事件驱动季报 (Event-Driven Quarterly Reports)",
+        "hypothesis": "季报事件前后的财务指标异常变化（非连续性）预示后续股价反应",
+        "hint": "使用 fnd6_newqeventv110_* 和 fnd6_eventv110_* 字段（如 pncwiepq, rcaq, prcepsq），"
+                "这些是极低竞争度字段(2-5用户)，研究事件变量的时序排名和截面异常"
+    },
+    {
+        "name": "🎯 期权Greeks截面 (Option Greeks Cross-Section)",
+        "hypothesis": "期权Greeks（delta/gamma/theta/vega）的截面分布揭示做市商对冲行为和隐含方向",
+        "hint": "使用 opt11_delta, opt11_gamma, put_breakeven_*, call_breakeven_* 字段，"
+                "研究Greeks的行业内排名、Greeks之间的比率信号"
+    },
+    {
+        "name": "📊 分析师指引差异 (Analyst Guidance Divergence)",
+        "hypothesis": "管理层指引值与分析师预期之间的差距（guidance gap）包含内部信息",
+        "hint": "使用 anl4_fsguidanceafv4_minguidance, anl4_fsguidanceafv4_maxguidance, "
+                "operating_profit_before_depr_amort_max_guidance_qtr 字段，"
+                "研究指引范围的宽度变化、指引与实际值的偏差"
+    },
+    {
+        "name": "🌐 宏观政策敏感度 (Macro Policy Sensitivity)",
+        "hypothesis": "个股对宏观政策风险指标（GPR/EPU）的敏感度差异预示不同宏观环境下的收益",
+        "hint": "使用 mdf_gpr, mdf_epu 等宏观字段，与基本面字段交互，"
+                "研究个股收益率与宏观指标的ts_corr及其变化"
+    },
 ]
+
 
 # =========================================================
 # D0 专属研究主题（供 Ollama D0 因子生成使用）
@@ -621,6 +726,30 @@ _ALPHA_TEMPLATES = [
     "trade_when(ts_rank({F1}, 20) > 0.7, group_rank(ts_delta({F2}, 10), subindustry), 0)",         # 跨域条件触发
     "group_neutralize(rank({F1}) * rank({F2}) - rank({F1} * {F2}), subindustry)",                  # 非线性交互残差
     "group_rank(ts_decay_linear(signed_power(rank({F1}) - rank({F2}), 2), {W}), subindustry)",     # 幂次差异衰减
+    # ════════════════════════════════════════════════════════════════
+    # 🌊 L. 蓝海数据集专属模板（强制使用低竞争度字段）
+    # ════════════════════════════════════════════════════════════════
+    # --- L1. 新闻情绪动量 ---
+    "group_neutralize(ts_rank(ts_delta(ts_mean({F}, 5), 5), {W}), subindustry)",                     # 新闻/情绪动量
+    "group_rank(ts_zscore(ts_delta({F}, 5), {W}), subindustry)",                                     # Z-score 动量
+    # --- L2. 社交媒体反转 ---
+    "group_neutralize(-ts_rank({F}, {W}), subindustry)",                                             # 热度反转
+    "group_rank(ts_av_diff({F}, {W}) * -1, subindustry)",                                            # 热度偏离反转
+    # --- L3. 事件驱动季报 ---
+    "group_neutralize(ts_count_nans({F}, {W}), subindustry)",                                        # NaN 计数信号
+    "group_rank(days_from_last_change({F}), subindustry)",                                           # 最近更新距离
+    "group_neutralize(last_diff_value({F}, {W}), subindustry)",                                      # 最后变化值
+    # --- L4. 期权Greeks交互 ---
+    "group_rank({F1} / ({F2} + 1e-6), subindustry)",                                                 # Greeks比率
+    "group_neutralize(ts_zscore({F1} - {F2}, {W}), subindustry)",                                    # Greeks差异Z
+    # --- L5. 分析师指引 ---
+    "group_neutralize(ts_delta({F}, {W}) / (ts_std_dev({F}, {W}) + 1e-6), subindustry)",             # 指引变化加速度
+    "group_rank(ts_rank({F}, {W}) - 0.5, subindustry)",                                              # 偏离中位数
+    # --- L6. 宏观交互 ---
+    "group_neutralize(ts_corr({F1}, {F2}, {W}), subindustry)",                                       # 宏观相关性
+    "group_rank(ts_regression({F1}, {F2}, {W}, 0, 2), subindustry)",                                 # 宏观回归残差
+    # --- L7. 复合多字段 ---
+    "group_neutralize(0.5 * ts_rank({F1}, {W}) + 0.5 * ts_rank({F2}, {W}), subindustry)",           # 等权双信号
 ]
 
 _D0_ALPHA_TEMPLATES = [
@@ -980,7 +1109,8 @@ def generate_systematic_sweep(wq_fields, wq_fields_by_category,
                                evaluated_alphas, n=20, fund_fields=None):
     """
     Systematic sweep generator -- GrandMaster core strategy.
-    Iterates field x skeleton x window Cartesian product deterministically.
+    ★ 改进: 使用类别轮询（Round-Robin）而非线性字段索引，
+           确保每一代都能覆盖不同数据集类别（含蓝海类别）。
     """
     state = _load_sweep_state()
     results = []
@@ -989,6 +1119,12 @@ def generate_systematic_sweep(wq_fields, wq_fields_by_category,
     if not fund_fields:
         fund_fields = [f for f in _FUNDAMENTAL_FIELDS if f in set(all_fields)] or _FUNDAMENTAL_FIELDS
 
+    # ★ 类别轮询：从 state 恢复当前类别和每类别的进度
+    cat_list = sorted(wq_fields_by_category.keys()) if wq_fields_by_category else []
+    cat_idx = state.get("cat_idx", 0)
+    cat_field_progress = state.get("cat_field_progress", {})  # {category: field_idx_within_category}
+
+    # 兼容旧 state（没有 cat_idx 的情况下退化为线性扫描）
     field_idx = state.get("field_idx", 0)
     skeleton_idx = state.get("skeleton_idx", 0)
     window_idx = state.get("window_idx", 0)
@@ -1000,19 +1136,39 @@ def generate_systematic_sweep(wq_fields, wq_fields_by_category,
     while len(results) < n and attempts < max_attempts:
         attempts += 1
 
-        if field_idx >= len(all_fields):
-            field_idx = 0
-            logging.info(f"[Sweep] Full field scan complete! Total={total}. Next round...")
+        # ★ 类别轮询选字段：优先按类别轮流取字段
+        if cat_list:
+            if cat_idx >= len(cat_list):
+                cat_idx = 0
+            current_cat = cat_list[cat_idx]
+            cat_fields = wq_fields_by_category.get(current_cat, [])
+            c_progress = cat_field_progress.get(current_cat, 0)
+            if c_progress >= len(cat_fields):
+                c_progress = 0  # 本类别已扫完一轮，重置
+                cat_field_progress[current_cat] = 0
+            if cat_fields:
+                field = cat_fields[c_progress]
+                cat_field_progress[current_cat] = c_progress + 1
+            else:
+                cat_idx += 1
+                continue
+            # 每取一个字段后切换到下一个类别
+            cat_idx += 1
+        else:
+            # 无类别信息，退化为线性扫描
+            if field_idx >= len(all_fields):
+                field_idx = 0
+                logging.info(f"[Sweep] Full field scan complete! Total={total}. Next round...")
+            field = all_fields[field_idx]
+            field_idx += 1
+
         if skeleton_idx >= len(_SWEEP_SKELETONS):
             skeleton_idx = 0
-            field_idx += 1
-            continue
         if window_idx >= len(_SWEEP_WINDOWS):
             window_idx = 0
             skeleton_idx += 1
             continue
 
-        field = all_fields[field_idx]
         skel_name, skel_template = _SWEEP_SKELETONS[skeleton_idx]
         window = _SWEEP_WINDOWS[window_idx]
 
@@ -1020,10 +1176,16 @@ def generate_systematic_sweep(wq_fields, wq_fields_by_category,
 
         expr = skel_template.replace("{F}", field).replace("{W}", str(window))
         if "{F2}" in expr:
-            f2_idx = (field_idx + skeleton_idx) % len(fund_fields)
-            f2 = fund_fields[f2_idx]
+            # ★ 跨类别 F2 选取：从不同类别选 F2
+            if cat_list:
+                f2_cat = cat_list[(cat_idx + 1) % len(cat_list)]
+                f2_candidates = wq_fields_by_category.get(f2_cat, fund_fields)
+                f2 = f2_candidates[(skeleton_idx + window_idx) % len(f2_candidates)]
+            else:
+                f2_idx = (field_idx + skeleton_idx) % len(fund_fields)
+                f2 = fund_fields[f2_idx]
             if f2 == field:
-                f2 = fund_fields[(f2_idx + 1) % len(fund_fields)]
+                f2 = fund_fields[(skeleton_idx + 1) % len(fund_fields)]
             expr = expr.replace("{F2}", f2)
 
         if expr in evaluated_alphas:
@@ -1038,13 +1200,15 @@ def generate_systematic_sweep(wq_fields, wq_fields_by_category,
     state["skeleton_idx"] = skeleton_idx
     state["window_idx"] = window_idx
     state["total_generated"] = total
+    state["cat_idx"] = cat_idx
+    state["cat_field_progress"] = cat_field_progress
     _save_sweep_state(state)
 
     if results:
-        progress_pct = (field_idx / max(len(all_fields), 1)) * 100
+        cat_info = f"cat={cat_list[cat_idx % len(cat_list)]}" if cat_list else f"field {field_idx}/{len(all_fields)}"
         logging.info(
             f"[Sweep] Generated {len(results)} factors | "
-            f"Progress: field {field_idx}/{len(all_fields)} ({progress_pct:.1f}%) | Total={total}"
+            f"Progress: {cat_info} skel={skeleton_idx} win={window_idx} | Total={total}"
         )
 
     return results
@@ -1490,7 +1654,9 @@ _tracker_operator = ExplorationTracker("算子", decay_interval=50)
 _tracker_field_cat = ExplorationTracker("字段类别", decay_interval=20)
 
 
-def generate_template_alphas(n: int, wq_fields: list, evaluated_alphas: set = None, wq_fields_by_category: dict = None) -> list:
+def generate_template_alphas(n: int, wq_fields: list, evaluated_alphas: set = None,
+                              wq_fields_by_category: dict = None,
+                              blue_ocean_fields: list = None) -> list:
     """
     从 _ALPHA_TEMPLATES 模板库随机填充字段，生成结构多样的候选因子。
 
@@ -1501,18 +1667,22 @@ def generate_template_alphas(n: int, wq_fields: list, evaluated_alphas: set = No
         n: 目标生成数量
         wq_fields: 完整字段列表（2663个，从缓存加载）
         evaluated_alphas: 已评估因子集合（用于去重，避免重复提交）
+        blue_ocean_fields: 蓝海字段池（list[dict] with 'id' key），30% 概率强制从此池采样 F1
     返回: 填充后的因子表达式列表
     """
     results = []
     all_fields = wq_fields if wq_fields else _FUNDAMENTAL_FIELDS
     # 基本面字段优先用于双字段模板的 F2（分母/配对字段）
     fund_fields = [f for f in _FUNDAMENTAL_FIELDS if f in all_fields] or _FUNDAMENTAL_FIELDS
+    # 蓝海字段 ID 列表（用于 30% 强制采样）
+    _blue_ids = [b['id'] for b in blue_ocean_fields] if blue_ocean_fields else []
 
     # 准备数据集类别列表用于轮询（Round-Robin），确保每个 Dataset 必定被选中
     category_list = list(wq_fields_by_category.keys()) if wq_fields_by_category else []
     if category_list:
         random.shuffle(category_list)  # 打乱顺序，避免每次生成的头几个类别都是固定的
 
+    blue_count = 0  # 统计蓝海采样次数
     attempts = 0
     while len(results) < n and attempts < n * 15:
         attempts += 1
@@ -1521,8 +1691,23 @@ def generate_template_alphas(n: int, wq_fields: list, evaluated_alphas: set = No
             template = _tracker_template.pick_one(_ALPHA_TEMPLATES)
             window = random.choice(_TEMPLATE_WINDOWS)
 
+            # ★★★ 蓝海强制采样：30% 概率从蓝海池选 F1 ★★★
+            use_blue_ocean = _blue_ids and random.random() < 0.30
+            if use_blue_ocean:
+                f1 = random.choice(_blue_ids)
+                blue_count += 1
+                # F2 从不同来源
+                if "{F2}" in template or "{F1}" in template:
+                    # F2 从基本面或另一个蓝海字段
+                    f2_pool = [b for b in _blue_ids if b != f1]
+                    if f2_pool and random.random() < 0.5:
+                        f2 = random.choice(f2_pool)
+                    else:
+                        f2 = random.choice(fund_fields)
+                else:
+                    f2 = random.choice(fund_fields)
             # 跨数据集强制融合：F1 和 F2 强制从不同类别采样（降低自相关）
-            if category_list:
+            elif category_list:
                 # ★ 反重复类别采样：已探索过的类别降温
                 chosen_cat = _tracker_field_cat.pick_one(category_list)
                 cat_fields = wq_fields_by_category[chosen_cat]
@@ -1563,7 +1748,7 @@ def generate_template_alphas(n: int, wq_fields: list, evaluated_alphas: set = No
 
     if results:
         logging.info(
-            f"🧱 模板工厂生成了 {len(results)} 个结构化因子 | "
+            f"🧱 模板工厂生成了 {len(results)} 个结构化因子 (🌊蓝海={blue_count}) | "
             f"探索: {_tracker_template.stats()} | {_tracker_field_cat.stats()}"
         )
     return results
@@ -1931,6 +2116,7 @@ def main(mode: str = "d0"):
     # ── 初始化认证 ──────────────────────────────────────────
     cm = CredentialManager(base_path=os.path.dirname(os.path.abspath(__file__)))
     if not cm.authenticate(auto_load=True, auto_prompt=False):
+        logging.error("❌ Authentication failed - cannot proceed without valid credentials")
         logging.error("Failed to authenticate.")
         return
 
@@ -2149,6 +2335,25 @@ def main(mode: str = "d0"):
         # 如果无类别信息，退化为全平池采样（兼容旧逻辑）
         wq_fields_by_category = {}
         logging.warning("⚠️ 无字段类别信息，将使用全平池随机采样（会偏向Fundamental）")
+
+    # ── 构建蓝海字段优先池（低用户/低因子数/足够覆盖率的字段）────────────
+    _blue_ocean_cache = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "constants",
+        "data_fields_cache_USA_1_TOP3000.json"
+    )
+    _blue_ocean_pool = _build_blue_ocean_pool(
+        _blue_ocean_cache, max_users=30, max_alphas=50, min_coverage=0.30
+    )
+    if _blue_ocean_pool:
+        # 按类别统计蓝海分布
+        _bo_cats = {}
+        for bo in _blue_ocean_pool:
+            _bo_cats[bo['category']] = _bo_cats.get(bo['category'], 0) + 1
+        logging.info(
+            f"🌊 蓝海类别分布: " +
+            " | ".join(f"{k}({v}个)" for k, v in sorted(_bo_cats.items(), key=lambda x: -x[1]))
+        )
 
     
     # ── 从 operatorRAW.json 动态加载全量算子池 ──────────────────────
@@ -2734,26 +2939,30 @@ def main(mode: str = "d0"):
                     if t.count("(") == t.count(")") and t not in evaluated_alphas:
                         d0_candidates.append(t)
 
-        # 腿二：遗传裂变（~8个，D1，单因子变异+杂交）— 仅 D1/both 模式
+        # 腿二：遗传裂变（精简版，D1，单因子变异+杂交）— 仅 D1/both 模式
+        # ★ 从 30→15 seeds，减少裂变腿对种子池的过度依赖，降低自相关
         d1_genetic = []
         if mode in ("d1", "both"):
-            for seed in pool_snapshot[:30]:
+            for seed in pool_snapshot[:15]:
                 neutralized_seed = inject_neutralization(seed)
                 d1_genetic += [
                     neutralized_seed,
                     f"ts_decay_exp_window({neutralized_seed}, 5, 2)",
                     inject_neutralization(smart_mutate(seed)),
                 ]
-            num_crossovers = min(30, len(pool_snapshot))
+            num_crossovers = min(15, len(pool_snapshot))
             for _ in range(num_crossovers):
                 pa = random.choice(pool_snapshot)
                 pb = random.choice([s for s in pool_snapshot if s != pa] or pool_snapshot)
                 d1_genetic.append(crossover_factors(pa, pb))
 
-        # 腿三：蓝海模板工厂（~9个，D1，Round-Robin 均衡采样）— 仅 D1/both 模式
+        # 腿三：蓝海模板工厂（★ 扩容 20→40，D1，Round-Robin 均衡采样 + 30% 蓝海强制采样）
         d1_blueocean = []
         if mode in ("d1", "both"):
-            d1_blueocean = generate_template_alphas(20, wq_fields, evaluated_alphas, wq_fields_by_category)
+            d1_blueocean = generate_template_alphas(
+                40, wq_fields, evaluated_alphas, wq_fields_by_category,
+                blue_ocean_fields=_blue_ocean_pool
+            )
             d1_blueocean = [inject_neutralization(a) for a in d1_blueocean]
 
         # 预加载后台 AI 缓冲的 D1 因子 — 仅 D1/both 模式
@@ -2775,7 +2984,7 @@ def main(mode: str = "d0"):
         if mode in ("d1", "both"):
             d1_sweep = generate_systematic_sweep(
                 wq_fields, wq_fields_by_category, evaluated_alphas,
-                n=20, fund_fields=None
+                n=30, fund_fields=None
             )
             d1_sweep = [inject_neutralization(a) for a in d1_sweep]
 
@@ -2839,7 +3048,7 @@ def main(mode: str = "d0"):
                 unique_alphas = [engine.mutate(knowledge_pool[0]) for _ in range(5)]
             
         # 从模拟器中取出上一代 429 失败被暂存的因子
-        retries = tester.get_retry_queue()
+        retries = getattr(tester, 'get_retry_queue', lambda: [])() if hasattr(tester, 'get_retry_queue') else []
         if retries:
             logging.info(f"♻️ 从重试队列取出 {len(retries)} 个因子优先处理")
             # 优先处理重试因子
@@ -2858,7 +3067,7 @@ def main(mode: str = "d0"):
         try:
             logging.info(f"  🎯 提交 D0={len(d0_candidates)}(优先) + D1={len(unique_alphas)} 个，模式={mode.upper()}...")
             # ★ D0 先提交，抢占模拟器资源
-            futures_d0 = tester.simulate_batch(d0_candidates, "USA", d0_settings, executor_key='d0') if (d0_candidates and mode in ("d0", "both")) else []
+            futures_d0 = tester.simulate_batch(d0_candidates, "USA", d0_settings) if (d0_candidates and mode in ("d0", "both")) else []
             futures_d1 = tester.simulate_batch(unique_alphas, "USA", settings) if (unique_alphas and mode in ("d1", "both")) else []
             all_futures = futures_d0 + futures_d1  # D0 在前，优先处理结果
 

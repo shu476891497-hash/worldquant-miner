@@ -1,0 +1,667 @@
+[
+  {
+    "source": "WQ-中文论坛",
+    "title": "当你手搓super alpha 累了的时候,来看看多模板多线程生成super alpha",
+    "text": "本文是我自己基于论坛中的各位大佬论坛模板进行整合并现写的一个Python代码:基于 WorldQuant BRAIN 平台的多线程 Super Alpha 回测框架，帮助量化研究者高效测试和优化 Super Alpha 策略。\n\n核心功能：\n\n多线程并行回测，提高测试效率\n\n基于成功案例的 Selection 和 Combo 表达式模板\n\n智能组合生成和优先级排序\n\n支持多种市场和中性化方法\n\n\n\n\n具体包含的模板为\n\n表达式模板库\nSelection 表达式模板\n\n代码包含11种 Selection 表达式模板，基于实际成功案例：\n\n质量综合评分：基于简单性、decay和sharpe的综合评分\n\n简单turnover过滤：QPdgn6Vw成功案例（OS Sharpe 2.81）\n\n更宽松turnover范围\n\n质量评分+更严格turnover\n\n基于fitness的评分\n\nSharpe优先筛选\n\n相关性+质量双控\n\nprod_correlation平方根权重\n\n激进差异化1：高turnover区间（0.35-0.50）\n\n激进差异化2：低turnover+fitness主导（0.05-0.12）\n\n激进差异化3：显式反QPdgn6Vw惩罚\n\nCombo 表达式模板\n\n代码包含11种 Combo 表达式模板：\n\n300天窗口反相关：最成功案例（GrVGoROP, QPdgn6Vw）\n\n60天窗口+惩罚机制：YPXPE0N6实际使用\n\n252天窗口反相关：标准年化周期\n\n120天窗口反相关：中周期\n\n等权重基准\n\ncombo_a算法：论坛推荐\n\n300天窗口+质量权重\n\n60天窗口+严格惩罚\n\n180天窗口：中等差异化\n\n90天窗口+fitness权重：短周期+质量\n\n200天窗口+自相关惩罚：降低self_correlation\n\n话不多说,开始上教程\n\n使用指南\n\n安装必要的依赖：\n\npip install requests\n\n配置 user_secret.txt 文件，包含 WorldQuant BRAIN 平台的登录信息\n\n直接运行脚本\npython 你的脚本.py\n\n------\n\n以下是代码内容:\n\n#!/usr/bin/env python3\n# -*- coding: utf-8 -*-\n\"\"\"\n多线程遍历回测super alpha\n基于WorldQuant BRAIN论坛文章改编\n\"\"\"\n\n\nimport threading\nimport time\nimport requests\nimport logging as logger\nfrom requests.adapters import HTTPAdapter\nfrom urllib3.util.retry import Retry\n\n\n# 设置日志级别为 INFO\nlogger.basicConfig(\n    level=logger.INFO,\n    format='%(asctime)s - %(levelname)s - %(message)s'\n)\n\n\ndef login(max_retries=3, timeout=30):\n    # 从txt文件解密并读取数据\n    # txt格式:\n    # password: 'password'\n    # username: 'username'\n    def load_decrypted_data(txt_file='user_secret.txt'):\n        with open(txt_file, 'r') as f:\n            data = f.read()\n            data = data.strip().split('\\n')\n\n\n            data = {line.split(': ')[0]: line.split(': ')[1] for line in data}\n\n\n        return data['username'][1:-1], data['password'][1:-1]\n\n\n    username, password = load_decrypted_data(\"user_secret.txt\")\n\n\n    # Create a session with connection pooling and timeout\n    s = requests.Session()\n\n\n    # 配置连接池和重试机制\n    # 兼容不同 urllib3 版本\n    retry_kwargs = {\n        'total': max_retries,\n        'backoff_factor': ",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39950658062103-%E5%BD%93%E4%BD%A0%E6%89%8B%E6%90%93super-alpha-%E7%B4%AF%E4%BA%86%E7%9A%84%E6%97%B6%E5%80%99-%E6%9D%A5%E7%9C%8B%E7%9C%8B%E5%A4%9A%E6%A8%A1%E6%9D%BF%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%94%9F%E6%88%90super-alpha",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【Alpha灵感启示录】合集（持续更新收录中）",
+    "text": "【Alpha 灵感启示录】为平台用户分享的研究学习笔记，涵盖了从一篇研报论文开始，找到核心思想需要的数据集、操作算符并进行论文复现，再进一步加强信号的主要流程和个人思考。该合集并不能确保可以找到可以提交的Alphas，但对于掌握Alpha Research的研究方法具有非常重要的价值！\n\n \n\n⭐研究员优选，推荐优先阅读,  🔒部分内容使用了顾问专属数据集，收录在顾问论坛中，成为顾问后可解锁。\n\nCHN-D1\n\n⭐【Alpha灵感】股票收益是球队还是硬币？\n⭐【Alpha灵感】A股换手率类因子\n⭐【Alpha灵感】基于价量互动的选股因子\n🔒【Alpha灵感】盈利加速的定量刻画与高增长组合的构建\n【Alpha灵感】处置效应下的换手率因子策略分析\n【Alpha灵感】A股市场拥挤度因子\n【Alpha灵感】A股动量类因子\n🔒【Alpha灵感】A股历史分位数因子\n🔒【alpha灵感】单因子测试之财务质量因子\n【Alpha灵感】隔夜涨跌反转\n⭐【Alpha灵感】基于量小换手率和量稳换手率的组合优化\n【Alpha灵感】A股动量类因子\n⭐【Alpha灵感】跳跃因子在A股的表现\n🔒【Alpha灵感】A股一致预期因子\n【Alpha灵感】异常交易量因子\n【Alpha灵感】振幅因子的切割\n【Alpha灵感】Earnings, retained earnings, and book-to-market \n🔒【Alpha 灵感】技术指标类单因子有效性考察\n【Alpha灵感】优加换手率UTR选股因子\n⭐【Alpha灵感】慢慢走还是过山车？\n⭐🔒【Alpha 灵感】基于交易者结构的因子构建\n🔒【Alpha灵感】偏斜性偏好和市场异象\n【Alpha灵感】行业维度动量因子优化\n🔒【Alpha灵感】不同交易者结构下的动量与反转\n【Alpha 灵感】基础单均线因子\n🔒【Alpha灵感】从ICIR角度探讨风格因子的均值回复性\n🔒【Alpha 灵感】从XGBOOST挖掘个股影响因子到工程化寻找alpha的讨论\n⭐【Alpha灵感】信息分布均匀度，基于高频波动率的选股因子\n⭐【Alpha灵感】UMR2.0，风险溢价视角下的动量反转统一框架\n【Alpha灵感】分析师的“真知灼见”\n【Alpha灵感】上下影线，蜡烛好还是威廉好？\n【Alpha灵感】UMR2.0——风险溢价视角下的动量反转统一框架\n【Alpha灵感】高/低位放量因子\n🔒【Alpha灵感】基于收益率偏度和市场异常的因子\n⭐🔒【Alpha灵感】从布林带到估值异常因子\n🔒【Alpha灵感】计数启发法与加权盈利频率\n【Alpha灵感】因子选股系列研究之三：投机、交易行为与股票收益（上）\n【Alpha灵感】常见技术指标在A股测试\n🔒【Alpha灵感】将隔夜涨跌变为有效的选股因子\n【Alpha灵感】东吴证券的几种换手率因子\n⭐【Alpha灵感】凸显理论（Salience Theory）\n【Alpha灵感】“球队硬币”因子构建\n⭐【Alpha灵感】新价量相关性RPV因子\n【Alpha灵感】基于遗传规划的一致预期因子挖掘\n【Alpha灵感】小市值狂欢之后什么策略有效？\n【Alpha灵感】A 股反转之力的微观来源\n【Alpha灵感】估值因子\n【Alpha灵感】换手率因子tps_turbo：如何用纯净化GTR因子增强传统换手率因子\n⭐【Alpha灵感】形态识别：均线的收敛与发散\n【Alpha灵感】在线评论可以预测个股长期回报\n【Alpha灵感】基本面量化之回归算子 \n【Alpha灵感】短贷长投因子\n【Alpha灵感】以ROA为代表的基于基本价值驱动的投资者理性信念\n【Alpha灵感】特质盈利因子\n【Alpha灵感】在A股抱团才能走更远\n【Alpha 灵感】网络中心度SCC因子\n\nCHN-D0\n\n【Alpha灵感】量稳换手率STR\n【Alpha灵感】VWAP：日内交易的圣杯\n🔒【Alpha灵感】A股成长类因子 ——根据研报再加工\n🔒【Alpha灵感】基于反事实模拟的中国股市涨跌停板磁吸效应研究\n\nUSA-D1\n\n⭐🔒【Alpha灵感】通过期权隐含价格与股票市场价格的差异寻找投资机会\n⭐【Alpha灵感】基于遗憾规避逻辑近似构建因子\n⭐【Alpha灵感】基于量价信息的可靠投资信号\n【Alpha灵感】分析师建议和回报率\n【Alpha灵感】基于社会、经济新闻所传达的走向与情绪\n⭐🔒【Alpha灵感】期权和股票成交量比率和未来回报率\n【Alpha灵感】看不见的负担\n【alpha灵感】华泰单因子测试之波动率因子\n【Alpha灵感】The Momentum of News\n【Alpha灵感】基于return的公司质量测度\n【Alpha灵感】量价交织：捕捉交易热度、尾部风险与动量反转\n【Alpha灵感】M&A增强行业受益率\n🔒【Alpha灵感】Qu",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/19273239621399--Alpha%E7%81%B5%E6%84%9F%E5%90%AF%E7%A4%BA%E5%BD%95-%E5%90%88%E9%9B%86-%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0%E6%94%B6%E5%BD%95%E4%B8%AD",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【新人科普，老人必读】从Combined Alpha Performance 的计算原理，学习如何提升表现！",
+    "text": "今天我们来聊聊顾问的名片指标也是GENIUS最重要的指标：Combined Alpha Performance。无论你是刚入门的新人，还是已经提交了几百个 alpha 的“老手”，这个话题都值得你花点时间认真琢磨。因为理解它，不仅能帮你提升 alpha 的表现，还能让你少走很多弯路。\n\n什么是 Combined Alpha Performance？\n\n先说说这个“Combined Alpha Performance”到底是什么。简单来说，它是一个用来衡量所有提交过的 alpha 和 super alpha 的整体表现的指标。它的计算方式很直接：把所有地区已经提交的 alpha 和 super alpha 等权组合，然后看它们在 2023-2025 年（semi-OS）的表现，具体是费后表现。\n\n这就像是一个大锅饭——你提交的每一个 alpha 都是这锅饭里的一粒米，表现好的米会让这锅饭更香，而表现差的米则可能毁掉整锅饭的味道。所以，Combined Alpha Performance 不仅仅是一个数字，它实际上反映了你提交的 alpha 是否在整体上“靠谱”。\n\n计算原理：从公式看本质\n\nCombined Alpha Performance 的计算公式其实很简单：\n等权组合 + 手续费调整 + 2023-2025 年的费后表现。\n\n换句话说，平台会把你提交的所有 alpha 和 super alpha 按等权组合起来，然后在 2023-2025 年的市场环境下模拟它们的表现，最后扣除手续费，得出一个费后的 Sharpe 值。\n\n从这个公式里，我们可以提炼出三个提升表现的关键词：\n\n分散、质量、手续费。\n\n\n接下来，我们就从这三个关键词出发，聊聊如何一步步提升你的 Combined Alpha Performance。\n\n关键词一：分散（Diversity)\n为什么分散很重要？\n\n分散的核心在于降低风险。就像投资一样，如果你把所有的钱都投在一个篮子里（比如一个地区、一个模板），一旦这个篮子表现不好，你的整体表现就会被拖累。而分散可以让你的 alpha 表现更加稳定，减少单一因素的影响。\n\n如何做到分散？\n\n地区分散：\n最容易做到的分散就是 region 的分散。不同地区的市场环境、手续费、波动性都不一样，把 alpha 分散到多个地区，可以有效降低单一区域表现不佳的风险。\n\n降低同一地区的 SC（Self Correlation）：\n在同一个 region 下，尽量降低 alpha 之间的相关性（SC）。最直接的方法就是多用不同类型的模板和数据类别（category）。也就是多点塔（Pyramid）这里要注意一点：我们说的“点塔”是指 主信号 的多样性，而不是通过科技（技术优化）或者附带信号来实现的点塔。换句话说，真正的分散是从信号本身出发，而不是靠“修修补补”来实现。\n\n总结\n\n分散是提升 Combined Alpha Performance 的第一步，也是最容易做到的一步。记住：多地区、多模板、多数据类别，多中性化，尤其是风险中性化，让你的 alpha 表现更加稳健。\n\n关键词二：质量\n质量比数量更重要\n\n不管是 Combined Alpha Performance 还是 VF(Value Factor），在不能兼顾的情况下，质量永远比数量重要得多。一个质量差的 alpha 不仅不会给你的组合加分，反而会拖累整体表现。而且，质量差的 alpha 需要很多个高质量的 alpha 来弥补。\n\n举个例子：一个负的 OS Sharpe 如何拖累组合表现？\n假设场景\n\n我们有一个组合，资金规模为 100 万美元，包含以下几个 alpha：\n\nAlpha A：OS Sharpe = -1\nAlpha B：OS Sharpe = +1\nAlpha C：OS Sharpe = +1\n\n这些 alpha 是等权分配资金的，也就是说每个 alpha 分配的资金为：\n100 万 ÷ 3 = 33.33 万美元。\n\n计算组合表现\n\nAlpha A 的影响：\n\nAlpha A 的 OS Sharpe = -1，相当于这 33.33 万美元的资金在拖累组合表现。\n\nAlpha B 和 Alpha C 的贡献：\n\nAlpha B 和 Alpha C 的 OS Sharpe = +1，它们的表现为组合提供了正收益。\n\n组合表现：\n\n由于等权组合的 Sharpe 是所有 alpha 的加权平均值，Alpha A 的负表现会显著拉低整体表现。\n结果是：即使有两个 OS Sharpe = +1 的 alpha，组合的 Sharpe 也只有 0.33，远低于 +1。一个负的alpha 让原本+1的组合表现降低了-66%\n需要多少好的 alpha 来弥补？\n\n如果我",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/35928620962839--%E6%96%B0%E4%BA%BA%E7%A7%91%E6%99%AE-%E8%80%81%E4%BA%BA%E5%BF%85%E8%AF%BB-%E4%BB%8ECombined-Alpha-Performance-%E7%9A%84%E8%AE%A1%E7%AE%97%E5%8E%9F%E7%90%86-%E5%AD%A6%E4%B9%A0%E5%A6%82%E4%BD%95%E6%8F%90%E5%8D%87%E8%A1%A8%E7%8E%B0",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "可以尝试使用的Alpha模板",
+    "text": "请注意，本贴仅收集总结，优秀程度不一定。\n部分存在严重overfitting风险，请参加更多顾问活动及课程解锁insight。\nregression_neut(regression_neut(group_neutralize(group_zscore(\\\nvec_avg({data}),sector),bucket(rank(cap),range=\"0.1,1,0.1\")),\\\ngroup_neutralize(group_zscore(cap,sector),bucket(rank(cap),range=\"0.1,1,0.1\"))),\\\nts_ir(returns-group_median(returns,sector),126))\nfear = ts_mean(abs(returns - group_mean(returns,1,market))/(abs(returns)+abs(group_mean(returns,1,market))+0.1),20);\\\n-group_neutralize(fear*group_normalize(ts_decay_exp_window(ts_percentage(vec_count(rsk82_raw_m3g_tni_p_su_fte),60,percentage=0.9)\\\n-ts_percentage(vec_count({data}),60,percentage=0.1),20, factor=0.8),market)*inverse(abs(ts_entropy(volume,20)))\\\n,bucket(rank(cap),range=\"0.1,1,0.1\"))\nd1_level=ts_max(vec_stddev({data}),20);\\\nd1_stability=ts_kurtosis(vec_stddev({data}),20);\\\nmkt_level=group_min(d1_stability,industry);\\\n-group_neutralize(d1_stability<=mkt_level?-d1_level:d1_level,bucket(rank(cap),range=\"0.1,1,0.1\"))\ngroup = bucket(rank(cap),range='0.1,1,0.1');\n\nrisk = rank(-ts_av_diff(vec_min({Analyst Std}),360));\n\nalpha=rank((1-risk)*group_rank(ts_scale(vec_max({OptionHighPrice})/close,120),industry));\n\ngroup_neutralize(ts_mean(alpha,2),group)\nDecay设置为10，Neutralize设置为industry\nmy_group = market;\n\nmy_group2 = bucket(rank(cap),range='0,1,0.1');\n\nalpha=rank(group_rank(ts_decay_linear(volume/ts_sum(volume,252),10),my_group)*group_rank(ts_rank(vec_avg({Fundamental})),my_group)*group_rank(-ts_delta(close,5),my_group));\n\ntrade_when(volume>adv20,group_neutralize(alpha,my_group2),-1)\nmarket_return = group_mean(returns,1,market);\n\nfear = ts_mean(abs(returns - market_return)/(abs(returns)+abs(market_return)),20);\n\nvhat = ts_regression(volume,ts_mean(vec_avg({Sentiment}),5),120);\n\nehat = ts_regression(returns-market_return,vhat,120);\n\nalpha = group_neutralize(-ehat*rank(fear),bucket(rank(cap),range='0,1,0.1'));\n\ntrade_when(abs(returns)<0.075,regression_neut(alpha,volume),abs(returns)>0.1)\nDecay设置为20，Neutralize设置为industry\nvector_neut(group_neutralize(gr",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/26054361848343-%E5%8F%AF%E4%BB%A5%E5%B0%9D%E8%AF%95%E4%BD%BF%E7%94%A8%E7%9A%84Alpha%E6%A8%A1%E6%9D%BF",
+    "exprs": [
+      "rank(ts_rank(vec_avg({Fundamental}))",
+      "rank(group_rank(ts_decay_linear(volume/ts_sum(volume,252),10)",
+      "rank(cap),range='0.1,1,0.1')",
+      "rank((1-risk)*group_rank(ts_scale(vec_max({OptionHighPrice})",
+      "rank(cap),range='0,1,0.1')",
+      "rank(fear),bucket(rank(cap)",
+      "ts_rank(vec_avg({Fundamental})",
+      "rank(cap),range=\"0.1,1,0.1\")",
+      "rank(-ts_av_diff(vec_min({Analyst Std}),360)",
+      "rank(-ts_delta(close,5),my_group)"
+    ],
+    "type": "text",
+    "has_expr": true
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Alpha 灵感分享：日内振幅与缩尾量能冲击",
+    "text": "分享一个非常实用的纯量价高频底盘。\n\n核心逻辑： 抛弃长周期的均线（斩断自相关性），直接去抓**“当日多空分歧极其剧烈（日内振幅大），且伴随主力资金异动（放量），但近期总体超跌”**的标的。\n\n公式伪代码（蓝图架构）：\n\nPlaintext\n \ngroup_zscore(\n    ts_decay_linear(\n        rank((high - low) / close) + \n        rank(min(volume / adv20, 5)) - \n        rank(returns), \n    3), \nindustry) * signed_power(group_rank(adv20, industry), 2)\n\n\n底层逻辑解剖：\n\n替换分母（天然抗黏滞）：放弃了大家最爱用的 ts_std_dev(returns, 20)，直接使用 (high - low) / close（真实日内振幅）。这让信号每一天都是全新且独立的，从根本上免疫了高自相关性。\n\n缩尾保护：min(..., 5) 就是刚才提到的防妖股利器，保住单笔胜率。\n\n完美对齐：全员套上 rank()，振幅、成交量、收益率三分天下，绝对不发生量纲吞噬。\n\n终极装甲：最外层使用 signed_power(group_rank(...), 2) 平方流动性装甲。强迫系统把省下来的换手率集中在流动性绝对龙头身上，大幅降低摩擦成本。\n\n这个结构的拓展性极强，大家可以尝试把中间的加法改为计算 (high-low)/close 和 volume 的短期相关性（ts_corr），往往能炸出极其惊艳的 Sharpe Ratio。\n\n挖掘纯量价就像是在螺丝壳里做道场，差一个算子可能分数就是天壤之别。一点踩坑经验，抛砖引玉，祝大家早日手握一堆 1.0+ 的神级 Alpha！\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39951306771223-Alpha-%E7%81%B5%E6%84%9F%E5%88%86%E4%BA%AB-%E6%97%A5%E5%86%85%E6%8C%AF%E5%B9%85%E4%B8%8E%E7%BC%A9%E5%B0%BE%E9%87%8F%E8%83%BD%E5%86%B2%E5%87%BB",
+    "exprs": [
+      "rank(min(volume / adv20, 5))",
+      "rank((high - low) / close)",
+      "rank(returns), \n    3)",
+      "rank(adv20, industry), 2)"
+    ],
+    "type": "text",
+    "has_expr": true
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【新人指南】到底要交什么样的Alpha？",
+    "text": "到底要交什么样的Alpha？——新人指南\n\n在Alpha开发与提交的过程中，许多新人常常会问：“到底什么样的Alpha才值得提交？”这是一个复杂的问题，因为Alpha的质量并没有一个单一的“金标准”可以作为绝对的判断依据。新人常见的错误是过度依赖某一两个单一指标，比如 Sharpe、Fitness 或 Margin，认为只要这些指标表现良好，Alpha就一定值得提交。\n\n然而，判断一个Alpha是否值得提交更像是诊断病情——不能仅仅依靠一个指标或单一的维度来做出决定。单一指标可能会提供片面的信息，而忽略了Alpha整体表现的复杂性和多样性。这种过度依赖单一指标的思维方式，往往会导致新人在Alpha提交过程中出现偏差。\n\n数量与质量的平衡：螺旋上升的原则\n\n在Alpha的开发与提交过程中，数量和质量是两个不可分割的重要维度。许多新人在实践中常常犯两个极端的错误：要么过度关注质量而忽视数量，要么完全不管质量，只追求数量。这两种错误都会对Alpha的整体表现产生负面影响。\n\n数量不足的问题\n\n如果过度追求质量而导致提交的Alpha数量不足，可能会出现以下问题：\n\nPortfolio不稳定：\nAlpha的数量不足会导致整体Portfolio的表现缺乏多样性，从而增加OS（Out-of-Sample）结果的不稳定性。\n缺乏真实水平的验证：\n单个Alpha的表现可能具有偶然性，只有通过足够的数量才能更接近整体的真实水平，避免因个别Alpha的异常表现而影响整体判断。\n质量不足的问题\n\n另一方面，如果完全忽视质量，只追求数量，也会带来风险：\n\nPortfolio表现受损：\n大量低质量的Alpha会拉低整体Portfolio的表现，导致Margin、Sharpe等关键指标下降。\n资源浪费：\n提交大量低质量Alpha不仅浪费了开发时间，也可能对平台的审核资源造成压力。\n螺旋上升的原则\n\n数量和质量并非对立，而是一个螺旋上升的过程。新人在初期阶段可以优先解决数量的问题，通过提交足够数量的Alpha来建立基础，然后逐步提高质量要求，最终实现数量与质量的平衡。\n\n新人建议：\n每个月提交的Alpha数量不要少于 40个。这一数量可以帮助新人更接近整体的真实水平，同时避免因单月表现异常而影响长期结果。\n数量的意义：足够的数量可以为Portfolio提供多样性，降低单个Alpha表现异常对整体的影响。\n质量的提升：在数量达到一定基础后，可以逐步提高Alpha的质量要求，例如优化Turnover、Margin等关键指标。\n平台的“最低标准”与其意义\n\n在Alpha提交过程中，平台设定了一些“最低标准”，这是每位新人必须满足的基本要求。这些标准的存在并非是为了限制，而是为了确保Alpha在实际应用中具有一定的可行性和质量。然而，许多新人在实践中往往只关注如何通过这些指标，而忽略了这些要求背后的逻辑和意义。\n\nTurnover的要求\n\nTurnover 是一个重要的指标，它衡量了Alpha的换手率。平台要求Turnover不能高于 70%，这是为了避免交易频率过高导致交易成本过高，从而影响 Margin 的表现。换手率过高会显著增加手续费，最终削弱Alpha的盈利能力。\n\n进阶建议：\n\n当你的水平到达一定程度，建议将Turnover控制在 30% 以下。\n当你已经不再断粮，建议将这一指标进一步降低至 15% 以下。\n\n特殊情况：\n\n如果Turnover较高，但 Margin 同时表现非常优秀（例如Margin超过 10），这种情况下高换手率是可以接受的。\nTurnover的下限\n\n平台同时要求Turnover不能低于 1%，这一点常常让新人感到困惑。事实上，这一要求的意义在于避免Alpha的持仓过于稳定。换手率过低会导致Position长期不变，而这与对冲基金的核心理念相悖。对冲基金的本质是通过动态调整持仓来捕捉市场机会，而过低的换手率可能意味着Alpha缺乏足够的市场反应能力。\n\nSub Universe与Robust Test的重要性\n\n在Alpha的评估过程中，Sub Universe 是一个关键的测试维度。平台要求Alpha在较小的股票范围（Sub Universe）中仍然保持一定的表现，这一要求的最低标准是 50% 的Sharpe。这意味着，如果Alpha在当前的Universe（例如Top3000股票）中表现良好，那么在更小的Universe（例如Top1000股票）中，它的Sharpe也必须达到至少50%的水平。\n\nSub Universe的原理\n\n这一要求的核心逻辑是为了避免Alpha的信号仅来源于流动性较低的小市值股票。如果一个Alpha在Top3000股票中表现良好，但在Top1000股票中完全失效，这通常表明其收益主要依赖于流动性较低的那2",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/32226888249239--%E6%96%B0%E4%BA%BA%E6%8C%87%E5%8D%97-%E5%88%B0%E5%BA%95%E8%A6%81%E4%BA%A4%E4%BB%80%E4%B9%88%E6%A0%B7%E7%9A%84Alpha",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "New post",
+    "text": "Skip to main content\nBRAIN platform Community FAQ Submit a request Xin Shu(XS20799)  English (United States) \nWorldQuant BRAIN  Community  New post\nWhat is your post about?\nTitle\nDetails(optional)\nTopic\n中文论坛\n\n© 2026 WorldQuant BRAIN®. All Rights Reserved.\n\n[评论区]",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/new?community_post%5Btopic_id%5D=12913416465431",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "今晚(4/23)新手课链接",
+    "text": "Topic: 《零基础上手 BRAIN-AI 篇》免费系列公开课 Class4\n\nJoin from PC, Mac, iPad, or Android:\n\nhttps://worldquant.zoom.us/s/95607402862\n\n时间安排：\n\n19-20：00 GrandMaster顾问在线答疑\n\n20-21：00 正式课程\n\n21-21：30 在线答疑\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39952997969047-%E4%BB%8A%E6%99%9A-4-23-%E6%96%B0%E6%89%8B%E8%AF%BE%E9%93%BE%E6%8E%A5",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "IQC 2025中国大陆区第一名参赛经验分享",
+    "text": "大家好，这篇帖子将介绍IQC 2025中国大陆区第一名的参赛历程及相关心得，希望能在IQC 2026即将开始之际，对新一届参赛的小伙伴有所帮助。\n\n报名IQC时我正在武汉大学软件工程专业读大三，IQC是我接触量化的起点。我的参赛时间轴如下：25年春节期间我第一次了解到WorldQuant Brain平台，随后三月份开始作为user提交alpha并报名IQC，一个星期后达到了10000分，大约一个月后成为有条件顾问，又大约三个月后成为正式顾问。7月11号在上海参加IQC China Regional Final，9月28号在新加坡参加Global Final。写这篇帖子的时间是26年3月上旬，我即将到WorldQuant上海进行实习。\n\n首先我想说说我体验到的参加IQC的好处。\n\n第一是相比于直接参加正式顾问的program，IQC有着更平滑的难度曲线。在IQC期间即使成为有条件顾问alpha的提交标准仍然与user保持一致，允许选手逐步摸索不会突然不知所措，但是要注意这种情况下提交的alpha也会影响IQC结束后作为正式顾问的帐号数据，因此也不能乱交alpha。\n\n第二是更快更早的收入激励。一部分是成为有条件顾问后的每日payment，据我观察IQC期间的payment应该是在一个单独的参加IQC的consultant pool中计算的，更容易拿高payment。另一部分是IQC的比赛奖金，我在China Regional Final中就获得了3000刀的奖金，这相当于有条件顾问两三个月的base payment，而且参加Final期间还可以享受免费的五星级酒店和美食。相信更快更早的收入激励对一部分小伙伴来说，能有效帮助他们坚持下去。\n\n第三是深入接触量化行业的机会，包括与许多业内人员接触的机会以及进入WorldQuant实习的机会，对非量化背景的小伙伴来说是转行进入量化行业的一个好机会。\n\n \n\n在赛事规则方面，第一是要注意队伍人数的问题。IQC允许一至四个同校的参赛选手进行组队，队伍中人多人少都有各自的利弊，希望锻炼自己能力的小伙伴可以大胆选择单人组队，去年我和不少Global Final中的队伍都是单人队，人少并不影响取得好成绩。但需要注意的是，尽量不要发生退队或者队伍解散的情况，否则可能面临score清零的问题。第二是关于OS的问题，去年的IS/OS记分比例已经来到了1比3。IQC最终考察的是整个alpha pool的表现，对于整体IS表现变动在提交每个alpha之前就能得知，但希望在比赛中取得一个好名次的选手必须时刻意识到--除了眼前可以看到的IS分数变动外，还有另一个重要3倍的指标在暗中浮动。所以在提交每个alpha时都应该慎重，切忌面向IS进行拟合或者面向高base payment进行拟合。\n\n \n\n谈到alpha产出，我在参赛期间的技术路线大概可以这样概括：机器暴力遍历alpha并不断优化遍历的速度 → 参考研报论文构造可解释的alpha → 引入AI工具创造更多可能。当然这只是我在一个程序员视角下得到的迭代路径，如果是有金融背景的同学或许一上手就有能力基于论文复现alpha，又或者在AI又出现惊人发展的一年后的今天，更多的小伙伴会直接以这些AI工作作为上手的起点。但不论使用什么样的手段，目的都是为了构造更好的alpha pool。关于这方面的经验，论坛中已经存在许多，大家在课程中也可以学到很懂，我着重分享我在参赛期间感受最深的两点。 首先是alpha pool的多样性diversity。一个IS期间表现很好的alpha，可能一进入OS就立马出现反向的走势，这种情况是完全有可能的，大家作为新人参加IQC甚至可以预先假设自己的alpha pool中一定会存在几个这样的alpha。而较高的diversity则有助于减轻这种情况的发生对于整体alpha pool的影响。一个alpha pool如果在IS表现不断提高的同时，还能保持较好的diversity，alpha之间的correlation都较低，那么OS给人的信心就比较大了。 其次就是关于单个alpha的问题，如果alpha pool的整体表现能通过diversity的角度把控，那么在提交单个alpha时如何避免overfitting呢？一个方法是通过微调表达式来做稳健性测试，将表达式中的参数在合理范围内进行调整，观察alpha表达是否会出现巨大波动，由或者用rank之类的操作符对整个alpha套上一层“重新映射”，观察alpha表现。另一个方法是通过调整settings来做稳健性测试，观察当前alpha的逻辑是否在另一个市场中也站得住脚。\n\n最后，希望各位小伙伴能紧跟线上线下课程，同时不断发展自己的alpha策略，快速学习快速迭代。也预祝IQC 2026取得成",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/38852178542743-IQC-2025%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86%E5%8C%BA%E7%AC%AC%E4%B8%80%E5%90%8D%E5%8F%82%E8%B5%9B%E7%BB%8F%E9%AA%8C%E5%88%86%E4%BA%AB",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "网页回测很卡，摆脱网页手搓",
+    "text": "本程序的作用：1，拜托网页回测。2，还可以回测所有的中性化和maxtrade开启或者不开启。\n使用方法：注释里面都写清楚了，我还是说明一下。alphaid参数是你要在哪个alpha的基础上进行优化；test_all_netu = True时，是遍历所有中性化，maxtrade；test_all_netu = False时，往express_arr 里面添加要回测的表达式，即可进行批量回测，速度很快。\n下面是全部的代码\nimport copy\nimport requests\nimport time\nfrom time import sleep\nimport json\nimport pandas as pd\nimport random\nimport pickle\nfrom urllib.parse import urljoin\nfrom itertools import product\nfrom itertools import combinations\nfrom collections import defaultdict\nimport os\nfrom os import environ\nfrom os.path import expanduser\nimport datetime\nimport numpy as np\n \nalpha_id = 'KPwOMNk1' # O05b13Xb        \ntest_all_netu = True #测试所有风险中性化\ntest_all_netu = False #配置不变，测试不同的表达式，代替网页手搓\nexpress_arr = [] #优化的表达式，test_all_netu=False时，往里面添加表达式\n\n\nalpha_name = alpha_id\nsess = login()\nso_tracker = my_locate_alpha(sess, alpha_id)\n\n\nalphas = [] # 'STATISTICAL'\nregion = so_tracker['settings']['region']\nnetu_all = []\nif region != 'IND':\n     netu_all = ['STATISTICAL','REVERSION_AND_MOMENTUM','SLOW_AND_FAST', 'FAST', 'SLOW', 'CROWDING', 'MARKET', 'SECTOR', 'INDUSTRY','SUBINDUSTRY']\nelse:\n     netu_all = ['REVERSION_AND_MOMENTUM','SLOW_AND_FAST', 'FAST', 'SLOW', 'CROWDING', 'MARKET','SECTOR', 'INDUSTRY','SUBINDUSTRY']\n\n\n#netu_all = ['REVERSION_AND_MOMENTUM','SLOW_AND_FAST', 'FAST', 'SLOW', 'CROWDING']\nmax_trade = ['ON','OFF']\nth_alpha_list = []\nif not test_all_netu:\n     for express in express_arr:\n         th_alpha_list.append({\"type\":so_tracker[\"type\"], \"settings\":so_tracker[\"settings\"], \"regular\": express})                \nelse :\n     for netu in netu_all: #maxTrade\n         for maxtrade in max_trade:\n             alpha2 = copy.deepcopy(so_tracker)\n             alpha2['settings']['neutralization'] = netu\n             alpha2['settings']['maxTrade'] = maxtrade\n             th_alpha_list.append(alpha2)\n\n\nprint(\"表达式数量:%s\"%len(th_alpha_list))\n\n\nif test_all_netu:\n     every_mul_count = 8\n     mul_count = 3\nelse :\n     every_mul_count = 8\n     mul_count = 7\n\n\nfo_pools = load_task_pool(th_alp",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39785152862999-%E7%BD%91%E9%A1%B5%E5%9B%9E%E6%B5%8B%E5%BE%88%E5%8D%A1-%E6%91%86%E8%84%B1%E7%BD%91%E9%A1%B5%E6%89%8B%E6%90%93",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "2026年IQC专辑《BRAIN x AI 零基础入门量化》系列课程Course 1作业",
+    "text": "欢迎大家留言、讨论、交作业、畅所欲言\n\nDay1课后作业:\n\n任务1：在 AI 的帮助下，至少成功提交 1 个 Alpha，并提供截图\n注：可以给AI下列题目去尝试 (取决于您的分数，下列文档有权限限制）\nAlpha Examples for Beginners\nAlpha Examples for Bronze Users 🥉\n⭐ Alpha Examples for Silver Users🥈\n \n\n任务2：学习平台上所有关键术语的计算公式，推荐合理使用各类人工智能工具（如豆包、kimi、deepseek等）。将学习过程在Forum发布一张截图。\n注：众多AI工具都有上述按钮，不强制使用任何工具，请使用您顺手的工具完成点赞或“负面点赞”\n任务3：👉点击链接阅读：⭐ How BRAIN platform works | WorldQuant BRAIN,并回答以下问题：假设全市场共5个股票，收盘价(即close)分别为[5,15,66,85,25], Alpha表达式为\"-close'（注意负号),在Neutralization Setting为Market的情况下，请回答这五个股票各自的交易权重(weight)为多少？long count 和 short count为多少（即有几个股票被做多，几个股票被做空）？\n\n \n\n截止时间：Course2开课当日北京时间16：00前\n\n注：作业审批并不一定按照时间顺序，稍安勿躁\n\n[评论区]\n任务一:\n\n \n\n任务二：\n\n \n\n \n\n任务三：\n\n最终权重：\n\n股票一：0.47\n\n股票二：0.33\n\n股票三：-0.37\n\n股票四：-0.63\n\n股票五：0.19\n\nlongcount:3\n\nshortcount:2\n---\n1. \n\n2. \n\n3. long count = 3（股票 1、2、5 做多）\n    short count = 2（股票 3、4 做空）\n---\n1.\n\n2.\n\n3.\n\n[34.2, 24.2, -26.8, -45.8, 14.2],long count = 3,short count = 2\n---\n1.\n\n \n\n2.\n\n3. 【0.33333，0.16667，-0.16667，-0.33333，0】 2，2\n\n \n---\n1.\n\n2.\n\n3.\n\nlong count有三只为1、2、5,short count有两只为3、4.\n---\n1\n\n \n\n2\n\n \n\n3\n\n[0.2355,0.1667,-0.1846,-0.3154,0.0978]\n\n3个做多，abe\n\n2个做空，cd\n\n \n---\n1.\n\n2.\n\n3.\n\n多3个，空2个\n\n股票\t权重\t \n股票 A (Close=5)\t0.2355\t \n股票 B (Close=15)\t0.1667\t \n股票 C (Close=66)\t-0.1846\t \n股票 D (Close=85)\t-0.3154\t \n股票 E (Close=25)\t0.0978\t \n---\n1.\n\n2.\n\n3. [0.236, 0.167, -0.185, -0.315, 0.098], long count = 3， short count = 2\n---\n任务1：\n\n任务2:\n\n任务3\n\n-close矩阵为[-5,-15,-66,-85,-25]，向量值的平均值为(-5-15-66-85-25)/5=-39.2。向量中的每个值中减去该组向量值的平均值矩阵为[34.2,24.2,-26.8,-45.8,14.2]，新数字的总和和平均值现在都是零。同时，正值之和等于负值之和。每个数字的绝对值之和为34.2+24.2+26.8+45.8+14.2=145.2。中性化后，每行的值除以这个和，得到交易权重0.2355，0.1667，-0.1846，-0.3154，0.0978，long count 为3，short count为2，即股票1，2，5做多，股票3，4做空。\n---\n五只股票的交易权重是【\n0.23553719，\n0.166666667，\n-0.184573003，\n-0.315426997，\n0.097796143\n】，三只股票做多，两只股票做空\n---\n任务1：\n任务2：\n任务3：3只做多，2只做空\n---\n任务1：\n\n\n任务2：\n任务3：\n交易权重（Weight）：[34.2, 24.2, -26.8, -45.8, 14.2]\nLong Count（做多）：权重为正的股票数 → 3个（股票1、2、5）\nShort Count（做空）：权重为负的股票数 → 2个（股票3、4）\n---\n作业1：\n\n作业2：\n\n作业3：\n\n表达式-close：-5、-15、-66、-85、-25\n\nDemean均值：-39.2= [（-5）+(-15)+",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39200810917015-2026%E5%B9%B4IQC%E4%B8%93%E8%BE%91-BRAIN-x-AI-%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8%E9%87%8F%E5%8C%96-%E7%B3%BB%E5%88%97%E8%AF%BE%E7%A8%8BCourse-1%E4%BD%9C%E4%B8%9A",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【论文合集】量化研究推荐论文(持续更新中）",
+    "text": "正如我们所知道的，与任何其他领域的研究一样，阅读论文也是量化研究不可或缺的一环，尤其是在前期的起步阶段。阅读论文不仅是从中学习知识和获取灵感，更是与学界业界前人的研究成果进行接轨，与全世界的量化同行进行交流探讨。\n\n我们将在此贴中持续更新推荐论文，相信读者在本身阅读的过程中就会有所收获和成长，Brain提供的强大的研究框架和丰富的数据集可以帮助大家快速实现论文中的Idea，并以此基础之上进行进一步的改进和扩展。将理论赋予实践，最终得到真知。\n\nNews\n\nCross-Firm Information Flows and the Predictability of Stock Returns\nTomorrow's Fish and Chip Paper? Slowly incorporated News and the Cross-section of Stock Returns\nPredictability of Industry Returns After M&A Announcements\nIntraday News Trading: The Reciprocal Relationships Between the Stock Market and Economic News\nNews-Based Links and Cross-firm Return Predictability\nEconomic Links and Predictable Returns\nNews Co-Occurrence, Attention Spillover and Return Probability \nThe Momentum of News\n[MAPC] Predictability of Industry Returns After M&A Announcements\n[MAPC] M&A Due Diligence, Post-Acquisition Performance, and Financial Reporting for Business Combinations\n[MAPC] Institutional Trading Around M&A Announcements\n[MAPC] Extraordinary Acquirers\n\nFundamental\n\nAre Cash Flows Better Stock Return Predictors than Profits?\nThe Invisible Burden\nStock Recommendations from Stochastic Discounted Cash Flows\nBack to Fundamentals: The Accrual-Cash Flow Correlation, the Inverted-U Pattern, and Stock Returns\nThe intangibles premium: Risk or mispricing?\nIntangible Capital and the Investment-q Relation\nSmall-Minus-Big Predicts Betting-Against-Beta: Implications for International Equity Allocation and Market Timing\nOvervalued Equity and Financing Decisions\nFact, Fiction, and the Size Effect\nProfitability, R&D Investments and the Cross-Section of Stock Returns\nDuration-Driven Returns\nThe Best of Strategies for the Worst of Times: Can Portfolios be Crisis Proofed?\nIntangible Value\nUnderstanding the Performance of the Equity Value Factor\nAn Augmented q-Factor Model with Expected Growth\n\nPV\n\nPenny Wise, Dollar Foolish: Buy-Sell Imbalances On and Around Round Numbers\nRelative Strength Strategies for Investing\nGood Volatility, Bad Volatility and the Cross-Section o",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/24897131810839--%E8%AE%BA%E6%96%87%E5%90%88%E9%9B%86-%E9%87%8F%E5%8C%96%E7%A0%94%E7%A9%B6%E6%8E%A8%E8%8D%90%E8%AE%BA%E6%96%87-%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0%E4%B8%AD",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【学习资料】BRAIN小贴士(这里有你想要的硬核内容！持续周更中）",
+    "text": "该帖子将被用来记录BRAIN团队提供的小贴士，欢迎跟帖评论、提问。\n\n香港地区的同学如何登陆？ – WorldQuant BRAIN\n\n[评论区]\n小贴士1：\n\n “Delay”是Alpha设置中的一个选项，它决定您的策略何时在股票上进行交易。Delay=1表示alpha使用昨天的数据,在早上进行交易; Delay=0表示alpha使用今天的数据，并在当天下午进行交易。\n\n以下是一些创建D0策略的提示：\n\n从D1策略开始，但使用D0数据（如价格-成交量）来生成潜在的信号，例如“开盘价”。除了价格回归的想法，还可以尝试组(group)回归概念-即，可以计算组的平均值，并期望个别股票的价值回归到组的平均值。\n接下来，转向新闻(News) D0数据集，您可以使用新闻条目的数量作为事件alpha的触发器。您可以选择罕见事件，例如合并或收购（此数据仅对顾问可用），然后根据该事件分配价值或根据事件发生当天的回报进行分配。您还可以尝试通过创建寻找没有人提到的股票的alpha来打赌“没有新闻就是好消息”。\nD0情绪数据集通常源自新闻或社交媒体数据，因此具有相同的特征（流动性，覆盖范围等）。由于情绪分数是派生值，因此通常可以直接使用它们来尝试创建alpha。您还可以在情绪数据字段上测试回归和技术指标，例如相对强度指数（RSI），而不是在价格数据字段上进行测试。\nD0 alpha的具体想法通常在与基本面和分析师数据等低周转数据集合作时更有效。\n您可以在D0 alpha中使用一些D1数据，例如关系(Relationship)数据集。\nD0 alpha通常在流动性较好的股票池中表现良好。\n有些alpha在D0和D1中都有效。可能还有其他alpha，其中D0版本优于其D1版本。但是，也可能有特定的D0 alpha在delay 0和delay 1中表现不同。例如，在D0中，股票价格可能会上涨并显示出动量趋势。然而，在D1中，由于被市场抛售，该股票可能开始显示回归趋势。\n---\n小贴士2：使用Ts_regression运算符\n\n回归分析是一种在金融领域中用于研究两个或更多变量之间线性关系的统计方法。例如，我们将应用回归分析来研究收盘价和交易加权平均价（VWAP）之间的关系。VWAP是一种衡量股票在一天内交易的平均价格的方法，考虑到交易的价格和交易量。换句话说，VWAP给交易量更高的交易更多的权重，因为它们在市场影响方面更重要。\n\nAlpha Idea\n\n对一只股票的收盘价和VWAP进行回归分析可以提供变量之间关系的重要信息。假设我们认为，收盘价和VWAP之间的正相关关系表明股票需求强劲，因为VWAP随着收盘价的上涨而上升。而负相关关系可能表明该股票需求较弱，因为VWAP随着收盘价上涨而下降。我们可以使用ts_regression运算符来估计收盘价和VWAP之间的beta系数，以5个变量作为输入：(因变量、自变量、时间窗口、滞后和rettype)。\n\n按照上述步骤，一个参考Alpha是：ts_regression(close, vwap, 4, lag = 0, rettype = 2)\n\n收盘价是我们想要预测的因变量，VWAP是自变量，4天是我们要运行回归分析的时间窗口，0表示没有滞后来预测收盘价，最后rettype = 2表示我们希望得到beta系数（β）作为输出。\n\n其他Rettype值\n\n如果我们想要得到其他参数作为输出，可以使用以下“rettype”参数值：\n\n0：误差项\n1：y截距（α）\n2：beta系数（β）\n3：因变量的估计值\n4：误差平方和（SSE）\n5：总平方和（SST）\n6：R平方\n7：均方误差（MSE）\n8：beta系数（β）的标准差\n9：y截距（α）的标准差\n---\n小贴士3：使用自定中性化设置提升Alpha表现\n\n什么是中性化？中性化是一种风险降低技术，将资本平均分配在多头和空头头寸上，以中和推动所选组中股票价格的事件效应。有关中性化工作原理的详细说明，请参阅此帖子。\n\n通常的中性化方法：我们不鼓励没有中性化的Alpha，因此您可能已经注意到，使用“MARKET”、“SECTOR”、“INDUSTRY”和“SUBINDUSTRY”等中性化选项可以默认中性化您的Alpha。\n\n自定义中性化：除了这些常见选项外，您还可以使用“group_neutralize()”运算符将自定义组上的α值中性化。\n\n自定义中性化示例：\n\nCUSTOM_GROUP = floor(rank(cap)*4.99);\n\ngroup_neutralize(alpha, CUSTOM_GROUP)\n\n思路说明：\n\n您首先使工具的“rank(cap)”矢量从0到1的规模。\n乘以4.99以将规模从0扩展到4.99。\n使用floor()运算符将所有工具分成5个存储桶，",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/15152019662487--%E5%AD%A6%E4%B9%A0%E8%B5%84%E6%96%99-BRAIN%E5%B0%8F%E8%B4%B4%E5%A3%AB-%E8%BF%99%E9%87%8C%E6%9C%89%E4%BD%A0%E6%83%B3%E8%A6%81%E7%9A%84%E7%A1%AC%E6%A0%B8%E5%86%85%E5%AE%B9-%E6%8C%81%E7%BB%AD%E5%91%A8%E6%9B%B4%E4%B8%AD",
+    "exprs": [
+      "rank(cap)”矢量从0到1的规模。\n乘以4.99以将规模从0扩展到4.99。\n使用floor()"
+    ],
+    "type": "text",
+    "has_expr": true
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "2026年IQC专辑《BRAIN x AI 零基础入门量化》系列课程Course 3作业",
+    "text": "必做Task:\n\n1.任选一数据集，使用AI为数据集提供模板。此项任务需展示至少3个模板。\n\n2.任选其中一个模板，使用代码将其展开并拼装成多个表达式，并阐述其搜索空间。\n\n3.回测这些Alpha并获得一个至少可以提交的Alpha，请展示提交截图.\n\n4.必做阅读👉一文带你读懂 “Genius Program\" -- 高阶顾问Quarterly Payment有机会获得高达8000USD保底\n\n5.选做，完成研究顾问问卷，截图workday task portal, 显示无task即可。\n\n \n\n截止时间：北京时间次节课16：00\n\n注：需要在任一问题展示如图点赞或点踩，证明自己对AI答案已进行思考\n\n[评论区]\n自行总结模板为：\n1》group_rank(datafield / ts_delay(datafield, 4))\n\n2》group_rank(ts_zscore(datafield, 8))\n\n3》group_rank(ts_mean(datafield, 4) / ts_std_dev(datafield, 4))\n\n \n\n第三个拆分后是 {group_op}({ts_op}({field},{day}) / {ts_op}({field},{day}),{group})\n\n \n\n以下是回测提交的合格alpha与workday空白截图\n\n \n\n \n---\ntask1\n模板1\ngroup_rank(\n    ts_zscore(\n        divide(<actual> - <forecast>, abs(<forecast>)),\n        d\n    ),\n    <group>\n)\n模板2\ngroup_rank(\n    ts_delta(<forecast>, d),\n    <group>\n)\n\n模板3\ngroup_rank(\n    ts_corr(<actual>, <forecast>, d),\n    <group>\n)\n\ntask2\n\ntask5\n\n \n---\n问题1：\n\n# 逻辑：利用高斯分布特性捕捉新闻情绪的统计显著性\n\nrank(ts_mean(ts_quantile({news_sentiment_score}, 10, driver=\"gaussian\"),3))\n\n# 逻辑：捕捉新闻情绪改善最快的股票，并剔除行业贝塔\n\nrank(group_normalize(ts_delta({news_sentiment_score}, 2),industry))\n\n# 逻辑：寻找新闻情绪强，但价格尚未过度反应的股票\n\nrank(ts_zscore({news_sentiment_score}, 20)/(ts_rank({news_post_vwap}, 10) + 0.001))\n\n问题2：rank(ts_mean(ts_quantile({news_sentiment_score}, 10, driver=\"gaussian\"),3))\n\n搜索空间为new12数据集所有matrix字段，共75个\n\n问题3：75个全部回测没有可以提交的\n\n \n\n \n---\n1. \n\n我选择的数据集是公司基本面数据集，包含 debt、debt_lt、debt_st、eps、ebit、ebitda、cashflow_op、equity、assets_curr 等字段。\n这些字段适合构造“变化”“历史位置”“稳定性”这几类 Alpha 模板。\n\n模板 1：变化型模板\n<group_compare_op>(<sign><ts_compare_op>(<company_fundamentals>, <days>), <group>)\n\n含义：先看某个基本面字段在一段时间内的变化，再在行业或板块内部比较。\n例如，负债下降越多越好，盈利改善越明显越好。\n\n模板 2：历史位置型模板\n<group_compare_op>(<ts_position_op>(<company_fundamentals>, <days>), <group>)\n\n含义：先看当前基本面字段在其自身历史中的相对位置，再在组内比较。\n例如，当前现金流是否处于过去一年中的高位。\n\n模板 3：稳定性型模板\n<group_compare_op>(<sign><ts_risk_op>(<company_fundamentals>, <days>), <group>)\n\n含义：先衡量某个基本面字段在过去一段时间内的波动，再在组内比较稳定性。\n例如，EBITDA 波动越小，通常说明经营更稳定。\n\n \n\n2. \n\n我选择模板 1：\n<group_compare_op>(<sign><ts_compare_op>(<company_fundamentals>",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39441605621911-2026%E5%B9%B4IQC%E4%B8%93%E8%BE%91-BRAIN-x-AI-%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8%E9%87%8F%E5%8C%96-%E7%B3%BB%E5%88%97%E8%AF%BE%E7%A8%8BCourse-3%E4%BD%9C%E4%B8%9A",
+    "exprs": [
+      "rank(\n    ts_delta(<forecast>, d),\n    <group>\n)",
+      "rank(ts_mean(ts_quantile({news_sentiment_score}, 10, driver=\"gaussian\"),3)",
+      "rank(\n    ts_corr(<actual>, <forecast>, d),\n    <group>\n)",
+      "rank(group_normalize(ts_delta({news_sentiment_score}, 2),industry)",
+      "rank(\n    ts_zscore(\n        divide(<actual> - <forecast>, abs(<forecast>))",
+      "ts_rank({news_post_vwap}, 10)",
+      "rank(ts_zscore({news_sentiment_score}, 20)/(ts_rank({news_post_vwap}, 10)",
+      "rank(ts_mean(datafield, 4) / ts_std_dev(datafield, 4)",
+      "rank(ts_zscore(datafield, 8))",
+      "rank(datafield / ts_delay(datafield, 4))"
+    ],
+    "type": "text",
+    "has_expr": true
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【顾问们的2025】BRAIN国区2025新年留言活动记录",
+    "text": "活动已完结，谨此纪念\n\n2025年的进度条已经拉满，BRAIN中国区的成绩单也正式出炉\n\n5万+新伙伴加入社区，3千+研究顾问签约并拿到第一笔收入，31亿次回测在云端飞驰，200+小时免费课程把会议室和直播间塞得满满当当。每一个数字背后，都是屏幕前的你敲下的那行代码、点下的那个Submit、深夜里的那杯咖啡。  \n\n新年钟声已经敲响，我们想用这篇帖子，把C位留给最会“搞钱”也最爱分享的你：\n\n【任选跟帖姿势】  \n\n\n1. 晒收入：2025年BRAIN到账账单，让大家流流口水；  \n2. 晒回测/提交：po出你今年提交的数量或最骄傲的成就；  \n3. 晒知识：总结你听过的课程/读过的文档带来的“aha moment”；  \n4. 晒伙伴：@出今年认识的神仙队友，一起出镜更带感！  \n（配图优先，越丰富越容易被官方盯上哦～）\n\n【福利】  \n\n\n截止2026年1月7日 24:00，将结合点赞和内容，选取20名优质评论，每人空投周边，尽力把机械键盘、T恤、礼盒、鼠标垫统统带回家！\n\n2026，我们继续把策略写进PNL，把故事写进评论区。  \n\n现在，轮到你发言了——  \n\n下滑，跟帖，开晒！\n\n[评论区]\n活动已完结，谨此纪念\n\n请勿在评论区留下任何的个人联系方式\n---\n一年多以来,base勉强破万,2026再接再厉\n\n=================================================================================\nAchievements are reached by hard work, but ruined by idleness; Actions are accomplished through thorough consideration, but destroyed by casual decision.​​\n=================================================================================\n---\n首评！10月下旬成为新顾问，基本保持在一天一提交，一月底要拿到第一笔工资咯，继续加油！\n\n（路过的前辈点点赞）\n---\n萌新VF0.97的Expect，两个月日均40刀之旅。感谢WQ给了我丰厚的过年红包。\n---\n很荣幸拿下收评，7月份第一次接触wq，到11月成为顾问，摇摇晃晃两个月过去，虽然还是小卡拉米，但是还是会努力钻研，目标直指gm！2026年希望能努力跟上大佬的脚步，跟wq一起无限进步！新年快乐！\n---\n1. 晒收入：2025年BRAIN新人Q3Q4收入，起点低，2026期待翻翻翻~~  \n\n\n2. 晒回测/提交：2025年在摸索中前行，分享下过往，留个记录  \n\n\n3. 晒知识：2025主要知识来源在于平台Learn、论坛；特别要点赞的工具 cnhkmcp\n4. 晒伙伴：还没有小伙伴结队同行，期望2026能有同行的队友\n---\n9月成为顾问的新人一枚，在2025年的最后一天，拿到了自己的最高单日base。从6月接触WorldQuant到现在不到半年的时间，从完全不懂的小白，到慢慢熟悉，了解量化。虽然进步不是很快，但感觉自己还是慢慢在前进。新的一年已经开始，希望自己能在新的一年中能更进一步。也祝大家新年快乐，vf升升升，combine节节高。\n---\ntalk is cheap,show you the money\n\n24年12月提交第一个alpha\n\n3月5日开始拿base\n\n9月1日拿到一次ra$60\n\n9月4日拿到最高单日$116.91\n\n9月拿到最高单月base $2780.36\n\nvf从0.5到最高0.99到现在0.53\n\n每日base从$1.64到最高$116.91,到现在$1.86，又回到了最初的起点~\n\ngenius从gold->master->gm\n\n最后感谢worldquant平台，希望worldquant越办越好\n\n                                                                            --2026年1月1日于家中\n---\n快看，快看有个靓仔集齐了金、木、水、火四元素之力，可以无限召唤GM了~~\n\n \n\n道阻且长，行则将至，紧跟各位老师以及大佬的步伐，相信每个人都能召唤GM！最后祝各位顾问新年快乐，万事如意~~\n---\n2025年的最大收获，是接触worldquant平台，还有平台一起奋斗的小伙伴们，老师们。感谢把我带到挖坑平台的推荐人PW58059  感谢这一年来老师们的培训课程还有指导 ，感谢小伙伴们在挖坑旅途中的帮助,此处特别鸣谢插件提供者华子哥 KZ79256",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/37374718949143--%E9%A1%BE%E9%97%AE%E4%BB%AC%E7%9A%842025-BRAIN%E5%9B%BD%E5%8C%BA2025%E6%96%B0%E5%B9%B4%E7%95%99%E8%A8%80%E6%B4%BB%E5%8A%A8%E8%AE%B0%E5%BD%95",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "2026年国际量化挑战赛 (IQC) 第一阶段 FAQ 与进阶指南",
+    "text": "更多官方FAQ：英文FAQ全文\n精华必读：\n2024年冠军分享一\n2024年冠军分享二\n2025年IQC顾问经验分享\n2025年冠军分享\n2025IQC stage1全球第三分享\n2025 Global Final 观后感\n新人要交什么样的alpha？\n一、 赛事日程与关键节点\n报名及组队开启：2026年3月17日 。\n第一阶段 Alpha 提交开启：2026年3月17日 。\n报名及组队截止：2026年5月13日 。\n第一阶段 Alpha 提交截止：2026年5月18日 。\n晋级通知：晋级团队最迟将于 2026年5月22日收到邮件通知 。\n时间标准：所有截止时间均为美东时间 (EST) 23:59 。\n二、 IQC 顾问收益与职业发展\n收益构成：作为 IQC 顾问，您有潜力获得基础费用 (Base Payment)、季度奖金 (Quarterly Payment) 及推荐费 。\nBase Payment：每日提交的前 4 个 Alpha 有机会赚取 1 至 60 美元，旨在补偿顾问在平台投入的每日努力, 要最大化每日 1 至 60 美元的 Base Payment 收益，建议从以下维度提升\n数量因素：确保每日提交满 4 个符合标准的 Alpha，并关注每月前 5 个 D0 Alpha 的提交 。\n质量因素：提交在 IS 期间表现优异（如高夏普比率、高 Fitness）且与您已有 Alpha 相关性极低的因子 。\n自我增长因素：保持持续的创新和改进，每日的进步程度也会影响结算金额 。\n相对竞争力：您的收益不仅取决于自身表现，还会与全平台顾问的产出进行横向对比，建议利用他人活跃度较低的阶段提交高质量 Alpha 。\n季度奖金：每季度奖励 100 至 25,000 美元 ，要求在一个季度内至少有 20 天每天提交至少 1 个 Alpha\n收益查看方式：您可以在每日下午三点（EST 3 AM）后，通过页面右上角的 Performance 栏目查看上一日的收益详情 。\n顾问转换：IQC 期间提交的 Alpha 会计入价值因子 (Value Factor) 计算，IQC 阶段的顾问预计将于 2026年7月起转为正式的 BRAIN 研究顾问 。\n职业机会：表现优异者将有资格获得 WorldQuant BRAIN 的实习或全职工作邀约 。\n薪酬发放：在成为full consultant后，且账单大于10USD后按以下日历发放薪酬https://support.worldquantbrain.com/hc/en-us/articles/28325770907415-2026-Payment-dates-Mainland-China\n三、 平台权限与参赛约束\n参赛状态说明：一旦参加 IQC 赛事，参赛者将无法中途退出。\n界面与权限限制：IQC 顾问在赛期间的权限与普通用户一致，菜单栏将继续保持蓝色\n功能解锁差异：相比于非参赛顾问，IQC 顾问在赛期间无法访问额外的可视化工具、竞赛、数据集和交易区域，以确保赛事的公平性；这些功能将在比赛结束后开放 。\n团队变动原则：若成员退出团队，其提交的 Alpha 及相关评分将保留在原团队中 。\n四、 核心评分逻辑：深度理解 Merged Performance\n双重评分体系：第一阶段得分由“个人资格赛积分”和“团队合并表现分数 (Merged Performance Score)”组成 。\n解锁机制：当团队中至少一名成员的个人积分达到 10,000 分时，团队将解锁合并表现分数 。\n权重分配：最终得分由 25% 的样本内 (IS) 分数与 75% 的样本外 (OS) 分数组成 。\nOS 评分机制：75% 的 OS 分数占据主导地位，但该分数仅在赛段结束时公布；因此，参赛者不应仅关注可见的 IS 分数，而应注重模型的泛化能力 。\n性能对比功能：积分达到 10,000 分后，可利用 Compare Performance 功能观察提交新 Alpha 前后的指标变化 。\n五、 提升 Alpha 质量与获取 Base Payment 的专家建议\n\n注重经济学含义：高评分（如 Spectacular）并不代表高质量 。应专注于简单且稳健的逻辑实现，移除没有实际驱动力或不符合金融逻辑的冗余元素 。\n\n善用性能对比（Compare Performance）功能：\n\n功能路径：达到 10,000 分后，在模拟页面的 Results 部分可查看性能对比 。\n操作策略：重点观察“提交前”与“提交后”的指标变化 。如果新提交的 Alpha 与已有因子高度相关，即使其本身指标优异，也可能降低合并后的夏普比率或增加回撤，导致最终得分下降\n样本外（OS）的重要性：\n警惕 IS 分数陷阱：IS 分数仅占 25%，且容易通过过度拟合（Ove",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39645863500055-2026%E5%B9%B4%E5%9B%BD%E9%99%85%E9%87%8F%E5%8C%96%E6%8C%91%E6%88%98%E8%B5%9B-IQC-%E7%AC%AC%E4%B8%80%E9%98%B6%E6%AE%B5-FAQ-%E4%B8%8E%E8%BF%9B%E9%98%B6%E6%8C%87%E5%8D%97",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "《零基础学量化》报名方式（长期有效）与往期作业合集",
+    "text": "《 零基础学量化》课程介绍\n\nClass1: 开营第一课 - 量化化行业初探及基本概念  \n\n熟悉BRAIN平台使用方式与指标、两类Alpha策略，可以使用API登录平台 \n\nClass2: 使用快速表达式写出第一个量化策略 \n\n了解和使用运算符和数据集，并学习2个Alphas实例，可以使用API获取数据；目标在第三节课前平台达到一万分 \n\nClass3: 中性化与分组：以经典的基本面策略为例 \n\n 了解中性化的实现方式，如何从快速表达式转化为P&L，可以批量发送回测请求； AI分享与实操 \n\nClass4: 增加策略平稳与稳健性：以经典的量价策略为例 \n\n通过提高Alphas的质量，避免Overfitting，提升OS分数，学习2个Alphas实例\n报名链接：《零基础学量化》课程报名 Survey\n\n \n\n2026年IQC专辑《BRAIN x AI 零基础入门量化》系列课程Course 1作业\n\n \n\n2026年IQC专辑《BRAIN x AI 零基础入门量化》系列课程Course 2作业\n\n \n\n2026年第一期《零基础学量化》系列课程Course 3作业 – WorldQuant BRAIN\n\n[评论区]\n以下是本周的课程表：\n\n \n\n2026年3月31日 周二 20：00 – 21：30\n\nClass2: AI 帮你写出第一个量化策略, 用自然语言描述想法，AI 帮你生成快速表达式\n\n通过 2 个 Alpha 实例，完成从数据集、运算符到策略成型的完整流程\n学会用 API 获取数据，争取在第三课前平台积分达到一万分\n\n点此注册  (请使用BRAIN邮箱注册会议，无需注册Zoom账户) \n\n \n\n2026年4月1日 周三 20：00 – 21：30\n\nClass3: 中性化与分组：以经典的基本面策略为例\n\n在 AI 的讲解下理解中性化、分组与 P&L 的关联\n学会从快速表达式到可回测 P&L 的转换\n批量回测与 AI 辅助生成多种 Alpha 模板的技巧，让 Alpha 创作走向“半工业化”\n\n点此注册  (请使用BRAIN邮箱注册会议，无需注册Zoom账户) \n\n \n\n2026年4月2日 周四 19：00 – 20：00\n\nClass1: 开营第一课 -在 AI 帮助下看懂量化世界（重开）\n\n用 AI 帮你翻译专业术语，快速建立量化与 Alpha 的基础认知\n熟悉BRAIN平台使用方式与指标、两类Alpha策略，可以使用API登录平台\n\n点此注册  (请使用BRAIN邮箱注册会议，无需注册Zoom账户) \n\n \n\n2026年4月2日 周四 20：00 – 21：30\n\nClass4: 增加策略平稳与稳健性：以经典的量价策略为例\n\n学会用多指标评估策略质量，避免过拟合，提高 OS 表现\n通过 2 个经典量价 Alpha 案例，理解如何让策略更平稳、稳健\n让 AI 帮你做“策略体检”，给出优化方向与改写建议\n\n点此注册  (请使用BRAIN邮箱注册会议，无需注册Zoom账户) \n---\n您好，我是刚刚注册报名，2026年3月21日 的直播课我错过了，什么时候有新的课程呢？\n---\nLIU XUE(LX75080)\n\n请关注你的BRAIN邮箱，应该是节后会有新的一轮课程",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39118228145431--%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%AD%A6%E9%87%8F%E5%8C%96-%E6%8A%A5%E5%90%8D%E6%96%B9%E5%BC%8F-%E9%95%BF%E6%9C%9F%E6%9C%89%E6%95%88-%E4%B8%8E%E5%BE%80%E6%9C%9F%E4%BD%9C%E4%B8%9A%E5%90%88%E9%9B%86",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "ZOOM 培训课注册和接入指南",
+    "text": "BRAIN 所有官方培训内容都将通过ZOOM软件完成，无需注册ZOOM账号即可接入（Zoom已不接受中国大陆地区用户注册）以下是接入指南。\n\n一、注册相关课程，获取接入链接和提醒\n\n邮箱收到相应课程通知后，点击注册课程，输入姓名和BRAIN注册邮箱\n\n二、注册成功后，你的邮箱会收到课程接入信息\n\n三、下载并安装Zoom Workplace软件\n\n前往官网下载，并根据自己的系统版本完成安装：https://go.zoom.us/download\n\n四、点击邮件中“加入网络研讨会”，并点击打开zoom.us，通过APP打开接入会议即可。浏览器方式目前可能无法接入会议。\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39646867944343-ZOOM-%E5%9F%B9%E8%AE%AD%E8%AF%BE%E6%B3%A8%E5%86%8C%E5%92%8C%E6%8E%A5%E5%85%A5%E6%8C%87%E5%8D%97",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "💎 BRAIN量化研究顾问 - 申请流程说明",
+    "text": "成为BRAIN量化研究顾问，不仅能让您有机会参与更多精彩活动，还有机会通过提交Alpha累积报酬。此篇贴文将带你了解成为BRAIN研究顾问的申请流程与步骤。\n\n【顾问申请整体流程概览】\n\n第一阶段：达到10K分获得邀请\n\n第二阶段：完成 1.研究能力测试、2. 顾问申请表填写和 3. 持续回测提交任务，三者缺一不可\n\n第三阶段：签署顾问合同、获得顾问权限\n\n \n\n如果你在顾问合同提交并获批前，参加了IQC比赛，则会成为IQC顾问，顾问申请流程一致，也仍然会累计收入。请注意IQC比赛报名后无法撤销，IQC顾问与普通顾问的区别，请见下文：\n\n已经到了10K分？ 那我要不要参加IQC？一文说明是否参加的优缺点 – WorldQuant BRAIN\n\n第三阶段：完成基础背调并通过后，填写银行卡成为Full Consultant\n\n[申请资格]\n\n您在BRAIN平台累积到10,000分后，将有机会受邀加入BRAIN研究顾问计划。请注意，邀请是由系统自动发出，并不是所有到达10,000分的用户都会收到该邀请。\n\n若您收到email邀请、或登录BRAIN看到提示窗，即可前往Workday开始您的顾问申请流程。Workday是WQ BRAIN的顾问申请及信息管理系统。\n\n1. 如何登录Workday\n\n登录您的WQ BRAIN账户WorldQuant BRAIN\n点击右上角的人物图标\n选择“账户”\n右侧点击Signin Workday，并输入BRAIN平台密码\n\n2. 进入Workday后您将看到以下界面\n\n【1️⃣第一步:背调授权书填写】\n在您的Inbox中点击名为“背景调查授权”的项目\n下载名为“BRAIN个人陈述和授权披露”的2页文件\n填写并完整签署两页文件，并将两个签完字的页面扫描成一个文件，注意两页都要填写\n拖放文件或单击“选择文件”按钮上传签署的扫描副本\n单击“提交”\n第一页：\n\n第二页\n\n注意事项：两页需要签名合并为一个文件上传\n【2️⃣第二步:上传身份证件信息】\n扫描或拍摄您的身份证人像面。\n在您的收件箱中点击“上传身份证”\n拖动文件或点击“选择文件”按钮上传扫描文件\n点击“提交”按钮\n【3️⃣第三步:背景调查问卷】\n \n \t \n\nQuestionnaire A and B \n\nC-G部分请阅读后无特殊情况均可填写NO\n\n请填写后再次检查是否有以下常见错误\n\n常见问题（注意以下任何一项有问题即会被打回，建议对照上面链接仔细检查）：\n\n填写语言：除中文名外，其余部分请使用英文填写\n名字填写：First name请填写名的拼音； Middle name 写NA； Last Name填写姓的拼音； Chinese Name写中文全名\n个人信息完整填写（身份证号码错误或者最后一位是X的请大写）\n地址历史：完整连续5年地址并使用英文，非常重要，请确保自填写日期之前的五年全部覆盖\n户口地址：使用英文完整填写，最少到街道\nWorldquant University学生：注意BRAIN平台课程不是WQU课程\n工作信息：如当前工作未离职，请勿填写，（点击键盘delete）在职请勿填写date to\n工作信息：未完整填写工作信息, 或者填写了没有工作但填写工作信息\n如果填写了工作信息请确保开始时间的准确性，以免与背调不一致而延误流程\n国籍：中国籍请填写CHINA\n\n提交完成后，再次回到workday内all task 检查是否有剩余task，完全没有剩余task才视为提交完成。成功提交后会收到邮件确认，否则是没有成功提交。\n\n【签署顾问协议Signing Consulting Agreement】\n\n在问卷信息审核完毕后，会在WQ Brain门户网站和您的电子邮件中通知，请通过BRAIN“账户”登录到Workday\n\n点击收件箱中的“完成咨询协议”栏目\n\n通过右键单击下载“WQ Brain咨询协议”，并进行审阅（如果您目前不是全日制学生，请点击链接下载另一份协议BRAIN量化研究顾问 - 非在校生合同 – WorldQuant BRAIN）\n在第1页和第19页签字并扫描保存为1个文件\n上传签署扫描副本的文件或单击“选择文件”按钮\n点击“提交\n\n注意事项：\n1.请填写红框内所有部分，请勿填写19页上方公司部分\n\n2.确保所有信息都用英文和中文对应书写\n\n\n\n\n顾问协议书审核通过后，将启动背景调查，WorldQuant 合作vender eeVoices (checks01@eevoicesgroup.com)将会主动 email (如未收到通知请定期检查垃圾邮件夹) 或致电联系确认身份\n\n✦---✨---🧠---✨---✦---✨---🧠---✨---✦---✨---🧠---✨---✦---✨---🧠---✨---✦\n\n \n\n若完成以上流程，恭喜您",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/28584425090455--BRAIN%E9%87%8F%E5%8C%96%E7%A0%94%E7%A9%B6%E9%A1%BE%E9%97%AE-%E7%94%B3%E8%AF%B7%E6%B5%81%E7%A8%8B%E8%AF%B4%E6%98%8E",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【学习资料】BRAIN平台自学路径图推荐",
+    "text": "介绍 / Introduction \n\n什么是Alphas? / Introduction to Alphas | WorldQuant BRAIN： \nBrain平台的原理 /⭐ How BRAIN platform works | WorldQuant BRAIN：  \nBrain快速表达式 / Introduction to BRAIN Expression Language | WorldQuant BRAIN \n理解平台规则和BRAIN Consultant项目\n顾问收入计算详解\n\n运算符 / Operators & 数据集 /Datasets \n\n理解数据结构和基本概念/Understanding Data in BRAIN: Key Concepts and Tips | WorldQuant BRAIN\n如何使用数据浏览器/How to use the Data Explorer | WorldQuant BRAIN\n运算符 / Operators| WorldQuant BRAIN\n三维数据类型/Vector Data Fields 🥉 | WorldQuant BRAIN\n分组数据类型/Group Data Fields 🥈 | WorldQuant BRAIN\n重要：[BRAIN TIPS] 6 ways to quickly evaluate a new dataset – WorldQuant BRAIN\n\n模拟回测Alpha / Simulation& 评估Alpha表现 \n\n如何进行回测前的参数设定 / How to choose the Simulation Settings | WorldQuant BRAIN \n模拟你的第一个Alpha / Simulate your first Alpha | WorldQuant BRAIN \n评估指标  / Parameters in the Simulation results | WorldQuant BRAIN \n如何理解回测表现 / Intermediate Pack - Understand Results [1/3] | WorldQuant BRAIN \nAlpha提交测试 / Clear these tests before submitting an Alpha | WorldQuant BRAIN \n什么是样本内和样本外 / IS,Semi-OS, and OS | WorldQuant BRAIN \n新人该交什么样的Alphas\n\n如何改进Alpha / Alpha Improvement \n\n提高Alpha表现 / Intermediate Pack - Improve your Alpha [2/3] | WorldQuant BRAIN \n如何使用条件运算符 / Intermediate Pack - Conditional Operators [3/3] 🥉 | WorldQuant BRAIN \n改进Alpha必读 / Must-read posts: How to improve your Alphas🥉 | WorldQuant BRAIN \n解读需要通过的各项测试 / Clear these tests before submitting an Alpha | WorldQuant BRAIN\n\nAlpha 例子 \n\n新手Alpha例子 / ⭐ Alpha Examples for Beginners |\nAlpha Examples 合集\n\n \n\n[评论区]\nPost is closed for comments.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/22863075241623--%E5%AD%A6%E4%B9%A0%E8%B5%84%E6%96%99-BRAIN%E5%B9%B3%E5%8F%B0%E8%87%AA%E5%AD%A6%E8%B7%AF%E5%BE%84%E5%9B%BE%E6%8E%A8%E8%8D%90",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【理解顾问收入计算】建议所有新顾问都来学习一下",
+    "text": "论坛内的新顾问朋友们大家好！想必刚开始大家对于BRAIN的顾问收入都还比较疑惑，为什么交1个是1.6，交2个不是3.2？ 什么是季度奖？怎么能拿更多的钱？\n\n我从8月底开始提交了第一个顾问alpha，中间经历了value factor 从0.5 断崖下滑至0.13再到这个月放出来到了0.8，中间得到了研究小组和论坛内很多大神的帮助，借这篇帖子回馈论坛，希望对大家有所帮助！\n\n【免责声明：以下内容为官方材料结合个人经验，不构成权威解答】\n\n一、顾问收入组成\n\n顾问收入由四部分组成: \n\nBase Payment：日常津贴，核心取决于 Value Factor， Theme\nQuarterly Payment：季度奖金，核心取决于Weight Factor和Value Factor\nCompetition：比赛奖金，取决于比赛名次\nReferral Bonus：推荐奖金，200刀每人，上不封顶\n\n二、Base Payment\n\n2.1 Regular Alpha: Value Factor 和Theme是主要影响\n\nRegular Alpha的每日区间是1-60 USD，计算逻辑用BRAIN表达式来说就是Group_Rank(Score, value_factor)\n平台每日结算，更新时间大概在下午2点前，对当日有提交的顾问，更具不同Value Factor进行分组，你的value factor决定了你当日base payment的上限和下限。\n关于value factor的介绍很多前辈已经分享过了，我就不在此展开了，传送门：\n\n【经验分享，限时置顶】ATOM比赛全球第一[value factor] 经验分享之0.88->0.13->0.94\n\n理解顾问最重要的指标Value Factor! 分享不同数值对应的预计每日收入\n\n【敲黑板重点】提高Value Factor是新顾问前三个月的最主要目标!\n那具体你的Base Payment在区间内能拿到多少取决于四个主要方面\nQuantity Factor：数量是计算的一个入参，但并不是一个alpha多少钱这样的乘数，新人的base payment受此加成不明显。每日上限4个。\nQuality Factor: Theme 主要影响的就是这部分的乘数，theme类似游戏的副本任务，完成theme内的alpha会有奖励加成，theme不定时公布。在平台右上角小铃铛announcement可以看到\nSelf Growth Factor：也就是自我成长比较，和自己的历史行为和数据相比是否有提升\n\n通常情况下，alpha表现越好，地区、universe等越分散，相关性越低，qualify factor就会越高。\n对于新人：每天1-2个Alpha是我建议的节奏，当然高手除外哈！这样可以最大化ROI，并且一个月30-60个Alpha也是可以有稳定的Value Factor表现，也可以满足季度奖\n1.5USD 大法：因此基于以上的计算公式，如果新人当日只提交了1个alpha，但Base Payment在1.5以上，那恭喜你这个alpha的质量应该是不错的。反之如果只有1.2，那可能要引起注意了。\n总之前三个月类似于顾问的试用期，只有度过这3个月，在平台证明了自己，收入也会有X倍的提升。\n\n2.2 Super Alpha Base Payment\n\n【解锁条件】提交满100个alpha以后，包含用户阶段提交的alpha\n【什么是Super Alpha】之前自己提交过的alpha进行筛选和组合，达到更强大的信号\n【金额范围】每日1-60USD，和regular 的alpha分别计算，我上面的绿色柱子就是\n每日只可以提交1个是上限。\n因为符合Super Alpha的人数更少，这个地方能拿到的payment会更多，研究小组内的大神经常可以拿到60USD的封顶，我自己通常也可以有10USD左右。\n\n二、Quarterly Payment\n\n【符合条件】每个自然季度，有20天提交过Alpha，则符合当季度的季度奖金\n【发放周期】每季度末发放，但每季度末发放的是上季度的季度奖。比如12月发放的是Q3的季度奖，3月发放的是此前Q4的季度奖，以此类推\n【奖金范围】100-25000 USD，取决于你的Genius Level，分为四个区间。新人到Expert是不难的，季度奖金对应的就是200USD - 2000 USD，水平高一些就瞄准Master，范围就是2000USD - 8000USD了\n【传送门】一文带你读懂 “Genius Program\" -- 高阶顾问Quarterly Payment有机会获得高达8000USD保底\nQuarterly Payment：主要取决于你的Alpha在样本外的表现（也就是22年-",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/28611992884631--%E7%90%86%E8%A7%A3%E9%A1%BE%E9%97%AE%E6%94%B6%E5%85%A5%E8%AE%A1%E7%AE%97-%E5%BB%BA%E8%AE%AE%E6%89%80%E6%9C%89%E6%96%B0%E9%A1%BE%E9%97%AE%E9%83%BD%E6%9D%A5%E5%AD%A6%E4%B9%A0%E4%B8%80%E4%B8%8B",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【限时羊毛】只要邀请完成平台使用邮箱注册，即可获得IQC限定雨伞和背包！",
+    "text": "IQC 比赛火热进行中，\n现在，不仅你可以冲击榜单，\n还能靠“安利”身边的同学和朋友，把 IQC 限定周边 一套带走！\n\n只要成功邀请好友注册并报名 IQC，\n就有机会获得：IQC 定制雨伞 + IQC 限定背包（各 1 个）！\n活动时间有限，抓紧上车！\n\n🎁 活动奖励\n\n累计有效邀请的IQC注册人数满 5 人\n👉 获得 IQC 定制雨伞 1 把\n\n累计有效邀请的IQC注册人数满 15 人（即在达到 5 人雨伞的基础上，再多邀请 10 人）\n👉 额外获得 IQC 限定背包 1 个\n\n说明：每位符合条件的推荐人最多可领取 1 套礼包。\n\n⏰ 活动时间\n即日起 至 2026 年 4 月 30 日（含当日）\n✅ 被邀请人需满足的条件\n\n只有当你邀请的好友满足以下全部条件时，\n才会计入你的「有效邀请人数」：\n\n通过你的邀请链接注册，或在注册时正确填写你的 BRAIN ID 作为推荐人；\n完成平台注册（包括邮箱验证等必要步骤）；\n成功报名本次 IQC 比赛；\n被邀请人当前所在地区为：中国大陆或中国香港地区。\n🚀 如何参与活动？\nStep 1：获取你的专属邀请方式\n\n使用你的专属邀请链接（推荐）\n\n链接形式为：\nhttps://platform.worldquantbrain.com/referral/你的BRAIN ID\n示例：BRAIN ID在平台右上角我的页面查看， 如果你的 BRAIN ID 是 AA11111，邀请链接就是：\nhttps://platform.worldquantbrain.com/referral/AA11111\n\n或者，让好友在注册时填写你的 BRAIN ID\n\n好友直接访问平台注册页面：\nhttps://platform.worldquantbrain.com\n在注册流程中，填写你的 BRAIN ID 作为推荐人\n\n小贴士：为避免好友手动填写时输错 BRAIN ID，建议优先使用专属邀请链接进行分享。\n\nStep 2：提醒好友完成注册并报名 IQC\n\n请你务必提醒好友：\n\n通过你的专属链接注册，或在注册时填写你的 BRAIN ID；\n完成平台注册与邮箱验证；\n登录平台后，在 IQC 比赛页面完成报名；\n开始参加 IQC 比赛，冲击积分与排名。\n(可选）免费公开课滚动开放，报名链接：《零基础学量化》课程报名 Survey\n\n当系统确认好友已完成上述步骤，并满足地区要求（中国大陆或中国香港），\nTA 就会被记为你的有效邀请 1 人。\n\nStep 3：达成 15 人，领取周边礼包\n\n当你的有效邀请人数累计达到 5 人：\n👉 获得 IQC 定制雨伞 1 把\n\n当你的有效邀请人数累计达到 15 人：\n👉 在雨伞基础上，额外获得 IQC 限定背包 1 个\n\n我们将在活动结束后统一统计邀请数据，并通过站内信或邮件联系你，\n收集收件信息后寄出对应奖品。\n\n📌 活动规则补充说明\n本活动仅统计被邀请人当前所在地区为中国大陆或中国香港，且完成平台注册并报名 IQC 的用户。\n有效邀请人数以平台后台记录为准，如因注册时未正确填写 BRAIN ID、未使用专属邀请链接或信息错误导致无法识别邀请关系，将无法计入邀请人数。\n每位推荐人最多可获得 1 套 IQC 周边礼包（雨伞 1 把 + 背包 1 个）。\n若发现存在恶意刷号、虚假注册等违规行为，平台有权取消相关邀请资格及奖励发放。\n活动时间：即日起至 2026 年 4 月 30 日，逾期注册与报名不再计入本次活动。\n活动最终解释权归 WorldQuant BRAIN 所有。\n用户阶段的推荐，不参与顾问推荐奖励计划\n\n[评论区]\n被邀请的人，是不是得在比赛期间至少提交一个因子才算满足‘\n\n开始参加 IQC 比赛，冲击积分与排名。\n\n’",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39305754538519--%E9%99%90%E6%97%B6%E7%BE%8A%E6%AF%9B-%E5%8F%AA%E8%A6%81%E9%82%80%E8%AF%B7%E5%AE%8C%E6%88%90%E5%B9%B3%E5%8F%B0%E4%BD%BF%E7%94%A8%E9%82%AE%E7%AE%B1%E6%B3%A8%E5%86%8C-%E5%8D%B3%E5%8F%AF%E8%8E%B7%E5%BE%97IQC%E9%99%90%E5%AE%9A%E9%9B%A8%E4%BC%9E%E5%92%8C%E8%83%8C%E5%8C%85",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "26年Q1 Genius定级已更新，Q2赛季加油！",
+    "text": "26年Q1 Genius定级已更新，Q2赛季加油！ Pinned\nFollow\nFollowed by 9 people\nKH94146\n10 days ago\n\n8\n\n[评论区]\n太厉害了！Q1拿下了这么高的Grandmaster和Master比例。Q2赛季继续冲，争取全员封神！💪\n\n========================================================================================================================================================================\n---\n上联：春榜题名添喜报\n下联：赛场逐鹿续荣光\n横批：步步高升",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39728815499543-26%E5%B9%B4Q1-Genius%E5%AE%9A%E7%BA%A7%E5%B7%B2%E6%9B%B4%E6%96%B0-Q2%E8%B5%9B%E5%AD%A3%E5%8A%A0%E6%B2%B9",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "从0 -10000积分，4.17加入平台，新人的一些心得和避坑",
+    "text": "我是4.16加入平台的，经过7、8天的摸索，终于来到了一万分的关口，\n\n \n\n刚开始和大部分新手一样，摸不着头绪：\n\n还是新人的时候，两百多个因子式都不通过还是很费人的，而且非常影响心情。\n\n建议新手一定要先去官方平台的learn学习新手教程，还有中文论坛里的置顶一定要看！\n\n盲目的只看一两个文档就开始测试的，基本会和我一样，几个小时甚至十几个小时一无所获。\n\n工欲善其事必先利其器。\n\n第一个坑，我替大家踩了。\n\n \n\n第二个坑，开始看学习资料了，慢慢的也摸到一些头绪，开始有一些因子积累了。由于平台规则一天只有2000分，一般一天我会提交1-2个因子，多的我会存起来等第二天发。\n\n这里要画重点，一旦一个因子式通过了你没有提交，那么机遇这个逻辑的相关因子你继续生成，会继续通过。但是一旦你提交一个因子，其他会因为相关性过高全部回测失败。所以第四天，我库存的二十多个因子全部失效。\n\n所以你的研究方向要多样性，二十多个因子还是要做几个小时的，这几个小时全浪费了。\n\n这是第二个坑，我也踩了。\n\n第三个坑就是如果你通过了因子不提交，别人提交了，你就提交不了了。就是这么巧😊\n\n作为一周左右的新人，暂时就分享这么多，祝大家多多提交优秀因子～\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39950729950487-%E4%BB%8E0-10000%E7%A7%AF%E5%88%86-4-17%E5%8A%A0%E5%85%A5%E5%B9%B3%E5%8F%B0-%E6%96%B0%E4%BA%BA%E7%9A%84%E4%B8%80%E4%BA%9B%E5%BF%83%E5%BE%97%E5%92%8C%E9%81%BF%E5%9D%91",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "新手课代码分享",
+    "text": "以下代码我以代码块作为区分，各位可以将代码块拷贝到Jupter Notebook中运行，请确保.env文件和代码在同一目录下。\n\nimport json\n\nfrom os.path import expanduser\n\nfrom os import environ\n\nimport pandas as pd\n\nimport requests\n\nfrom requests.auth import HTTPBasicAuth\n\nimport time\n\n# Load credentials\n\ntry:\n\n    with open(expanduser('brain_credentials.txt')) as f:\n\n        credentials = json.load(f)\n\nexcept FileNotFoundError:\n\n    credentials = (environ.get('BRAIN_USERNAME'), environ.get('BRAIN_PASSWORD'))\n\n# Extract username and password from the list\n\nusername, password = credentials\n\n# Create a session object\n\nsess = requests.Session()\n\n# Set up basic authentication\n\nsess.auth = HTTPBasicAuth(username, password)\n\n# Send a POST request to the API for authentication\n\nresponse = sess.post('https://api.worldquantbrain.com/authentication')\n\n# Print response status and content for debugging\n\nprint(response.status_code)\n\nprint(response.json())\n \n## 获取数据集ID为 fundamental6 下的所有数据字段\n\ndef get_datafields(\n\n        s,\n\n        instrument_type: str = 'EQUITY',\n\n        region: str = 'USA',\n\n        delay: int = 1,\n\n        universe: str = 'TOP3000',\n\n        dataset_id: str = '',\n\n        data_type: str = 'MATRIX',\n\n        search: str = ''\n\n):\n\n    offset = 0\n\n    datafields_list = []\n\n    while True:\n\n        url_template = \"https://api.worldquantbrain.com/data-fields?\" + \\\n\n                       f\"&instrumentType={instrument_type}\" + \\\n\n                       f\"&region={region}&delay={str(delay)}&universe={universe}&dataset.id={dataset_id}&limit=50\" + \\\n\n                       f\"&offset={offset}\" + \\\n\n                       f\"&type={data_type}\"\n\n        url_template += (f\"&search={search}\" if search else \"\")\n\n        resp = sess.get(url_template)\n\n        results = resp.json()\n\n        # print(results)\n\n        if 'results' not in results:\n\n            print(f\"Unexpected response: {results}\")\n\n            break\n\n        else:\n\n            print(f\"Fetched {len(results['results'])} data fields with offset {offset}.\")\n\n            da",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39467969845783-%E6%96%B0%E6%89%8B%E8%AF%BE%E4%BB%A3%E7%A0%81%E5%88%86%E4%BA%AB",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【新人科普】一文助你成为BRAIN兼职研究顾问？",
+    "text": "回馈社区，给新人朋友们科普关于BRAIN兼职研究顾问（Consultant）你所需要知道的一切！\n\n【什么是BRAIN Consultant】\n\n通俗的讲是一个开放给所有人的兼职岗位, 通过Python脚本或者平台界面进行操作，利用平台提供的海量15万+数据、算力和API框架进行数据特征挖掘。根据提交的Alpha数量、质量和个人在平台的”等级“的不同，获取相应的报酬。\n\n成为顾问会签署顾问协议合同，根据平台的固定付款周期获取报酬。顾问每日都可以在平台内看到当天的收入，收入多少取决于每个人的”级别 （value factor）“和活跃程度，如果没有提交则没有收入。在前三个月的”试用期“的时候少一些，三个月以后根据表现提升了“级别（value factor）”后则会有几倍甚至几十倍的提升，每个人的方差比较大，从几百元到几万元都有。\n\n值得注意的是，如果当前在金融机构或金融科技等公司任职的话，可能由于利益冲突问题无法成为兼职顾问。\n\n【我是新用户，如何成为顾问】\n\n平台有两大类用户权限：用户权限（导航栏是蓝色）和顾问权限（导航栏是绿色）。\n\n初始注册后的用户权限为新手试用，在数据、地区、功能、算力等方面都远不如顾问权限。决定账户是否可以升级为顾问账户，取决于你的Challenge Score。正常情况下，如果达到一万分（Gold Level) 后的第二天即可获得系统的自动邀请。需要提示的是平台有系统风控，并不是所有用户都会收到邀请，所以还是要认真自己学习。\n\n当前除了达到一万分以外，国区的申请者要继续提交到20个alpha，并且通过 alpha 研究能力测试题（都是零基础学量化讲座中的基础知识）才能获得顾问资格。\n\n通过提交Alpha累计Challenge Score，查询自己Challenge Score的入口在Compeitions，Challenge 点击进入。以下是常见的Challenge Score的坑，此处敲黑板!\n\n* 每日获取分数的上限是2000分，不管提交多少，最多就是2000分！\n* 分数并不是实时更新的，T+1 更新，更新时间大约在北京时间的下午2-3点之间\n* 通常情况下1个alpha的分数大概在1500-2000分，2个alpha可以确保获得2000分\n* 平台对全球统一采用美东时间，也就是说北京时间的19号下午和20号上午会被认为是19号，以此类推\n\n【新用户自学都有哪些资源？】\n\n      中文论坛: 列举一些推荐的内容\n\n【学习资料】BRAIN平台自学路径图推荐\n【Alpha灵感启示录】合集（持续更新收录中）\n\n      平台LEARN 界面: 里面有视频和文字，都是英文版，可以使用翻译插件变成中文\n\nhttps://platform.worldquantbrain.com/learn\nhttps://platform.worldquantbrain.com/learn/documentation/create-alphas/19-alpha-examples\n\n     《零基础学量化》官方免费在线公开课\n\n这个由WQ的研究员来主讲，会不定时开课。报名在此文的评论区\n【学习资料】一文读懂BRAIN的量化学习体系：从入门到高阶\n\n【收到了顾问邀请以后都要做什么？】\n\n第一步：填写顾问申请表，此处一定注意阅读填写指南，否则被退回会非常影响申请进度。提交后务必关注自己的邮箱，如果有填写错误的地方会收到邮件要求修改，以免错过。在此期间请保持提交和回测，审核顺序按申请人的提交数量和回测数量排序，更高的数量将会缩短等待的时长，并且提高成功的概率。\n\n💎 BRAIN量化研究顾问 - 申请流程说明\n\n第二步：申请表通过后会收到顾问合同，按要求签署后提交，通常在当天或者第二天，就会获得顾问权限了。此时你的账户可以解锁平台主要的顾问功能，提交的任何alpha已经可以开始积累报酬了。但此时你的顾问身份为有条件顾问（Conditional Consultant）。在这一步，你还会解锁顾问中文论坛，里面有更多进阶的学习内容\n\n第三步：等待背调通过，在这段时间内背调公司（eeVoice）可能会通过邮件联系你要求提供一些补充材料，尤其是在职的同学。但对方不会联系你的雇主，因此不用担心。背调通过后，就会请你提供银行卡信息，之后你的账户就是正式顾问了。这个过程通常会有3-4周。\n\n以上就是BRAIN兼职顾问的介绍、学习资源以及申请步骤！希望对大家有所帮助，有任何问题欢迎随时下方留言！\n\n[评论区]\n很多同学留言说报名课程，我们课程滚动开课，邮件提醒。请关注邮件\n---\n这篇分享全面介绍了成为 BRAIN 兼职研究顾问的步骤和需要注意的事项，为新用户提供了清晰且实用的指引。从顾问的基本概念到申请流程，包括 Challenge Sc",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/28643095649943--%E6%96%B0%E4%BA%BA%E7%A7%91%E6%99%AE-%E4%B8%80%E6%96%87%E5%8A%A9%E4%BD%A0%E6%88%90%E4%B8%BABRAIN%E5%85%BC%E8%81%8C%E7%A0%94%E7%A9%B6%E9%A1%BE%E9%97%AE",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【新手教程】问题求助",
+    "text": "新手教程里有这样一个例子\n\n/*\n HYPOTHESIS: Poorly performing stocks are discussed more in general on social media platforms and thus they might have a higher relative sentiment volume, thus consider to short those stocks.\n \n IMPLEMENTATION: We apply negative weights if there's more sentiment volume, which we can do through social media data fields.\n \n HINT TO IMPROVE THE ALPHA: Can using the vector_neut operator vector for the alpha, neutralizing with volume improve alpha performance?\n */\n \n-scl12_buzz\n \n通过ai翻译：\n/*\n   假设：表现较差的股票在社交媒体平台上通常被讨论得更多，因此它们可能有更高的相对情绪量，故考虑做空这些股票。\n   \n   实现：如果有更高的情绪量，我们施加负权重，这可以通过社交媒体数据字段来实现。\n   \n   改进该因子的提示：对 Alpha 使用 vector_neut 算子进行向量化，并用成交量进行中性化，能否提升 Alpha 表现？\n*/\n\n我尝试改进这个alpha，发现几个问题：\n\n1.教程中提示使用vector_neut 算子，但这个算子似乎不是base算子，我在库里搜索vector只有vec_avg(x)和vec_sum(x)，前者是取平均值，后者是求总和，但要求数据已经是向量了，而提示要求要先对scl12_buzz进行向量化\n2.要求对成交量进行中性化，已知题目给出的是情绪量，情绪量越高，代表该只股票的表现越差，因此要做空这只股票，对情绪量取负是否就代表成交量\n3.我注意到题目提到要对向量化后的数据进行中性化，既然特意提到，应该不是仅仅在设置里面修改，我注意到库里有这个\n\ngroup_neutralize(x, group)\n\n但是由于1.2我无法实现，直接使用group_neutralize回测的结果肯定是不对的，所以这一条还没办法验证\n\n此外，学习了两节课，我感觉我的学习生涯进入了瓶颈期，回测一天甚至连一个alpha都提交不了，距离10000分遥遥无期，跟ai的交流受限，在教程里有时候碰到较难的题目，要花很多时间，得到的还尽是提交不了的alpha，有时fitness值仅差0.1内，反复尝试就是达不了标，挫败感还是很明显的\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39949828910999--%E6%96%B0%E6%89%8B%E6%95%99%E7%A8%8B-%E9%97%AE%E9%A2%98%E6%B1%82%E5%8A%A9",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【IQC 2026 交流】分享几个避坑心得",
+    "text": "🚨 三大常见“数据融合”避坑指南\n\n1. 警惕“量纲吞噬”（避免单票权重畸高） 另类数据（比如某些舆情热度值或财务绝对值）的数值波动极大，动辄成百上千；而我们常用的价格偏离度通常只有零点几。如果直接把它们相加，价格信号会瞬间被吞噬，导致系统把资金全砸在一两只极值股票上。\n\n通用解法： 在做加法或减法融合前，一定要先对两边的数据做横截面标准化（比如都套上 rank()，或者分别做 group_zscore），让大象和蚂蚁在同一个量级上对话。\n\n2. 警惕“自相关性（Self-correlation）”爆表 另类数据由于更新频率的问题，很多时候具备“黏滞性”（比如一个新闻热度能持续好几天不变）。如果这时候你再配合上长周期的价格均线（比如 20 天以上的 ts_mean），你的持仓就会像化石一样僵硬，自相关性轻轻松松飙过 0.7 的红线。\n\n通用解法： 尽量缩短时间窗口。做日频因子，多尝试 3-5 天的短周期反转逻辑（Reversal），保持因子的敏锐度。\n\n3. 警惕“换手率（Turnover）”失控 如果为了降自相关性，全部使用极短期的横截面排名，每天的排名震荡又会让换手率直接起飞，摩擦成本会大幅拖累 Fitness。\n\n通用解法： 给核心信号套上一层薄薄的时间平滑（如 3 天的 ts_decay_linear），并且在公式最外层永远记得乘以流动性权重（比如基于 adv20 的降权），把资金集中在滑点低的票上。\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39951300705559--IQC-2026-%E4%BA%A4%E6%B5%81-%E5%88%86%E4%BA%AB%E5%87%A0%E4%B8%AA%E9%81%BF%E5%9D%91%E5%BF%83%E5%BE%97",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "2026年IQC专辑《BRAIN x AI 零基础入门量化》系列课程Course 2作业",
+    "text": "欢迎大家留言、讨论、交作业、畅所欲言，严禁抄袭\n\nDay2参考文章1《101个Alpha》：https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701346\n\n该文章为本节课《使用快速表达式写出策略》的主题提供了很好的样本和思路，展示了如何将文字语言转化成数学语言的多种范例。供参考！\n\nDay2参考文章2之论文资源：Research-paper-1-The-Momentum-of-News\n\nDay2参考文章3之文档资源: Understanding Data in BRAIN: Key Concepts and Tips\n\nDay2参考文章4之了解数据：Understanding Data in BRAIN: Key Concepts and Tips | WorldQuant BRAIN\n\nDay2课后作业(所有必做）:\n\n必做1： 概念辨析，什么是long-count,什么是short-count?平台中的这两个值如何计算得出？\n必做2： 参考6tips文章，研究出datafield  anl4_cff_flag 的更新频率，并解释理由。同时请举出一个现实生活中的例子，什么样的数据可能跟它的更新频率类似（举例：我认为体检信息跟它的更新频率类似，因为.........）\n提示：先根据字段描述定性了解该数据字段，并最好附上回测结果截图进行说明。\n必做3： 解释 ts_std_dev(x, d) operator 能测出数据更新频率的逻辑.\n必做4：建议（非强制）使用get datafields批量生成Alpha，并对所有alpha进行回测。但要求在下节课前必须实现20次以上回测（截图Alpha id）。\n必做5：使用 AI，同时输入“BRAIN的运算符”和“数据字段的搜索结果”（你需要自行想出搜索关键词），请求 AI 帮助你实现这个 Alpha 想法:\n\n市场存在“新闻动量”,基于公司层面新闻文本的“情绪/倾向性”打分,当前新闻更正面的公司，未来一段时间,继续出现更正面的新闻；相反亦然。核心:新闻反映并预告了公司基本面的持续性，但市场对“新闻本身”和“新闻的可持续性”都存在低反应，导致在短期内（尤以硬新闻、信息不透明股票为甚）可以系统性赚取风险调整后的超额收益。\n\n你需要展示你的 Alpha 表达式，并以三种方式实现该想法，也就是说你需要给出 3 个 Alpha 表达式。不允许混信号，不允许不假思索使用AI，需对AI反馈进行如下截图，以证明思考。\n请特别注意，不要踩点提交，且最好每天都保持提交，因为challenge score每天仅更新一次且上限为2000分/日。\nCourse 2作业截止时间：北京时间次节课当日16：00\n\n[评论区]\ntask1:\n\nLong Count (做多数量): 指你的 Alpha 模型在特定日期给出的信号值为正，从而被分配了正权重（即建议买入）的股票总数。\n\nShort Count (做空数量): 指你的 Alpha 模型在特定日期给出的信号值为负，从而被分配了负权重（即建议卖出）的股票总数。\n\n根据编写的 Alpha 表达式自动计算和统计出来的。\n\ntask2：\n\n我认为四六级跟它的更新频率类似，因为四六级每年有两次考试两次考试的间隔有六个月，而在模拟的结果来看分别在每年的一月和七月进行细致的总结与反馈。\n\n \n\ntask3：\n\n这是因为我们可以巧妙地利用数据自身的特性来间接推断其更新模式。其背后的逻辑是：一个不更新的数据，它的值在一段时间内是恒定的，而恒定序列的标准差为零。\n\ntask4:\n\ntask5:\n\n1.rank(assets_curr / assets_curr)\n2.(assets_curr - delay(assets_curr, 5)) / assets_curr\n3.(assets_curr / ts_std_dev(assets_curr, 10)) / assets_curr\n---\n第一题：longcount就是做多shortcount就是做空，或者说是正向与负向\n\n第二题：使用ts_backfill(anl4_cff_flag,10)然后进行逐个检查就可以找到更新频率，大概是三个月更新一次，差不多相当于财务报告吧，三个月一次更新\n\n第三题：因为这个公式是计算数据系列x在过去d天内的标准差，测量该期间值与均值的偏差程度。\n\n第四题：回测过十万提交五十多\n\n\n \n\n# Alpha1 【成交量最高·短期最强】5日量价新闻动量（高频换手，量能最优） alpha1 = ts_zscore(ts_delta(ts_mean(news_all_vwap, 5), 5))\n\n# Alpha2 【IC最优·中期稳健】10日衰减量",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39411791834647-2026%E5%B9%B4IQC%E4%B8%93%E8%BE%91-BRAIN-x-AI-%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8%E9%87%8F%E5%8C%96-%E7%B3%BB%E5%88%97%E8%AF%BE%E7%A8%8BCourse-2%E4%BD%9C%E4%B8%9A",
+    "exprs": [
+      "rank(assets_curr / assets_curr)",
+      "ts_zscore(ts_delta(ts_mean(news_all_vwap, 5), 5))"
+    ],
+    "type": "text",
+    "has_expr": true
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "WorldQuant BRAIN 老新人经验",
+    "text": "写在前面\n\n在 WQ Brain 平台摸索了一段时间，踩过不少坑，也从论坛大佬们那里学到了很多。今天把一些核心经验整理一下，希望能帮到新人！\n\n 一、最重要的几个认知\n\n1. 心态建设\n⭐不要心急这是一个长投入的赛道，前期很多alpha 都会失败，这很正常。\n⭐value factor坐牢不要怕，重要的是不要放弃，跟自己比，每天进步一点点。\n⭐新人阶段要在不触发风控（控制PC、控制相关性）的前提下，保证一定的提交量，先拿到顾问资格。数量是基础，但乱交只会被风控反噬。\n\n2. 学习路径\n⭐先看官方文档和 Glossary（基础中的基础），多参加平台组织的培训课程\n⭐从简单模板开始练手，熟悉基本概念与基本操作\n⭐多看论坛高票经验分享帖，尤其是论坛精选帖\n⭐实践中不断调整策略，该放弃就放弃，不要死瞌，失败是正常的\n⭐利用好AI，助力因子研究，前提是基础玩明白。\n⭐ 要多交流、多分享、多提问\n\n二、实战技巧\n\n1.数据集选择\n\n⭐数据集 特点 推荐度 \n\n⭐TOP3000  覆盖面广，易出 alpha  | ⭐⭐⭐⭐⭐ |\n⭐TOP2500  对 prod corr 有帮助     | ⭐⭐⭐⭐ |\n\n2. 区域选择建议\n\n⭐新手村：USA（数据质量最好，但相关性高）、ASI（相对容易）\n⭐进阶：CHN（A 股特色）、EUR（欧洲市场）\n\n三、我踩过的坑\n\n坑 1、Delay 选择的教训\nDelay=0 的 alpha 尽量少交，难度大，回报低。\n\n坑2、忽视相关性\n只关注 IS，不与因子池对比\n确保与因子池里的 alpha 相关性 < 0.7，别被风控了。\n\n坑 3：value坐牢就放弃\n每次更新都可能大幅提升，着眼于因子质量，value factor不会亏待你的，坚持就是胜利！\n\n四、规划成长路线图\n\n第一阶段：0-30 个 alpha\n**目标**：熟悉平台，理解规则  \n**策略**：多跑基础模板，不要怕失败\n\n第二阶段：30-100 个 alpha  \n**目标**：形成自己的策略体系，自己的因子库\n**策略**：尝试自定义因子，学习中性化、降低turnover等技巧\n\n第三阶段：100+ alpha\n**目标**：优化质量，冲击更高级别  \n**策略**：关注 fitness、Sharpe，降低相关性\n\n五、官方资源\n⭐WorldQuant BRAIN 官方文档\n⭐Glossary 术语表\n⭐平台组织的培训课程\n\n最后的话\n\n量化这条路不容易，但只要有正确的方法和坚持，一定能看到进步，龟速爬行的老新人一个，大佬勿喷！\n\n[评论区]\n====================================================================================我是一条评论喵(๑´ڡ`๑)====================================\n \n写的不错，感谢你的建议，我相信对新人是非常有帮助的。都是来时路。\n \n=============================================================================点赞的大佬高vf+高OS rank====================================\n---\n大佬,帮个忙,我现在是在平台的教程阶段,需要一个可以提交的alpha,然后我用AI生成了好多,都是报错,大概意思是语法不对,但是我又不知道各个方法的使用规则,这个问题该怎么解决啊",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39329332106903--WorldQuant-BRAIN-%E8%80%81%E6%96%B0%E4%BA%BA%E7%BB%8F%E9%AA%8C",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "【Alpha Idea】The Information Content of Option Demand",
+    "text": "Paper：Research paper 71: The Information Content of Option Demand (https://support.worldquantbrain.com/hc/en-us/community/posts/17611254171031-Research-paper-71-The-Information-Content-of-Option-Demand)\n\n \n\n文章idea：这篇文章特别研究了Option Market Sidedness的增加 (OMS+)，得到的结论是OMS+与股票回报率 (RETt)，put-call parity (PCP) 偏差之间存在负向预测关系。\n\n \n\n关键实现方式：作者对Options Market Sidedness的数学定义，两个回归（Fama MacBeth Regressions & put-call parity (PCP)）表达式。代码请看作业1\n\n作业1  https://support.worldquantbrain.com/hc/en-us/community/posts/23759895660183/comments/23806461831447 \n\n \n\nAlpha表达式迭代过程，设置信号交易条件达到可提交状态请看作业2\n\n作业2  https://support.worldquantbrain.com/hc/en-us/community/posts/23807105368215/comments/23880986326039\n\n \n\nAlpha泛化，以及数据库的挑选请看作业3：\n\n作业3  https://support.worldquantbrain.com/hc/en-us/community/posts/23906082201239/comments/23940444519575  \n\n \n\n其他思考：\n\n1 通过什么方式把turnover给压下来\n\n2 抽象表达式怎么通过Self/Prod Correlation\n\n \n\n \n\n \n\n[评论区]\n感谢提醒，我重新copy了每一个作业的permalink，您看看是否能打开~（Strangely enough, I can open these links!）",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/23941370595991--Alpha-Idea-The-Information-Content-of-Option-Demand",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Combining sentiment and short-term price behavior for alpha signals",
+    "text": "I have been exploring alpha construction by combining options-implied sentiment with short-term price behavior to identify potential mispricings.\n\nThe idea is that implied volatility differences between calls and puts can capture market sentiment, while short-term return dynamics often reflect overreaction or noise. Combining both helps highlight cases where sentiment and price are not aligned.\n\nTo improve stability, I smooth the sentiment signal and use normalization methods like rank and z-score to make components comparable across stocks. On the price side, I scale returns by volatility and apply decay functions to emphasize recent movements.\n\nCross-sectional ranking and group neutralization also help reduce noise and improve robustness.\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39844078214807-Combining-sentiment-and-short-term-price-behavior-for-alpha-signals",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "My Journey to Gold Level: Lessons from Building Intraday Reversal Alphas",
+    "text": "Hi Community,\n\nI wanted to share a quick update on my recent progress. After several weeks of experimentation and many rejected submissions, I finally managed to reach Gold level with a couple of alphas.\n\nWhat I Did:\n\nI focused on short-term mean-reversion ideas using basic price and volume relationships (Open, High, Low, VWAP). Instead of making the expressions overly complex, I concentrated on refining the core signal, adding proper smoothing, and most importantly, tuning the submission settings.\n\nThe main improvements came from:\n\nSwitching from close-based to VWAP-based references\nAdding controlled amplification to increase signal strength\nUsing light smoothing (ts_mean)\nHeavy emphasis on neutralization, decay, and truncation settings\nGeneral Concept:\n\nThe core idea is a short-term intraday exhaustion / mean-reversion alpha. It tries to identify stocks that made strong directional moves with high volatility during the day and bets on a reversal the next day. The logic is built on the concept that markets tend to overreact in the short term, especially on high-range days, and these moves often correct.\n\nKey Takeaways:\nSettings matter as much as the expression itself (especially Subindustry neutralization and high Decay)\nSmall changes in smoothing can significantly improve fitness and help pass correlation checks\nSimple microstructure ideas can work very well when properly neutralized and smoothed\nVWAP-based signals tend to be cleaner than raw close/open for intraday reversal logic\n\nThis whole process taught me that patience and systematic tuning of both the formula and settings are more important than complexity.\n\nWould love to hear from others:\n\nWhat types of mean-reversion or microstructure alphas have you had success with?\nAny favorite settings combinations for short-term alphas?\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39857750912535-My-Journey-to-Gold-Level-Lessons-from-Building-Intraday-Reversal-Alphas",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Turnover vs Alpha: Efficiency Matters More Than Speed",
+    "text": "A common issue in BRAIN:\n\nHigh turnover often looks good in backtests—but hurts in reality.\n\nThe key equation is simple:\n\nNet Alpha = Gross Alpha − Turnover × Cost\n\nMany alphas optimize for IC / Sharpe, but ignore that turnover directly drives:\n\nSlippage\nMarket impact\nCapacity limits\nCore Insight\n\nHigh turnover usually means the signal is reacting to noise, not persistent information.Faster is not always better.\nMore stable signals tend to:\n\nTrade less\nScale better\nDeliver stronger net performance\nHow to Improve Turnover (Without Killing Alpha)\n\nInstead of forcing turnover down, focus on signal quality:\n\nReduce sensitivity to short-term noise\nPrioritize persistence over immediacy\nIgnore marginal signal changes\nUse structured ranking / grouping approaches\nCombine multiple signals for smoother behavior\nTest lower rebalancing frequency\nBetter Metric\n\nDon’t just look at turnover level—look at:\n\nAlpha per unit of turnover\n\nTakeaway\n\nTurnover is not the enemy—inefficient turnover is.\n\nThe best alphas are not the most active ones,\nbut the ones that trade only when it matters.\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39856208659735-Turnover-vs-Alpha-Efficiency-Matters-More-Than-Speed",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Are LLMs Making Alpha Research Too Easy — or More Efficient?",
+    "text": "With the growing use of large language models in quantitative research, generating alpha ideas, refining expressions, and debugging logic has become significantly faster. Tasks that previously required deep manual effort can now be accelerated through prompt-driven exploration.\n\nHowever, this raises an interesting question: does this “ease” improve research quality, or does it risk flooding the alpha space with structurally similar ideas?\n\nOn one hand, LLMs can help validate logic, reduce errors, and expand the search space efficiently. On the other hand, heavy reliance on them might lead to:\n\nReduced originality in alpha construction\nOver-exploration of similar operator combinations\nFaster convergence to crowded signals\n\nI’m curious about the community’s perspective:\n\nHave LLMs improved your alpha discovery process meaningfully?\nHow do you ensure originality when using AI-assisted generation?\nDo you treat LLMs as a tool for validation or for idea generation?\nCould widespread use of LLMs reduce overall alpha uniqueness over time?\n\nLooking forward to hearing how others are integrating LLMs into their research workflows while maintaining an edge.\n\n[评论区]\nIt's a wealth of financial knowledge that we can use to improve architecture and research new directions to make alpha development more effective and efficient.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39673573721111",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "The Concept That Changed How I See Alphas: Rank",
+    "text": "Starting my journey on WorldQuant Brain as a commerce student and here’s one concept that really clicked for me ; RANK.\n\nAt first, I was focusing too much on raw values (prices, ratios, etc.), but rank changed how I think. Instead of asking “how big is this number?”, it asks “how does this compare to others?”\n\nSo rather than worrying about scale, rank helps you:\n\nIdentify relative winners and losers\nNormalize different data points\nBuild cleaner, more robust alphas\n\nFor example, a value might not mean much on its own, but once ranked, you immediately see where it stands in the market.\n\nSimple idea, but very powerful when building signals.\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39850220016535-The-Concept-That-Changed-How-I-See-Alphas-Rank",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Alpha creation",
+    "text": "Alpha creation\nFollow\nFollowed by 3 people\nDM51539\n5 days ago\n4\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39848069071639-Alpha-creation",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "A Beginner’s Perspective: Is Simplicity the Real Alpha?",
+    "text": "As someone new to WorldQuant Brain, I’ve been exploring different approaches to building alphas and noticed that many strategies tend to become quite complex, combining multiple signals and heavy optimization. This made me wonder whether simplicity itself could be an overlooked advantage. I’ve been thinking about whether a straightforward approach—such as using a single intuitive signal like momentum or mean reversion, combined with a basic filter like volume or volatility—might actually produce more robust results by reducing overfitting and improving generalization across different market conditions. As a beginner, I’m curious to learn from others in the community: have simpler models ever outperformed more complex ones in your experience, and how do you decide when adding more factors stops adding real value?\n\n \n \n \n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39860387579543-A-Beginner-s-Perspective-Is-Simplicity-the-Real-Alpha",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "My Alpha Development Journey on BRAIN",
+    "text": "Hi everyone,\n\nI’ve been actively working on building alphas using price-volume, options, and sentiment data.\n\nRecently, I developed a strategy combining short-term mean reversion with volume signals. The idea is that stocks that recently declined tend to rebound, especially when supported by strong trading activity.\n\nI’ve also been experimenting with improving alpha performance using techniques like time-series smoothing, ranking, and group neutralization.\n\nOne key lesson I’ve learned is that small structural changes in alpha expressions can significantly improve performance and reduce correlation.\n\nLooking forward to learning more from the community and improving my strategies further.\n\nThanks!\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39844286547351-My-Alpha-Development-Journey-on-BRAIN",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Rescuing a Low Sharpe: Moving Beyond Raw Alpha to Risk-Adjusted Signals",
+    "text": "Hi everyone,\n\nI've been reviewing some of my recent alpha submissions, and a recurring issue I’m hitting is passing the initial return hurdles but failing the strict 1.58 Sharpe cutoff in testing (sometimes coming in terribly low, like 0.25).\n\nWhen this happens, it usually means the signal has the right directional intuition, but the volatility is eating the risk-adjusted returns alive. Here are a few techniques I’m using to try and smooth out the variance:\n\nAggressive Neutralization: A raw signal often carries hidden market or sector beta. Applying strict group_neutralize (e.g., neutralizing by Sub-Industry) can significantly reduce the volatility of the daily PnL, pushing the Sharpe up even if absolute returns drop slightly.\n\nSignal Smoothing: If the underlying data is noisy, wrapping the core expression in a ts_mean or ts_rank over a 3 to 5-day window can cut down on daily erratic swings.\n\nVolatility Scaling: Penalizing stocks with high historical volatility by dividing the signal by a trailing standard deviation metric.\n\nHow do you usually approach a signal that has a good concept but a weak Sharpe? Do you try to smooth the data first, or focus entirely on neutralizing the output?\n\n[评论区]\nGreat strategies. Neutralize first, then smooth signals to enhance Sharpe.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39951906541463-Rescuing-a-Low-Sharpe-Moving-Beyond-Raw-Alpha-to-Risk-Adjusted-Signals",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Combining Multiple Data Sources for Robust Alpha Generation",
+    "text": "In alpha research, relying on a single signal often leads to unstable performance due to noise and overfitting. A more robust approach is to combine signals from different, relatively uncorrelated data sources.\n\nFor example, news sentiment can be used to identify regimes where momentum or mean reversion is more effective. Price/volume signals such as VWAP/close can capture short-term inefficiencies, while fundamental ratios like debt-to-equity or operating income trends provide longer-term insights.\n\nBy combining these signals, it is possible to improve both Sharpe ratio and stability while reducing reliance on any single data source.\n\nAdditionally, simulation parameters such as decay and truncation play an important role. Increasing decay can smooth signals and reduce turnover, while truncation helps control extreme exposures.\n\nOverall, diversification across signals and careful parameter tuning are key to building robust alphas.\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39847972185623-Combining-Multiple-Data-Sources-for-Robust-Alpha-Generation",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "SIMPLE FRAMEWORK FOR BUILDING ROBUST ALPHAS",
+    "text": "🧠 A SIMPLE FRAMEWORK FOR BUILDING ROBUST ALPHAS IN WORLDQUANT BRAIN\n\n 1. CORE IDEA\n\nIn WorldQuant Brain, strong alphas are not defined by high backtest Sharpe alone, but by **robustness, consistency, and economic intuition**.\n\nAn alpha is simply:\n\n> A transformation of market data that produces a ranked signal predicting future returns.\n\nThe key question is not “how complex is the formula?”, but:\n\n> “Does this signal consistently extract meaningful structure from noisy market data?”\n\n 1) Four Pillars of a Good Alpha\n 2) Predictive Logic (Edge)\n\nA valid alpha must reflect a real market effect such as:\n\n* mean reversion\n* momentum\n* liquidity effects\n* behavioural biases\n\nIf there is no clear reason the signal should work, it is likely noise.\n2) ROBUSTNESS\n\nA strong alpha should remain stable under:\n\n* different time periods\n* small parameter changes\n* different market regimes\n\nIf minor changes break performance, the alpha is likely overfit.\n\n3) CONTROLLED TURNOVER\n\nHigh turnover reduces real-world viability due to costs and noise sensitivity.\n\nGood alphas typically use:\n\n* smoothing (ts_mean)\n* decay functions\n* longer lookbacks\n\nGoal: **reduce unnecessary trading while preserving signal strength**\n\n4) CROSS_SECTIONAL STABILITY\n\nSince Brain is fundamentally cross-sectional, a useful alpha should:\n\n> consistently rank assets in a stable and interpretable way.\n\nIf rankings are erratic, the signal is mostly noise.\n\n3. COMMON PITFALL\n\nMany researchers over-optimize Sharpe in backtests. This often leads to:\n\n> fragile, unstable alphas that do not generalize.\n\nA better approach is:\n\n> prioritize stability and economic intuition first; Sharpe should follow naturally.\n\n 4. SIMPLE RESEARCH WORKFLOW\n\n1. Start with a clear hypothesis\n2. Convert it into measurable features\n3. Apply transformations (rank, decay, smoothing)\n4. Build cross-sectional signal\n5. Stress test across regimes and parameters\n6. Evaluate beyond Sharpe (turnover, stability, fitness)\n\n5. FINAL INSIGHT\n\nAlpha ",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39897747148183-SIMPLE-FRAMEWORK-FOR-BUILDING-ROBUST-ALPHAS",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Turnover Compression in Alpha Design: Advanced Methods to Preserve Signal Edge While Trading Less",
+    "text": "One of the most overlooked areas in alpha research is turnover efficiency. Many signals appear strong in simulation, but excessive turnover can reduce real performance through instability, unnecessary rebalancing, and weaker implementation quality. In my recent research, I focused on designing alphas that preserve predictive strength while trading less.\n\nI found that the first improvement comes from signal construction. Instead of relying on highly reactive raw inputs, I used ranked and standardized factors to reduce noise. Operators such as rank, ts_rank, and zscore helped create cleaner cross-sectional signals that changed only when relative information truly shifted.\n\nThe second improvement came from smoothing signal behavior. Applying ts_decay_linear, ts_mean, and longer lookback windows reduced short-term fluctuations that often create unnecessary trades. In multiple tests, smoother signals produced stronger Fitness and more stable Sharpe than faster unstable versions.\n\nAnother useful method was combining different low-correlated components such as liquidity behavior, short-term mean reversion, and volatility response. Composite signals were more stable than single-factor alphas, which naturally lowered turnover.\n\nI also found that group_neutralize helped remove sector-driven rotations that can create avoidable trading activity. By focusing on stock-specific edge instead of industry movement, the alpha became more efficient.\n\nMy key conclusion is that turnover should be treated as part of alpha design, not as an afterthought. The strongest long-term strategies are often those that update only when meaningful information changes. I’d be interested to hear how other researchers balance turnover reduction with maintaining signal edge.\n\n \n \n \n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39851103798423-Turnover-Compression-in-Alpha-Design-Advanced-Methods-to-Preserve-Signal-Edge-While-Trading-Less",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "How to start Alpha research using the BRAIN Tutorial🧑‍🏫🪄",
+    "text": "This post is to explain how the BRAIN Tutorial that you can see on the right-side window of the Simulate page works, and how you can utilize it to learn about BRAIN and reach further level as an aspiring quant!\n\n📌Introducing BRAIN Tutorial\n: a step-by-step interactive guide to building your first Alphas in BRAIN:\n\nAll new users can access the Tutorial on the right-side window of the Simulate tab\nOnce you click “Start tutorial” button, the 30-day window begins for you to complete all the learnings and requirement in each of the 27 module.\nIf you complete the tutorial and meet all the requirements (including reaching Gold level) within the time window, a “Quantitative Finance Starter Level Certificate” will be issued to your email.\n\n \n\n📌How each module works: \n\nYou can check your tutorial learning progress and your progress till reaching Gold level(10,000 Challenge points) on the top of each tutorial module\n\n\n\nEach module has a task that you need to try and succeed in order to proceed to the next learning module.\n\n\nWhen you check the “RESULTS” tab, you can see whether you were able to successfully pass the task or not:\n\n\n\n\nIn case you are stuck with the task, there are ‘hints’ and ‘answers’ that can help you in the tutorial: \n \n\nOnly if you succeed the task, the “Next” button on the bottom right will be activated, and you can move on the the following learning module. This continues till you finish the 27 modules.\n\nYou can utilize other learning resources on the platform (Learn page, videos, BRAIN Tips, live webinars, forum posts, etc.) that can help you pass the Tutorial tasks and help you earn your Quantitative Finance Starter Level certificate. \n\n\n\nIf you have any questions about the Tutorial, or face any error while using it please feel free to send us a ticket, or leave comment below.\n\nThank you,\n\nWorldQuant BRAIN Team\n\n[评论区]\nHello! I have a question regarding the 11th module of the tutorial. When using the following code as suggested by the solution \n\nclv = ((cl",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/30928810917271-How-to-start-Alpha-research-using-the-BRAIN-Tutorial",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "In Research, Pretty Results Can Be Dangerous",
+    "text": "In research, one lesson keeps showing up:\na good-looking result is not the same as a robust result.\n\nIt’s easy to get excited by patterns.\nIt’s harder to ask whether the pattern survives noise, bias, weak assumptions, and changing conditions.\n\nI’m trying to train myself to respect rigor more than excitement.\n\nBecause in the long run, disciplined thinking beats attractive illusions.\n\nWhat are your thoughts?\n\n[评论区]\nThis is very true, and honestly one of the hardest habits to build.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39925470817431",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "The Power of Data Hygiene and Signal Refinement",
+    "text": "One key lesson I’ve learned after nearly a month of daily simulations on the WorldQuant BRAIN platform is that a great idea only works if the data is \"clean.\" Initially, I focused only on raw signals, but I’ve realized that managing data missingness and weight concentration is what actually separates a simulation from a tradable Alpha.\n\nI’ve started consistently using operators like ts_count_nans and ts_backfill to reward reporting consistency, combined with trade_when to handle concentration risk. I’ve also found that scaling momentum signals over a 20-day window and applying industry neutralization significantly improves the return-to-drawdown ratio. Sharing this because focusing on these \"hygiene\" steps transformed my Sharpe ratios and made my Alphas much more robust across different universes.\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39861312594071-The-Power-of-Data-Hygiene-and-Signal-Refinement",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Super sport golf",
+    "text": "Super sport golf\nFollow\nFollowed by 2 people\nJL12518\n16 hours ago\nFemale golf course\n1\n\n[评论区]\nI'm likely glad to be part of a new opportunity base on world quantity this might be an incredible opportunity for me\n---\nI don't quite understand your question. Could you please explain your idea in more detail?",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39958616426519",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Exploring Whether Cash Flow Signals Are Stronger Than Profit Signals",
+    "text": "I’ve been researching whether cash flow metrics can provide stronger predictive signals than traditional profit-based measures when building equity factors.\n\nOne pattern I keep noticing is that reported profits do not always reflect the true financial strength of a company. Earnings can improve while underlying cash generation remains weak. In contrast, firms with stable and improving cash flows may offer more reliable forward signals.\n\nAreas I’m currently exploring:\n\n• Operating cash flow strength relative to valuation\n• Gross profit supported by real cash generation\n• Capital expenditure efficiency and reinvestment quality\n• Cases where profit growth diverges from cash flow trends\n• Whether cash-based signals remain robust across sectors\n\nUseful BRAIN fields for testing:\n\n• cashflow\n• enterprise_value\n• mdf_gpr\n\nEarly hypothesis: combining valuation with cash generation may outperform relying on profits alone.\n\nExample starting ideas:\n\nrank(cashflow / enterprise_value)\n\nrank(mdf_gpr * cashflow)\n\nStill testing different neutralizations, decay settings, and holding horizons. Curious if others have found stronger robustness from cash-based signals than pure earnings metrics.\n\nHappy research!\n\n \n \n \n\n[评论区]\nCash flow signals often prove more robust than profits because they’re harder to distort. Combining profitability, valuation, and cash efficiency usually gives the best durable results.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39867788617879-Exploring-Whether-Cash-Flow-Signals-Are-Stronger-Than-Profit-Signals",
+    "exprs": [
+      "rank(cashflow / enterprise_value)",
+      "rank(mdf_gpr * cashflow)"
+    ],
+    "type": "text",
+    "has_expr": true
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "BRAIN 版本更新记录",
+    "text": "此贴记录Brain平台版本功能迭代：\n\n2023.11.22: Alpha状态更新\n\nAlpha页面中从IS,OS,Production更新为Unsubmitted和Submitted\n\n2023.12.25: New Universe\n\nOnly stocks in Utility sector within the usual TOP3000 universe\n\n[评论区]\nPost is closed for comments.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/19420568914839-BRAIN-%E7%89%88%E6%9C%AC%E6%9B%B4%E6%96%B0%E8%AE%B0%E5%BD%95",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Term #6: Fitness",
+    "text": "Fitness is defined in the Alpha Performance help page: Fitness = Sharpe * sqrt(abs(Returns) / Max(Turnover,0.125)). \n\nFitness is similar to ELO ratings in chess, which make it easier to compare two chess players.\n\n[评论区]\nFitness is a powerful metric because it combines multiple aspects of an alpha into a single score. By incorporating Sharpe, returns, and turnover, it not only evaluates profitability but also efficiency and stability. The comparison to ELO ratings is insightful, as it simplifies performance evaluation and makes it easier to compare different alphas on a consistent scale.\n---\nFitness is similar to world rankings of soccer teams. These rankings make it easier to compare two teams and are based on complex algorithms (e.g., the number of matches, played, the quality of the opposition, etc.).\n---\nThanks for breaking that down — the chess ELO analogy for Fitness really helps make sense of how to compare alphas beyond just Sharpe.\n---\nWhat I like about this Fitness metric is that it forces balance, not just raw performance.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/14487400012823-Term-6-Fitness",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Super sport golf",
+    "text": "Super sport golf\nFollow\nFollowed by 2 people\nJL12518\n16 hours ago\nFemale golf course\n1\n\n[评论区]\nI'm likely glad to be part of a new opportunity base on world quantity this might be an incredible opportunity for me\n---\nI don't quite understand your question. Could you please explain your idea in more detail?",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39958616426519-Super-sport-golf",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "👉New Singapore/ Malaysia Forum👈",
+    "text": "We understand that the alpha-making journey isn’t easy, we’ve been through it and we want to help. If you have any question or challenges you face, we welcome you to submit a post to this forum. The BRAIN team will get back to your query shortly.\n\nHelpful sites:\n\nAlpha Ideas 👉 27 Alpha Examples\nTips to get more points in IQC 👉 3 Tips\nOur upcoming events (Online and Offline) 👉 Calendar\nLearning Series to Improve your Alpha 👉 BRAIN Tips\n\n[评论区]\nHi there, any Malaysian and Singaporean here ? Is more happier and productive to have a local community to help each other. I been studying alpha idea for 2 months now. Still learning.\n---\nHi! my name is Kevin and I am currently living in Singapore. just want to ask, I have submitted around 3/4 alphas from the worldquant beginner and intermediate webinar, but how come in my profile only 1 alphas shows up?\n---\nhello Kevin, you can check if your alpha has been successfully submitted by clicking on the Alphas tab -> Out Sample. If you only see 1 alpha, it means the rest has not been submitted. You can find alphas you have previously simulated under 'In Sample' and then submit them. \n\n \n---\nThanks for the answer! Do you know what is the threshold to become a research consultant? also, it is optimal to submit 1 alphas per day is it\n\n \n---\nHi,\n\nYou need to clear the WorldQuant challenge and get 10000 points to be eligible for a research consultant opportunity. You can read more about the challenge here:\nWorldQuant Challenge | WorldQuant BRAIN\n---\nHi all, Once again thank you for the answer.\n\nCurrently, I already reached 10 thousand points and reached gold. My friends said that people from worldquant will contact me to offer the research consultant program, however, they haven't still contact me. Do I just have to wait or do I actually need to register somewhere else first? I need to become research consultant asap so I can join ACE challenge.\n\nThank you all for your answers and helps!",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/14806425202583--New-Singapore-Malaysia-Forum",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "新人成长血泪史！VF0.5->0.56->0.91：我踩过的坑和汗水",
+    "text": "大家好！我是一名10月13号参加第二批线下培训的“新人”顾问，成为顾问至今也有快5个月了，看着同期的课代表和其他优秀的同学先后达到了0.99+的高value factor，日薪早早达到100🔪的水平，不争气的泪水忍不住从嘴角流了下来。痛定思痛，我开始反思为什么比我晚成为顾问的同学却比我更早一步拿到了诱人的payment，以及我到底是哪里出了问题才会让value factor一直停滞不前？现在我把我的经验和反思分享给大家共勉！希望大家不会像我一样走这么多的弯路。如果觉得此篇分享对您有帮助，请不要吝惜您的点赞支持！\n\n下面是我前天以前的payment，可以看到0.5和0.56两个阶段泾渭分明，0.56阶段的工资相比0.5已经有了较大的提升（嗯嗯。究其原因，一方面是0.56确实对收入有一点提升，我认为更重要的是因子的质量！\n\n前不久EUR市场公布了最新的universeTOP2500，正巧那段时间我也正在做EURTOP1200，索性就直接转战2500.在这个universe，我挖到了大量的12阶高质量因子，甚至有一个fit3.3，prod只有0.43的二阶因子，但可惜我在提交截图时提交了微信截图，没有评到双周奖，很可惜。一阶的因子使用数据少，也更加的稳定，因此提交一阶因子收入提升非常明显。可以看到，我的payment在迎来第一次小高潮后陷入了低谷，后来因为主题的推出payment才再次提高，但其实这个时候我已经没有一阶因子可以交了。由此可见，因子的质量提升有时会有接近于主题倍率的提升！\n\n那么话说回来，为什么我前期每天基本都交满因子，value factor却只有可怜的0.56呢？我认为一味的追求数量不是正解，即便是一个新人。当然新人可以尽量多交一点因子来迅速提升多样性，但是如果对于因子整体表现损失过大一定要慎重！我在11月初得了重病，导致那段时间没有任何因子产出。但迫于新人奖日期限制的压力，我必须迅速挖出10个可以提交的因子，那段时间只要是满足要求的因子，不论表现我都会提交，这也就导致了我第一次更新value factor 只有0.56.虽然后期靠着大量质量一般的因子扳回一局，但得到高value factor显然已经不可能。因此在1月份我转换了策略，如果没有对整体表现有益的因子，我宁可不去提交。厚积，最终薄发！\n\n \n\n最后，也是我认为最重要的一点，如果每天回测数太少，不仅意味着挖到的因子数表少，同样意味着挖到高质量因子数量也会变少，因此前两点都建立在一个拥有一个强大高效的回测效率的基础之上。我在这里选择使用多线程来提升回测效率，这样的话因子的数量多，选择也更多，质量也就自然提升起来了！\n\n说点题外话，我经常会懊悔在value factor第的时候交了太多的高质量因子，导致现在value factor高的时候没有足够的高质量因子可以提交了哈哈。相信可能有人和我也想的一样。但其实不然。如果没有之前的高质量因子做基础又怎么会有gaovalue factor呢？退一万步讲，value factor只不过是平台对我们因子质量的认可，目前value factor低并不是不提交高质量因子的原因。\n\n最后声明，本文仅代表个人观点，如有意见欢迎评论区友好讨论！如有帮助，万请不吝点赞支持！谢谢大家！\n\n[评论区]\n重病坚持挖因子,你值得拥有\n\n-----------------------------------------------------------------------------\n\n-----------------------------------------------------------------------------\n\n--------------------------热爱生活的老毛---------------------------------\n\n-----------------------------------------------------------------------------\n\n-----------------------------------------------------------------------------\n---\nthis is the post i was looking for. before, i only cared about the submittable alpha so the os and value scores were very low. then i paid attention to the sharp factors of the years, tunover, margin so the performance was more",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/30684190103319-%E6%96%B0%E4%BA%BA%E6%88%90%E9%95%BF%E8%A1%80%E6%B3%AA%E5%8F%B2-VF0-5-0-56-0-91-%E6%88%91%E8%B8%A9%E8%BF%87%E7%9A%84%E5%9D%91%E5%92%8C%E6%B1%97%E6%B0%B4",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "[BRAIN TIPS] 6 ways to quickly evaluate a new dataset",
+    "text": "WorldQuant BRAIN has thousands of datafields for you to create alphas. But how do you quickly understand a new datafield? Here are 6 ways. Simulate the below expressions in “None” neutralization and decay 0 setting. And obtains insights of specific parameters using the Long Count and Short Count in the IS Summary section of the results.\n\n \n\nSr. No\n\n\t\n\nExpression\n\n\t\n\nInsight\n\n\n\n\n1\n\n\t\n\ndatafield\n\n\t\n\n% coverage, would approximately be ratio of (Long Count + Short Count in the IS Summary )/ (Universe Size in the settings)\n\n\n\n\n2\n\n\t\n\ndatafield != 0 ? 1 : 0\n\n\t\n\nCoverage. Long Count indicates average non-zero values on a daily basis\n\n\n\n\n \n\n \n\n3\n\n \n\n\t\n\n \n\n \n\nts_std_dev(datafield,N) != 0 ? 1 : 0\n\n\t\n\nFrequency of unique data (daily, weekly, monthly etc.).\n\nSome datasets have data backfilled for missing values, while some do not. The given expression can be used to find the frequency of unique datafield updates by varying N (no. of days).\n\n \n\nDatafields with a quarterly unique data frequency would see a Long Count + Short Count value close to its actual coverage when N = 66 (quarter). When N = 22 (month) Long Count + Short Count would be lower (approx. 1/3rd of coverage) and when N = 5 (week), Long Count + Short Count would be even lower.\n\n\n\n\n4\n\n\t\n\nabs(datafield) > X\n\n\t\n\nBounds of the datafield. Vary the values of X and see the Long Count. For example, X=1 will indicate if the field is normalized to values between -1 and +1?\n\n\n\n\n5\n\n\t\n\nts_median(datafield, 1000) > X\n\n\t\n\nMedian of the datafield over 5 years. Vary the values of X and see the Long Count. Similar process can be applied to check the mean of the datafield.\n\n\n\n\n6\n\n\t\n\nX < scale_down(datafield) && scale_down(datafield) < Y\n\n\t\n\nDistribution of the datafield. scale_down acts as a MinMaxScaler that can preserve the original distribution of the data. X and Y are values that vary between 0 and 1 that allow us to check how the datafield distribute across its range.\n\n \n\nFor example, if you simulate [close <= 0], You will see Lo",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/11807866133911--BRAIN-TIPS-6-ways-to-quickly-evaluate-a-new-dataset",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "From Days to Hours: How LLMs Are Rewriting Quant Research",
+    "text": "The biggest change LLMs bring to quant research is:\n\nCompression.\n\nWhat used to take days now takes hours.\n\nFuture researchers targeting World Quant should already be training this skill.\n\nUsing NotebookLLM and Other LLM's:\n\nPrompt 1 — Multi-Source Synthesis\n\n“Combine insights from these papers and identify overlapping signals.”\n\nExpected Output\n\nMomentum + liquidity overlap\nVolatility clustering signal\nComposite alpha idea\n\nPrompt 2 — Feature Engineering\n\n“Generate 5 alternative features using price and volume.”\n\nExpected Output\n\nVWAP deviation\nVolume spike ratio\nLiquidity imbalance\nRange compression\n\nPrompt 3 — Risk Overlay\n\n“Add risk controls to a high-turnover strategy.”\n\nExpected Output\n\nPosition limits\nVolatility scaling\nSector neutrality\n\nBut here’s what most people miss:\n\n“The quality of your research is increasingly bounded by the quality of your prompts.”\n\nA vague prompt gives you generic signals.\nA tight, well-structured prompt gives you actionable alpha candidates.\n\nIn other words:\n\nBad prompt → noise\nAverage prompt → known ideas\nPrecise prompt → differentiated thinking\n\nLLMs shift the bottleneck from:\nexecution → judgment\n\nBut even before judgment, there’s a new gate:\n\n👉 Problem framing through prompts\n\nQuestion:\nDo you think LLMs will commoditize alpha ideas, or actually help uncover more unique ones — depending on who’s asking the questions?\n\n[评论区]\nThis is a great framing ,especially the idea that LLMs shift the bottleneck from execution to judgment.\n---\nI think the LLMs shift is going to give a good point of view towards how to alphas look but will also help with idea's.\n\n \n---\nThank you for the insight, it's a big eye opener👏👏",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39937449819287",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Is Turnover the Most Ignored Risk?",
+    "text": "Many high-Sharpe alphas look strong in simulation, but they often come with very high turnover. In practice, this creates two key issues: >Trading costs (commissions, slippage, market impact) can significantly reduce—or fully offset—returns Scalability constraints — high-frequency rebalancing becomes harder to execute as capital grows A simple way to frame it: Net Return ≈ Gross Alpha − Trading Costs This means a “good” alpha on paper may not be a good strategy in reality. I’ve also noticed: High-turnover alphas tend to be less stable over time They may rely on short-lived signals that decay quickly Combining many high-turnover alphas can amplify cost drag So I’m starting to think: A slightly lower Sharpe with lower turnover and better stability may be more valuable in a real portfolio. Curious how others think about this: Do you apply a turnover filter early in your research? Or optimize for Sharpe first and handle turnover later? Any rules of thumb for balancing Sharpe vs turnover?\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39843861563415-Is-Turnover-the-Most-Ignored-Risk",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "‎How to reduce weight concentration and increase Sub-universe sharpe ‎",
+    "text": "‎How to reduce weight concentration and increase Sub-universe sharpe ‎\nFollow\nFollowed by one person\nAR43211\n5 days ago\n0\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39843020743191--How-to-reduce-weight-concentration-and-increase-Sub-universe-sharpe",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "📣 新徽章：\"Top Commenter\" 🏅",
+    "text": "我们很高兴向大家介绍一个新的徽章 - \"Top Commenter\"。\n社区成员可以通过积极参与社区中讨论获得该徽章:\n\n   帮助回答其他成员的常见疑问\n   分享自己的知识和经验\n   完成所参与课程要求的作业\n   参与社区中广泛的讨论与交流\n\nBRAIN 团队会管理社区中的事务并定期颁发该徽章。\n该徽章会显赫的展示在个人资料中以及所发布的帖子和评论旁侧, 以突出显示您的等级和对论坛的贡献。\n我们希望大家都可以参与进来共同营造一个开放包容的社区氛围，在量化的旅途中互相学习，共同成长！\n\n[评论区]\nPost is closed for comments.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/20022067378711--%E6%96%B0%E5%BE%BD%E7%AB%A0-Top-Commenter",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "How Do You Control Turnover Without Losing Signal Strength?",
+    "text": "One thing I’ve been thinking about recently is how easy it is to ignore turnover early in the research process. At the beginning, I focused mostly on predictive metrics like Sharpe and fitness. But over time, I noticed that many of my higher-turnover signals looked strong at first, then became unstable or decayed faster than expected. In several cases, it seemed like high turnover wasn’t coming from strong predictive logic, but from the signal reacting too much to short-term noise. So lately, I’ve been trying to better understand how to control turnover without weakening the core signal, and I’m curious how others approach this.\n\nWhy Does High Turnover Often Lead to Instability?\n\nFrom my experience, high-turnover signals tend to show similar behavior patterns.\nThey often:\n\nReact too quickly to small price changes that may just be noise\nProduce unstable rankings, with positions flipping frequently\nShow inconsistent results across different time periods\nDecay faster when tested on more recent data\n\nAt first, high turnover can look attractive because the signal appears responsive. But after running more tests, it sometimes becomes clear that the signal is reacting to randomness rather than meaningful structure.\n\nHas anyone else noticed this pattern?\n\nWhat Techniques Have Worked for You?\n\nHere are a few things I’ve been experimenting with, but I’d really like to hear how others approach this.\n\nSignal Smoothing\n\nAdding smoothing — like short rolling averages — seems to reduce sudden fluctuations and stabilize rankings.\n\nIn some cases, I’ve noticed:\n\nTurnover drops naturally\nRankings become more stable\nPerformance becomes less noisy\n\nHave you found smoothing helpful, or does it sometimes weaken signal responsiveness too much?\n\nAdjusting Lookback Windows\n\nVery short lookback periods seem to amplify noise, while slightly longer windows often improve stability.\n\nHowever, making windows too long can reduce responsiveness.\n\nHow do you decide on reasonable lookback ranges?\nDo y",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39857826856855-How-Do-You-Control-Turnover-Without-Losing-Signal-Strength",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "In Research, Pretty Results Can Be Dangerous",
+    "text": "In research, one lesson keeps showing up:\na good-looking result is not the same as a robust result.\n\nIt’s easy to get excited by patterns.\nIt’s harder to ask whether the pattern survives noise, bias, weak assumptions, and changing conditions.\n\nI’m trying to train myself to respect rigor more than excitement.\n\nBecause in the long run, disciplined thinking beats attractive illusions.\n\nWhat are your thoughts?\n\n[评论区]\nThis is very true, and honestly one of the hardest habits to build.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39925470817431-In-Research-Pretty-Results-Can-Be-Dangerous",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "From Days to Hours: How LLMs Are Rewriting Quant Research",
+    "text": "The biggest change LLMs bring to quant research is:\n\nCompression.\n\nWhat used to take days now takes hours.\n\nFuture researchers targeting World Quant should already be training this skill.\n\nUsing NotebookLLM and Other LLM's:\n\nPrompt 1 — Multi-Source Synthesis\n\n“Combine insights from these papers and identify overlapping signals.”\n\nExpected Output\n\nMomentum + liquidity overlap\nVolatility clustering signal\nComposite alpha idea\n\nPrompt 2 — Feature Engineering\n\n“Generate 5 alternative features using price and volume.”\n\nExpected Output\n\nVWAP deviation\nVolume spike ratio\nLiquidity imbalance\nRange compression\n\nPrompt 3 — Risk Overlay\n\n“Add risk controls to a high-turnover strategy.”\n\nExpected Output\n\nPosition limits\nVolatility scaling\nSector neutrality\n\nBut here’s what most people miss:\n\n“The quality of your research is increasingly bounded by the quality of your prompts.”\n\nA vague prompt gives you generic signals.\nA tight, well-structured prompt gives you actionable alpha candidates.\n\nIn other words:\n\nBad prompt → noise\nAverage prompt → known ideas\nPrecise prompt → differentiated thinking\n\nLLMs shift the bottleneck from:\nexecution → judgment\n\nBut even before judgment, there’s a new gate:\n\n👉 Problem framing through prompts\n\nQuestion:\nDo you think LLMs will commoditize alpha ideas, or actually help uncover more unique ones — depending on who’s asking the questions?\n\n[评论区]\nThis is a great framing ,especially the idea that LLMs shift the bottleneck from execution to judgment.\n---\nI think the LLMs shift is going to give a good point of view towards how to alphas look but will also help with idea's.\n\n \n---\nThank you for the insight, it's a big eye opener👏👏",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39937449819287-From-Days-to-Hours-How-LLMs-Are-Rewriting-Quant-Research",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Research Paper 04: Are Cash Flows Better Stock Return Predictors than Profits?",
+    "text": "Abstract:\n\nAlthough various income statement–based measures predict the cross section of stock returns, direct method cash flow measures have even stronger predictive power. We transform indirect method cash flow statements into disaggregated and more direct estimates of cash flows from operations and other sources and form portfolios on the basis of these measures. Stocks in the highest-cash-flow decile outperform those in the lowest by over 10% annually (risk adjusted). Our results are robust to investment horizons and across risk factors and sector controls. We also show that, in addition to operating cash flow information, cash taxes and capital expenditures provide incremental predictive power.\n\nKey ideas:\n\nPage 18 paragraph 1\nPage 25 paragraph 1\nPage 27 paragraph 3\n\nUseful datafields on BRAIN:\n\nTerm\n\n\t\n\nDatafield\n\n\t\n\nDataset\n\n\n\n\nCash flow\n\n\t\n\ncashflow\n\n\t\n\nCompany Fundamental Data for Equity\n\n\n\n\nValue\n\n\t\n\nenterprise_value\n\n\t\n\nCompany Fundamental Data for Equity\n\n\n\n\nGross profit\n\n\t\n\nmdf_gpr\n\n\t\n\nModel Data\n\n \n\nAuthor: Stephen R. Foerster, John Tsagarelis, Grant Wang\n\nYear: 2017\n\nLink: https://ssrn.com/abstract=2472571\n\n \n\n[评论区]\nPost is closed for comments.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/14932488666903-Research-Paper-04-Are-Cash-Flows-Better-Stock-Return-Predictors-than-Profits",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "🖊️ Passing Submission Test: How to improve Fitness",
+    "text": "Welcome to IQC 2026 !\n\nFitness is often the most challenging metric to master. Let's explore how to optimize it:\n\nAccording to the formula, you can enhance fitness by increasing the Sharpe ratio (or Returns) and reducing Turnover.\n\nHowever, improving one factor typically negatively impacts the other. For instance, lowering turnover can limit trades and reduce returns.\n\nTherefore, we must strike for a balance.\n\nOne approach is to focus on improving one factor first, such as the Sharpe ratio or Returns, and then reducing turnover to achieve a desirable fitness level (ideally >0.8). From there, you can continue to optimize until you pass the fitness test.\n\nFor more tips on improving fitness, check out more of our community.\n\nMore to explore:\n\n[1/3] Intermediate Pack - Understanding Results – WorldQuant BRAIN\n\n[2/3] Intermediate Pack - Improving your Alpha Idea – WorldQuant BRAIN\n\n[3/3] Intermediate Pack -Conditional Operators – WorldQuant BRAIN\n\nHappy research!\n\n[评论区]\nit can help in fitness Sharpe ratios\n---\nin my personal experience, beginners should focus on reducing turnover rather than increasing sharpe or return. reducing turnover from 50% to 25% is much easier than increasing sharpe from 2 -> 3; techniques you can use are increasing decay, using group_operator and neutralization, but personally for beginners, increasing decay is the easiest.\n---\nHow i improve fitness in all alpha anyone tell me and help to create better sharp and fitness alphas\n---\nThis is a very practical and balanced approach to optimizing fitness! Finding the right balance between Sharpe ratio and turnover is crucial, as improving one can negatively impact the other. The step-by-step approach of focusing on one factor first and then optimizing the other is a great way to achieve a desirable fitness level. Thanks for sharing these valuable insights!\n---\nwhat about the sharpe ratio\n---\nThanks! It was very helpful. \n\nCan you advise, if i am trying to get into master- which is more important- High",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/30873523677847--Passing-Submission-Test-How-to-improve-Fitness",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Regime Trouble: Failing the IS Ladder Check During Market Shifts",
+    "text": "Hi everyone,\n\nI've been analyzing an interesting failure mode: an alpha passes almost everything, but completely collapses during a specific historical window in the IS Ladder (for example, failing the Sharpe cutoff terribly between early 2022 and 2024).\n\nThis points straight to regime vulnerability. The 2022-2024 window was characterized by aggressive rate hikes, a massive rotation out of growth/tech, and unique macro shocks. If an alpha fails only there, it’s likely carrying a hidden macro bias (like being inherently long-duration or strictly short-value).\n\nTo make my alphas more \"all-weather\", I’m experimenting with:\n\nConditional Logic: Using if/then structures based on market volatility indices or moving averages of the broader market to shrink the signal’s exposure during heavy drawdowns.\n\nDual-Sided Risk: Ensuring the alpha is strictly dollar-neutral and sector-neutral, so a massive rotation between tech and energy doesn't blow up the portfolio.\n\nMacro-Neutralization: Specifically neutralizing against factors that blew up in that 2022 window, like momentum and high-beta.\n\nHow do you handle alphas that are highly profitable 80% of the time but break down during specific structural market shifts? Do you try to fix them, or just discard them as too fragile?\n\n[评论区]\nI have been expriencing the same \nThanks for the insight.\n---\nPersonally, I wouldn’t rush to discard them. If an alpha works 80% of the time, it probably has a real edge, it’s just carrying an unintentional regime bias.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39951937759383-Regime-Trouble-Failing-the-IS-Ladder-Check-During-Market-Shifts",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "IQC IS Score Increasing",
+    "text": "Hi everyone,\n\nI’ve been actively working on alphas in WorldQuant BRAIN, but I’m noticing that each submission is only increasing my score by around 50–200 points.\n\nI wanted to understand from more experienced participants:\n\n* What differentiates a high-impact alpha from a basic one in terms of scoring?\n* How important is uniqueness vs performance metrics like Sharpe and fitness?\n* Do you focus more on generating many alphas consistently, or fewer but highly optimized ones?\n\nI’ve been experimenting with different factors and transformations, but I feel there’s still a gap in achieving stronger score improvements.\n\nAny guidance, strategies, or insights would be really helpful. Thanks in advance!\n\n[评论区]\nBecause that point involves merging your alpha group to a certain point, it will limit the ceiling. Pushing new alphas in won't increase performance. You'll need to create alphas with low core values ​​to generate diversity and increase scores faster.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39958803818007",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "IQC IS Score Increasing",
+    "text": "Hi everyone,\n\nI’ve been actively working on alphas in WorldQuant BRAIN, but I’m noticing that each submission is only increasing my score by around 50–200 points.\n\nI wanted to understand from more experienced participants:\n\n* What differentiates a high-impact alpha from a basic one in terms of scoring?\n* How important is uniqueness vs performance metrics like Sharpe and fitness?\n* Do you focus more on generating many alphas consistently, or fewer but highly optimized ones?\n\nI’ve been experimenting with different factors and transformations, but I feel there’s still a gap in achieving stronger score improvements.\n\nAny guidance, strategies, or insights would be really helpful. Thanks in advance!\n\n[评论区]\nBecause that point involves merging your alpha group to a certain point, it will limit the ceiling. Pushing new alphas in won't increase performance. You'll need to create alphas with low core values ​​to generate diversity and increase scores faster.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39958803818007-IQC-IS-Score-Increasing",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "IQC 2026 2025 Webinar Recording (2nd Apr)",
+    "text": "This is the webinar recording of the “IQC 2026” held on 2 April 2026.\n\nThe video has to be taken down in 5 days, so please watch it quickly and ask any questions in the comments.\n\nThe recording is shorter than the live webinar. Attendees of the live webinar get access to live Q&A.\n\n[评论区]\nThank you for sharing",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39600824640279-IQC-2026-2025-Webinar-Recording-2nd-Apr",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "Options, Relationship and Vector Datafields 2023 IQC培训视频回放",
+    "text": "Vector Datafields https://platform.worldquantbrain.com/learn/documentation/advanced-topics/vector-datafields\n\n[评论区]\n33分钟讲到 pcr_vol_10 这个dataset 是 put-call volatility ratio，这里应该是 put call volume ratio 才对吧？\n---\nSL92815 您好，是的，您说的是对的。",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/15440162031639-Options-Relationship-and-Vector-Datafields-2023-IQC%E5%9F%B9%E8%AE%AD%E8%A7%86%E9%A2%91%E5%9B%9E%E6%94%BE",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "IQC 2026 2025 Webinar Recording (9th Apr)",
+    "text": "This is the webinar recording of the “IQC 2026- Tools & Techniques for building submittable Alphas” held on 9 April 2026.\n\nThe video has to be taken down in 5 days, so please watch it quickly and ask any questions in the comments.\n\nThe recording is shorter than the live webinar. Attendees of the live webinar get access to live Q&A.\n\n[评论区]\n         Thanks for the webinar! In practice, when an alpha fails due to high self-correlation but already has strong Sharpe and Fitness, would you recommend orthogonalizing the signal (e.g., volatility scaling, decay transforms) or combining it with alternative datasets like sentiment or fundamentals?\n---\nGood question,I think changing the datafield will help you cub self correlation problem\n---\nThank you for sharing this valuable recording. The webinar offers practical alpha-building insights and useful techniques. I’ll watch soon before removal and appreciate the opportunity greatly.\n---\nVery helpful, let me try it",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39730259578263-IQC-2026-2025-Webinar-Recording-9th-Apr",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  },
+  {
+    "source": "WQ-中文论坛",
+    "title": "IQC 2026 2025 Webinar Recording (26th Mar)",
+    "text": "This is the webinar recording of the “IQC 2026” held on 26 March 2026.\n\nThe video has to be taken down in 5 days, so please watch it quickly and ask any questions in the comments.\n\nThe recording is shorter than the live webinar. Attendees of the live webinar get access to live Q&A.\n\n[评论区]\n\n              \n              \n              \n            \n---\nBe the first to write a comment.",
+    "url": "https://support.worldquantbrain.com/hc/en-us/community/posts/39600725182487-IQC-2026-2025-Webinar-Recording-26th-Mar",
+    "exprs": [],
+    "type": "text",
+    "has_expr": false
+  }
+]

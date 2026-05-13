@@ -192,9 +192,114 @@ class CredentialManager:
             self.credentials = None
             return False
     
+    def try_auth_json(self) -> bool:
+        """
+        Try to authenticate using saved cookies from auth.json (bypasses Biometrics).
+        Supports both cookie-based and Bearer token (JWT 't' cookie) auth.
+        Returns True if the saved session is still valid.
+        """
+        auth_json_path = Path(__file__).parent.parent / 'auth.json'
+        if not auth_json_path.exists():
+            return False
+        try:
+            with open(auth_json_path, 'r') as f:
+                storage = json.load(f)
+            cookies = storage.get('cookies', [])
+            if not cookies:
+                return False
+
+            # 找 't' JWT token，优先用 Authorization Bearer
+            jwt_token = None
+            for c in cookies:
+                if c.get('name') == 't' and c.get('value', '').startswith('eyJ'):
+                    jwt_token = c['value']
+                    break
+
+            test_session = requests.Session()
+
+            if jwt_token:
+                # 方式1：Bearer header（WQ Brain API 标准）
+                test_session.headers['Authorization'] = f'Bearer {jwt_token}'
+                resp = test_session.get('https://api.worldquantbrain.com/users/self', timeout=10)
+                if resp.status_code == 200:
+                    user = resp.json()
+                    import base64, json as _json
+                    try:
+                        payload = _json.loads(base64.b64decode(jwt_token.split('.')[1] + '=='))
+                        from datetime import datetime
+                        exp_dt = datetime.fromtimestamp(payload.get('exp', 0))
+                        hours_left = (exp_dt - datetime.now()).total_seconds() / 3600
+                        logger.info(f"✅ auth.json JWT 登录成功: {user.get('email')} | Level={user.get('geniusLevel')} | token还有 {hours_left:.1f}h")
+                        if hours_left < 1:
+                            logger.warning("⚠️ JWT token 不足1小时到期！尝试自动从浏览器刷新...")
+                            try:
+                                from .auto_token_refresh import fetch_token_from_browser, save_token_to_auth_json
+                                new_tok = fetch_token_from_browser()
+                                if new_tok:
+                                    save_token_to_auth_json(new_tok, auth_json_path)
+                                    test_session.headers['Authorization'] = f'Bearer {new_tok}'
+                                    logger.info("[AutoToken] token 已自动刷新")
+                            except Exception as _re:
+                                logger.warning(f"[AutoToken] 自动刷新失败: {_re}，请手动运行: python update_token.py <token>")
+                    except Exception:
+                        logger.info(f"✅ auth.json JWT 登录成功: {user.get('email')} / Level={user.get('geniusLevel')}")
+                    self.authenticated = True
+                    self.session = test_session
+                    return True
+                else:
+                    logger.warning(f"auth.json JWT 已过期 (status={resp.status_code})，尝试从浏览器自动刷新...")
+                    try:
+                        from .auto_token_refresh import auto_refresh_if_needed
+                        new_tok = auto_refresh_if_needed(auth_json_path, threshold_hours=0)
+                        if new_tok:
+                            test_session.headers['Authorization'] = f'Bearer {new_tok}'
+                            resp_retry = test_session.get('https://api.worldquantbrain.com/users/self', timeout=10)
+                            if resp_retry.status_code == 200:
+                                user2 = resp_retry.json()
+                                logger.info(f"[AutoToken] 自动刷新后登录成功: {user2.get('email')}")
+                                self.authenticated = True
+                                self.session = test_session
+                                return True
+                    except Exception as _re:
+                        logger.warning(f"[AutoToken] 自动刷新失败: {_re}")
+
+            # 方式2：Cookie jar 方式（兼容旧格式）
+            test_session2 = requests.Session()
+            for c in cookies:
+                test_session2.cookies.set(c['name'], c['value'], domain=c.get('domain', '.worldquantbrain.com'))
+            resp2 = test_session2.get('https://api.worldquantbrain.com/users/self', timeout=10)
+            if resp2.status_code == 200:
+                user = resp2.json()
+                logger.info(f"✅ auth.json cookie 登录成功: {user.get('email')} / Level={user.get('geniusLevel')}")
+                self.authenticated = True
+                self.session = test_session2
+                return True
+            else:
+                logger.warning(f"auth.json cookies 已过期 (status={resp2.status_code})，最后尝试浏览器自动刷新...")
+                try:
+                    from .auto_token_refresh import auto_refresh_if_needed
+                    new_tok = auto_refresh_if_needed(auth_json_path, threshold_hours=0)
+                    if new_tok:
+                        sess_final = requests.Session()
+                        sess_final.headers['Authorization'] = f'Bearer {new_tok}'
+                        r_final = sess_final.get('https://api.worldquantbrain.com/users/self', timeout=10)
+                        if r_final.status_code == 200:
+                            uf = r_final.json()
+                            logger.info(f"[AutoToken] 最终自动刷新成功: {uf.get('email')}")
+                            self.authenticated = True
+                            self.session = sess_final
+                            return True
+                except Exception as _re:
+                    logger.warning(f"[AutoToken] 最终刷新失败: {_re}")
+                return False
+        except Exception as e:
+            logger.warning(f"auth.json 读取失败: {e}")
+            return False
+
     def validate_credentials(self) -> bool:
         """
-        Validate credentials by attempting authentication
+        Validate credentials by attempting authentication.
+        Handles Biometrics/inquiry 401 gracefully.
         
         Returns:
             True if credentials are valid, False otherwise
@@ -204,13 +309,10 @@ class CredentialManager:
             return False
         
         try:
-            # Create a temporary session for validation
             test_session = requests.Session()
-            
             from requests.auth import HTTPBasicAuth
             auth = HTTPBasicAuth(self.credentials.username, self.credentials.password)
             
-            # Attempt authentication
             logger.info(f"Validating credentials for: {self.credentials.username}")
             response = test_session.post(
                 'https://api.worldquantbrain.com/authentication',
@@ -221,12 +323,20 @@ class CredentialManager:
             if response.status_code == 201:
                 logger.info("✅ Credentials validated successfully")
                 self.authenticated = True
-                
-                # Store session for reuse
                 self.session = test_session
                 self.session.auth = auth
-                
                 return True
+            elif response.status_code == 401:
+                body = response.json() if response.content else {}
+                inquiry_id = body.get('inquiry', '')
+                if inquiry_id:
+                    logger.error(f"❌ WQ Brain 要求 Biometrics 验证 (inquiry={inquiry_id})")
+                    logger.error("   请运行: python inject_cookies.py \"<从DevTools复制的Cookie>\"")
+                    logger.error("   或参考 README 了解如何获取 Cookie")
+                else:
+                    logger.error(f"❌ Authentication failed: 401 {response.text[:200]}")
+                self.authenticated = False
+                return False
             else:
                 logger.error(f"❌ Authentication failed: {response.status_code}")
                 logger.error(f"   Response: {response.text[:200]}")
@@ -270,16 +380,19 @@ class CredentialManager:
     
     def authenticate(self, auto_load: bool = True, auto_prompt: bool = True) -> bool:
         """
-        Complete authentication flow
-        
-        Args:
-            auto_load: Automatically try to load from file
-            auto_prompt: Automatically prompt if file not found
+        Complete authentication flow.
+        Priority: auth.json cookies > credential.txt password > prompt
         
         Returns:
             True if authenticated, False otherwise
         """
-        # Step 1: Try to load from file
+        # Step 0: Try saved cookies first (bypasses Biometrics completely)
+        logger.info("尝试 auth.json Cookie 登录...")
+        if self.try_auth_json():
+            return True
+        logger.info("auth.json 不可用，尝试密码登录...")
+
+        # Step 1: Try to load from credential file
         if auto_load:
             if self.load_from_file():
                 if self.validate_credentials():

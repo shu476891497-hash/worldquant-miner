@@ -1,0 +1,86 @@
+{
+  "compiler_logic": {
+    "description": "Compiler logic as code - learned from runtime errors and reverse engineered from AST",
+    "version": "1.0",
+    "last_updated": "2025-12-22"
+  },
+  "event_input_compatibility": {
+    "description": "Operators that do not support event inputs (learned from simulation errors)",
+    "incompatible_operators": [],
+    "replacements": {
+      "multiply": "ts_multiply",
+      "add": "ts_add",
+      "subtract": "ts_subtract",
+      "divide": "ts_divide",
+      "power": "ts_power",
+      "signed_power": "ts_signed_power",
+      "abs": "ts_abs",
+      "log": "ts_log",
+      "sqrt": "ts_sqrt",
+      "min": "ts_min",
+      "max": "ts_max",
+      "rank": "ts_rank",
+      "delta": "ts_delta",
+      "correlation": "ts_correlation"
+    },
+    "rules": [
+      "Arithmetic operators (add, subtract, multiply, divide) do not support event inputs",
+      "Cross-sectional operators (rank, winsorize, zscore) do not support event inputs",
+      "Use ts_* prefix versions for time series operations with event inputs",
+      "vec_* operators work with VECTOR fields, not event inputs"
+    ]
+  },
+  "type_compatibility": {
+    "description": "Operator scope and field type compatibility rules",
+    "rules": [
+      "REGULAR scope operators work with REGULAR, MATRIX, and VECTOR fields",
+      "MATRIX scope operators work with MATRIX fields only",
+      "VECTOR scope operators work with VECTOR fields only",
+      "vec_* operators require VECTOR fields"
+    ]
+  },
+  "ast_patterns": {
+    "description": "Common AST patterns extracted from successful templates",
+    "successful_patterns": [],
+    "failed_patterns": []
+  },
+  "compiler_stages": {
+    "description": "Compiler pipeline stages",
+    "stages": [
+      {
+        "stage": 1,
+        "name": "Lexical Analysis",
+        "description": "Tokenize source code into tokens (OPERATOR, FIELD, LITERAL, ARITHMETIC, PAREN)"
+      },
+      {
+        "stage": 2,
+        "name": "Parsing",
+        "description": "Build Abstract Syntax Tree (AST) from tokens using recursive descent"
+      },
+      {
+        "stage": 3,
+        "name": "Semantic Analysis",
+        "description": "Validate operator existence, field existence, type compatibility, event input compatibility"
+      },
+      {
+        "stage": 4,
+        "name": "IR Generation",
+        "description": "Transform AST to Intermediate Representation with metadata"
+      },
+      {
+        "stage": 5,
+        "name": "Code Generation",
+        "description": "Generate final FASTEXPR expression from IR"
+      },
+      {
+        "stage": 6,
+        "name": "Optimization",
+        "description": "Apply optimizations (optional): redundant parentheses removal, constant folding"
+      }
+    ]
+  },
+  "learned_rules": {
+    "description": "Rules learned from simulation errors - updated dynamically",
+    "rules": []
+  }
+}

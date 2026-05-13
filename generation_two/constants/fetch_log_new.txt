@@ -1,0 +1,24 @@
+﻿璁よ瘉: 2263721154@qq.com
+
+鎷夊彇 D0 (delay=0, TOP1000)...
+D0: 1225 涓瓧娈?
+鎷夊彇 D1 (delay=1, TOP3000)...
+D1: 5905 涓瓧娈?
+D0涓撳睘: 133 | D1涓撳睘(D0绂佺敤): 4813 | 鍏辨湁: 1092
+
+D0 瀛楁鍒嗙被:
+  fundamental                660 涓?
+  news                       336 涓?
+  analyst                     90 涓?
+  pv                          64 涓?
+  option                      64 涓?
+  socialmedia                 11 涓?
+
+淇濆瓨瀹屾垚: generation_two\constants\d0_fields_whitelist.json (1225 瀛楁)
+寮曟搸鍒嗙被:
+  fundamental: 660
+  analyst: 90
+  news: 336
+  sentiment: 11
+  option: 64
+  pv: 64
