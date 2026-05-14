@@ -671,252 +671,124 @@ VRP_EXPR_POOL = [
 ]
 
 _ALPHA_TEMPLATES = [
-    # === A. 基本面/市值比率行业排名（借鉴比率结构）===
-    "group_rank({F}/cap, subindustry)",
-    "group_rank({F}/({F2}+1e-6), industry)",
-    "group_neutralize(rank({F}/cap) - rank({F2}/cap), subindustry)",   # 双字段市值比率差
-    # === B. 时序排名中性化 ===
-    "group_neutralize(ts_rank({F}, {W}), subindustry)",
-    "group_neutralize(ts_zscore({F}, {W}), industry)",
-    "group_rank(ts_decay_linear(rank({F}), {W}), sector)",              # 衰减加权排名
-    # === C. 反转信号（做空长期强势）===
-    "-group_rank(ts_rank({F}, 252), sector)",
-    "group_neutralize(-ts_av_diff({F}, {W}), subindustry)",
-    "group_rank(-ts_zscore({F}, 60), subindustry)",                     # 长窗口反转
-    # === D. 变化速度（动量加速度，借鉴tree结构）===
-    "group_rank(ts_delta({F}, 5) / (abs({F}) + 1e-6), industry)",
-    "group_rank(ts_delta({F}, {W}) / (ts_std_dev({F}, {W}) + 1e-6), sector)",
-    "group_neutralize(ts_rank(ts_delta({F}, 5), {W}), subindustry)",   # 嵌套：速度的排名
-    # === E. 双字段组合（借鉴brownian motion多字段思路）===
-    "group_rank(ts_zscore({F1}, 20) - ts_zscore({F2}, 20), subindustry)",
-    "group_neutralize(rank({F1}) - rank({F2}), subindustry)",
-    "group_rank(rank({F1}) * rank({F2}), sector)",
-    "group_neutralize(ts_rank({F1}, {W}) - ts_rank({F2}, {W}), industry)",   # 双字段时序差
-    # === F. 条件触发（借鉴event-driven思路）===
-    "trade_when(ts_rank({F1}, 10) > 0.7, group_rank({F2}, subindustry), -1)",
-    "trade_when(rank({F1}) > 0.5, ts_rank({F2}, {W}), -ts_rank({F2}, {W}))",
-    "trade_when(ts_zscore({F1}, 20) > 1.0, group_neutralize({F2}, subindustry), 0)",  # Z分数条件
-    # === G. 复合双腿结构 (期权/价量 + 基本面) ===
-    "ts_decay_linear(0.5 * winsorize(group_neutralize(ts_decay_linear({F1}, 8), subindustry), std=2.5) + 0.5 * group_rank(ts_decay_linear(ts_rank({F2}, 5), 5), subindustry), 4)",
-    "ts_decay_linear(0.6 * group_rank(ts_zscore({F1}, 20), industry) + 0.4 * group_neutralize(winsorize({F2}, std=3), subindustry), 5)",
-    # === H. 波动率/流动性截面 ===
-    "group_rank(ts_std_dev({F}, 20), subindustry)",
-    "group_neutralize(winsorize(ts_zscore({F}, 60), std=3), subindustry)",
-    # === H. 三层嵌套（借鉴algorithmic_generator的tree_generation）===
-    "group_rank(ts_rank(ts_delta({F}, 5), {W}), subindustry)",                        # 速度→排名→行业
-    "group_neutralize(rank(ts_decay_linear(ts_zscore({F}, 20), 5)), subindustry)",    # Z分数→衰减→排名→中性
-    # === I. 蓝海断代/NaN 平滑补丁（如果没数据，就用基本面或价量兜底）===
+    # ════════════════════════════════════════════════════════════════
+    # 全新模板库 v2 —— 每个模板使用完全不同的算子骨架
+    # 设计原则: 最大化结构差异，最小化自相关
+    # ════════════════════════════════════════════════════════════════
+
+    # ── S1. 时序回归残差（别人没在用的 ts_regression）──
+    "group_rank(ts_regression({F1}, {F2}, {W}, 0, 2), subindustry)",
+    "group_neutralize(ts_regression({F}, returns, {W}, 0, 2) * rank({F}), subindustry)",
+
+    # ── S2. 协方差 / 相关性（跨字段联动信号）──
+    "group_neutralize(ts_corr({F1}, {F2}, {W}), subindustry)",
+    "group_rank(ts_covariance({F1}, {F2}, {W}) / (ts_std_dev({F1}, {W}) + 1e-6), subindustry)",
+
+    # ── S3. 非线性幂次变换（signed_power）──
+    "group_rank(signed_power(ts_zscore({F}, {W}), 0.5), subindustry)",
+    "group_neutralize(signed_power(rank({F1}) - rank({F2}), 3), subindustry)",
+
+    # ── S4. 跳跃衰减 / 驼峰（rare算子）──
+    "group_rank(jump_decay({F}, {W}, 0.5, 252), subindustry)",
+    "group_neutralize(hump({F}, 0.3) * rank({F2}), subindustry)",
+
+    # ── S5. 分位数 / 第k元素 ──
+    "group_rank(ts_quantile({F}, 0.25, {W}), subindustry)",
+    "group_neutralize(kth_element({F}, 3, {W}), subindustry)",
+
+    # ── S6. 连乘累积 / 步长趋势 ──
+    "group_rank(ts_product({F}/({F2}+1e-6), {W}), subindustry)",
+    "group_neutralize(ts_step(1) * {F} / (cap + 1e-6), subindustry)",
+
+    # ── S7. 极值时间位置（ts_arg_max / ts_arg_min）──
+    "group_neutralize(ts_arg_max({F}, {W}) - ts_arg_min({F}, {W}), subindustry)",
+    "group_rank(({W} - ts_arg_max({F}, {W})) / {W}, subindustry)",
+
+    # ── S8. NaN计数 / 数据断裂信号（数据质量因子）──
+    "group_neutralize(ts_count_nans({F}, {W}), subindustry)",
+    "group_rank(days_from_last_change({F}), subindustry)",
+    "group_neutralize(last_diff_value({F}, {W}), subindustry)",
+
+    # ── S9. 条件触发（trade_when，稀疏信号）──
+    "trade_when(ts_rank({F1}, 20) > 0.8, group_rank({F2}, subindustry), 0)",
+    "trade_when(ts_zscore({F1}, 20) > 1.5, group_neutralize(-rank({F2}), subindustry), 0)",
+
+    # ── S10. 比率信号（跨字段除法）──
+    "group_rank({F1} / ({F2} + 1e-6), subindustry)",
+    "group_neutralize(ts_delta({F1} / ({F2} + 1e-6), {W}), subindustry)",
+
+    # ── S11. NaN缺失值补丁（if_else结构）──
     "group_neutralize(if_else(is_nan({F}), ts_zscore(assets/cap, 20), {F}), industry)",
     "group_rank(if_else(is_nan({F}), group_rank(sales/cap, subindustry), {F}), subindustry)",
-    "group_neutralize(if_else(is_nan(ts_delta({F}, 5)), ts_zscore(-returns, 20), ts_delta({F}, 5)), sector)",
-    # === J. 冷启动算子族（当前模板库中0次出现的算子，结构性降低自相关）===
-    "group_neutralize(ts_corr({F1}, {F2}, {W}), subindustry)",                                     # 相关性信号
-    "group_rank(ts_regression({F1}, {F2}, {W}, 0, 2), subindustry)",                               # 回归残差
-    "group_neutralize(ts_covariance({F1}, {F2}, {W}), subindustry)",                               # 协方差
-    "group_rank(ts_quantile({F}, 0.25, {W}), subindustry)",                                        # 分位数
-    "group_neutralize(ts_arg_max({F}, {W}), subindustry)",                                         # 最大值位置→时间信号
-    "group_rank(ts_product({F}/({F2}+1e-6), {W}), subindustry)",                                   # 连乘→累积效应
-    "group_neutralize(hump({F}, 0.3), subindustry)",                                               # 驼峰函数
-    "group_rank(jump_decay({F}, {W}, 0.5, 252), subindustry)",                                     # 跳跃衰减
-    "group_neutralize(kth_element({F}, 3, {W}), subindustry)",                                     # 第k元素
-    "group_rank(ts_step(1) * {F}, subindustry)",                                                   # 线性趋势
-    # === K. 跨数据集强制融合（每个模板强制混合2个不同dataset的字段）===
-    "group_neutralize(ts_corr({F1}, {F2}, {W}) * rank({F1}), subindustry)",                         # 相关性×排名交互
-    "group_rank(ts_zscore({F1}, {W}) * sign(ts_delta({F2}, 5)), subindustry)",                     # Z分数×方向交互
-    "trade_when(ts_rank({F1}, 20) > 0.7, group_rank(ts_delta({F2}, 10), subindustry), 0)",         # 跨域条件触发
-    "group_neutralize(rank({F1}) * rank({F2}) - rank({F1} * {F2}), subindustry)",                  # 非线性交互残差
-    "group_rank(ts_decay_linear(signed_power(rank({F1}) - rank({F2}), 2), {W}), subindustry)",     # 幂次差异衰减
-    # ════════════════════════════════════════════════════════════════
-    # 🌊 L. 蓝海数据集专属模板（强制使用低竞争度字段）
-    # ════════════════════════════════════════════════════════════════
-    # --- L1. 新闻情绪动量 ---
-    "group_neutralize(ts_rank(ts_delta(ts_mean({F}, 5), 5), {W}), subindustry)",                     # 新闻/情绪动量
-    "group_rank(ts_zscore(ts_delta({F}, 5), {W}), subindustry)",                                     # Z-score 动量
-    # --- L2. 社交媒体反转 ---
-    "group_neutralize(-ts_rank({F}, {W}), subindustry)",                                             # 热度反转
-    "group_rank(ts_av_diff({F}, {W}) * -1, subindustry)",                                            # 热度偏离反转
-    # --- L3. 事件驱动季报 ---
-    "group_neutralize(ts_count_nans({F}, {W}), subindustry)",                                        # NaN 计数信号
-    "group_rank(days_from_last_change({F}), subindustry)",                                           # 最近更新距离
-    "group_neutralize(last_diff_value({F}, {W}), subindustry)",                                      # 最后变化值
-    # --- L4. 期权Greeks交互 ---
-    "group_rank({F1} / ({F2} + 1e-6), subindustry)",                                                 # Greeks比率
-    "group_neutralize(ts_zscore({F1} - {F2}, {W}), subindustry)",                                    # Greeks差异Z
-    # --- L5. 分析师指引 ---
-    "group_neutralize(ts_delta({F}, {W}) / (ts_std_dev({F}, {W}) + 1e-6), subindustry)",             # 指引变化加速度
-    "group_rank(ts_rank({F}, {W}) - 0.5, subindustry)",                                              # 偏离中位数
-    # --- L6. 宏观交互 ---
-    "group_neutralize(ts_corr({F1}, {F2}, {W}), subindustry)",                                       # 宏观相关性
-    "group_rank(ts_regression({F1}, {F2}, {W}, 0, 2), subindustry)",                                 # 宏观回归残差
-    # --- L7. 复合多字段 ---
-    "group_neutralize(0.5 * ts_rank({F1}, {W}) + 0.5 * ts_rank({F2}, {W}), subindustry)",           # 等权双信号
+
+    # ── S12. 波动率截面（ts_std_dev 为主骨架）──
+    "group_rank(ts_std_dev({F}, {W}) / (ts_mean(abs({F}), {W}) + 1e-6), subindustry)",
+
+    # ── S13. 动量加速度（二阶差分）──
+    "group_neutralize(ts_delta(ts_delta({F}, 5), 5), subindustry)",
+    "group_rank(ts_delta({F}, 5) / (ts_std_dev({F}, {W}) + 1e-6), subindustry)",
+
+    # ── S14. 非线性交互残差 ──
+    "group_neutralize(rank({F1}) * rank({F2}) - rank({F1} * {F2}), subindustry)",
+
+    # ── S15. 加权衰减混合（双字段复合）──
+    "ts_decay_exp_window(0.6 * group_rank({F1}, subindustry) + 0.4 * group_neutralize({F2}, subindustry), {W}, 2)",
 ]
 
 _D0_ALPHA_TEMPLATES = [
-    # === 原有核心模板（7 个）===
-    # D0 专属模板：结合跳空信号与基本面/期权/分析师数据，且严格 ts_delay(close,1) 避免未来函数
-    "group_neutralize(ts_delay({FUND_F}, 1) / (ts_delay(close, 1) + 1e-5), subindustry)",
-    "group_rank(ts_rank({BLUE_F}, 10) * (open / ts_delay(close, 1) - 1), industry)",
-    "group_neutralize(ts_delta({ANALYST_F}, 5) * rank(open / ts_delay(close, 1) - 1), subindustry)",
-    "trade_when(ts_rank({BLUE_F}, 10) > 0.8, group_rank(open/ts_delay(close,1)-1, subindustry), -group_rank(open/ts_delay(close,1)-1, subindustry))",
-    "group_rank(ts_zscore({FUND_F}, 20) - ts_zscore({ANALYST_F}, 20), subindustry)",
-    "group_neutralize(ts_rank({BLUE_F}, 5) - ts_rank({FUND_F}, 5), subindustry)",
-    "group_rank((open - ts_delay(close, 1)) / (ts_delay(high, 1) - ts_delay(low, 1) + 1e-5) * rank({FUND_F}), industry)",
+    # ════════════════════════════════════════════════════════════════
+    # D0 模板库 v2 —— 去除重复跳空信号，最大化结构多元性
+    # 每个模板骨架完全不同，严格 ts_delay 避免未来函数
+    # ════════════════════════════════════════════════════════════════
 
-    # === 新增：跳空缺口变体（Gap Signal Variants）===
-    "group_rank((open/ts_delay(close,1)-1) * rank({FUND_F}/cap), subindustry)",
-    "group_neutralize(ts_decay_linear(open/ts_delay(close,1)-1, 5) * rank({FUND_F}), subindustry)",
-    "group_rank(winsorize(open/ts_delay(close,1)-1, std=3) * ts_rank({FUND_F}, {W}), industry)",
-    "group_neutralize((open-ts_delay(close,1))/(ts_delay(close,1)+1e-5) * group_rank({BLUE_F}, subindustry), subindustry)",
-
-    # === 新增：隔夜收益率（Overnight Return）===
-    "group_rank(ts_zscore(open/ts_delay(close,1)-1, {W}) * rank({FUND_F}), subindustry)",
-    "group_neutralize(ts_rank(open/ts_delay(close,1)-1, {W}), subindustry)",
-    "group_rank(ts_corr(open/ts_delay(close,1)-1, ts_delay({FUND_F},1), {W}), subindustry)",
-
-    # === 新增：滞后价量交互（Lagged Price-Volume）===
-    "group_neutralize(ts_rank({FUND_F}, {W}) * rank(ts_delay(volume,1)/ts_mean(ts_delay(volume,1),20)), subindustry)",
-    "group_rank(ts_zscore({FUND_F}, 20) * sign(open-ts_delay(close,1)), industry)",
-    "group_neutralize(ts_delta({FUND_F}, 5) / (ts_std_dev({FUND_F}, 20)+1e-6) * rank(open/ts_delay(close,1)-1), subindustry)",
-
-    # === 新增：波动率择时（Vol Timing）===
-    "group_rank(ts_rank({BLUE_F}, {W}) * sign(open/ts_delay(close,1)-1), subindustry)",
-    "group_neutralize(ts_zscore({BLUE_F}, 20) * ts_rank(open/ts_delay(close,1)-1, 10), subindustry)",
-
-    # === 新增：时序回归/相关（TS Regression/Correlation）===
+    # ── D0-S1. 回归残差（ts_regression）──
     "group_rank(ts_regression(open/ts_delay(close,1)-1, ts_delay({FUND_F},1), {W}, 0, 2), subindustry)",
-    "group_neutralize(ts_corr({FUND_F}, ts_delay(close,1)/ts_delay(close,2)-1, {W}), subindustry)",
-    "group_rank(ts_covariance(open/ts_delay(close,1)-1, {FUND_F}, {W}), subindustry)",
+    "group_neutralize(ts_regression(ts_delay({FUND_F},1), ts_delay({ANALYST_F},1), {W}, 0, 2), subindustry)",
 
-    # === 新增：条件触发组合（Conditional Triggers）===
-    "trade_when(ts_zscore({FUND_F}, 20) > 1.0, group_rank(open/ts_delay(close,1)-1, subindustry), 0)",
-    "trade_when(rank({FUND_F}) > 0.6, group_neutralize(open/ts_delay(close,1)-1, subindustry), -group_neutralize(open/ts_delay(close,1)-1, subindustry))",
-    "trade_when(ts_rank({BLUE_F}, 20) > 0.7, group_rank({FUND_F}/cap, subindustry), -1)",
-
-    # ── 来源2：D0 AI生成（论坛智能注入）── 12 条 WQ论坛精华模板
-    # D0 intraday mean-reversion: combines opening gap (close vs open), volume tail-cut, and prior return decay, neutralized by subindustry and cap-bucketed
-    "group_neutralize(group_zscore(rank(ts_delay(close,1) - open) + rank(min(ts_delay(volume,1)/adv20, 5)) - rank(ts_delay(returns,1)), subindustry), bucket(rank(cap), range=\'0.1,1,0.1\'))",
-    # D0 opening gap weighted by liquidity: multiplies gap signal by squared industry-rank of ADV20, neutralized by subindustry
-    "group_neutralize(rank(ts_delay(close,1) - open) * signed_power(group_rank(adv20, subindustry), 2), subindustry)",
-    # D0 fear plus analyst divergence: combines fear signal (return dispersion) with negative analyst std divergence, neutralized by subindustry
-    "group_neutralize(rank(ts_mean(abs(ts_delay(returns,1) - group_mean(ts_delay(returns,1), 1, market))/(abs(ts_delay(returns,1))+0.1), 20)) + rank(-ts_av_diff(vec_min({ANALYST_F}), 360)), subindustry)",
-    # D0 news momentum plus volume tail: combines news VWAP change with volume tail-cut, neutralized by subindustry
-    "group_neutralize(rank(ts_zscore(ts_delta(ts_mean(news_all_vwap, 5), 5))) + rank(min(ts_delay(volume,1)/adv20, 5)), subindustry)",
-    # D0 option sentiment scaled by price: multiplies option max/close ratio with negative prior return, neutralized by subindustry
-    "group_neutralize(rank(ts_scale(vec_max({BLUE_F})/ts_delay(close,1), 120)) * rank(-ts_delay(returns,1)), subindustry)",
-    # D0 gap plus volume surge minus return: uses opening gap, volume/mean volume, and negative prior return, neutralized by subindustry and cap
-    "group_neutralize(group_zscore(rank((open - ts_delay(close,1))/ts_delay(close,1)) + rank(ts_delay(volume,1)/ts_mean(ts_delay(volume,1), 20)) - rank(ts_delay(returns,1)), subindustry), bucket(rank(cap), range=\'0.1,1,0.1\'))",
-    # D0 regression residual plus reversal: combines 60-day regression of returns on opening gap with negative prior return, neutralized by subindustry
-    "group_neutralize(rank(ts_regression(ts_delay(returns,1), open/ts_delay(close,1) - 1, 60)) + rank(-ts_delay(returns,1)), subindustry)",
-    # D0 gap times 5-day momentum: multiplies opening gap signal by 5-day mean return, neutralized by subindustry
-    "group_neutralize(rank(ts_delay(close,1) - open) * rank(ts_mean(ts_delay(returns,1), 5)), subindustry)",
-    # D0 news momentum plus intraday close/open ratio: combines news VWAP change with today's close/open ratio, neutralized by subindustry
-    "group_neutralize(rank(ts_zscore(ts_delta(ts_mean(news_all_vwap, 5), 5))) + rank(ts_delay(close,1)/open - 1), subindustry)",
-    # D0 volume surge times analyst divergence: multiplies volume ratio with negative analyst std divergence, neutralized by subindustry
-    "group_neutralize(rank(ts_delay(volume,1)/ts_mean(ts_delay(volume,1), 20)) * rank(-ts_av_diff(vec_min({ANALYST_F}), 360)), subindustry)",
-    # D0 option sentiment plus volume tail: combines option max/close with volume tail-cut, neutralized by subindustry
-    "group_neutralize(rank(ts_scale(vec_max({BLUE_F})/ts_delay(close,1), 120)) + rank(min(ts_delay(volume,1)/adv20, 5)), subindustry)",
-    # D0 opening gap weighted by liquidity rank: multiplies gap by squared industry-rank of 20-day mean volume, neutralized by subindustry
-    "group_neutralize(rank(ts_delay(close,1) - open) * signed_power(group_rank(ts_mean(ts_delay(volume,1), 20), subindustry), 2), subindustry)",
-
-    # ════ FORUM-INJECTED D0 TEMPLATES (auto-managed) ════
-    # [直取] 缩尾量能排名（滞后版，D0合规）
-    "rank(min(ts_delay(volume,1) / adv20, 5))",
-    # [直取] 日内振幅排名（滞后版，D0合规）
-    "rank((ts_delay(high,1) - ts_delay(low,1)) / ts_delay(close,1))",
-    # [深扫] 流动性平方加权
-    "signed_power(group_rank(adv20, industry), 2)",
-    # [直取] news vwap zscore momentum
-    "ts_zscore(ts_delta(ts_mean(news_all_vwap, 5), 5))",
-    # [直取] cashflow vs enterprise value
-    "rank(cashflow / enterprise_value)",
-    # [直取] GPR macro x cashflow
-    "rank(mdf_gpr * cashflow)",
-    # ════ END FORUM-INJECTED TEMPLATES ════
-
-    # ════ trade_when 事件驱动 D0 模板（官方文档推荐）════
-    # 原理：只在信号触发时开仓，否则保持0仓，提高信噪比
-
-    # 1. 新闻波动率异常 → 做反转（恐慌反弹）
-    "trade_when(ts_rank(news_mov_vol, 60) > 0.85, group_neutralize(-ts_rank(ts_delay(returns,1), 20), subindustry), 0)",
-
-    # 2. 跳空缺口 + 成交量放大 → 追势
-    "trade_when(ts_delay(volume,1) / adv20 > 2, group_neutralize(rank((open - ts_delay(close,1)) / ts_delay(close,1)), subindustry), 0)",
-
-    # 3. 新闻情绪极值 → 动量
-    "trade_when(abs(ts_zscore(ts_delta(ts_mean(news_all_vwap, 5), 5))) > 1.5, group_neutralize(rank(ts_delta(ts_mean(news_all_vwap, 5), 5)), subindustry), 0)",
-
-    # 4. 分析师预期上调 → 做多
-    "trade_when(ts_delta({ANALYST_F}, 5) > 0, group_neutralize(rank(ts_delta({ANALYST_F}, 20)), subindustry), 0)",
-
-    # 5. 隔夜收益异常 × 量能确认
-    "trade_when(ts_delay(volume,1) / adv20 > 1.5, group_neutralize(rank((open - ts_delay(close,1)) / ts_delay(close,1)) + rank(-ts_delay(returns,1)), subindustry), 0)",
-
-    # 6. 新闻驱动 × 基本面支撑
-    "trade_when(news_mov_vol > ts_mean(news_mov_vol, 20), group_neutralize(rank({FUND_F} / ts_mean({FUND_F}, 60)), subindustry), 0)",
-
-    # 7. 成交量激增事件 → 短期反转
-    "trade_when(ts_delay(volume,1) / adv20 > 3, group_neutralize(-rank(ts_delay(returns,1)), subindustry), 0)",
-
-    # 8. 早盘跳空 + 新闻共振
-    "trade_when(news_mov_vol > ts_rank(news_mov_vol, 60) * adv20, group_neutralize(rank(open / ts_delay(close,1) - 1), subindustry), 0)",
-
-    # 9. 分析师极度分歧 → 反转（多空博弈时机）
-    "trade_when(ts_rank(ts_std_dev({ANALYST_F}, 20), 60) > 0.8, group_neutralize(-rank(ts_delay(returns,3)), subindustry), 0)",
-
-    # 10. 量能排名极端 → 隔夜收益方向
-    "trade_when(group_rank(ts_delay(volume,1), industry) > 0.9, group_neutralize(rank((open - ts_delay(close,1)) / ts_delay(close,1)), subindustry), 0)",
-
-    # 11. 新闻正面 + 低波动 → 趋势跟随
-    "trade_when(ts_delta(ts_mean(news_all_vwap, 5), 5) > 0, group_neutralize(rank(ts_mean(ts_delay(returns,1), 5)), subindustry), 0)",
-
-    # 12. 综合事件触发：新闻 OR 量能任一异常即开仓
-    "trade_when(ts_rank(news_mov_vol, 40) > 0.75, group_neutralize(rank(ts_delay(volume,1) / adv20) + rank((open - ts_delay(close,1)) / ts_delay(close,1)), subindustry), 0)",
-    # ════ END trade_when TEMPLATES ════
-
-    # ════ VRP 波动率风险溢价因子（用户指定精英种子）════
-    # 核心逻辑: implied_volatility_call_120 / parkinson_volatility_120
-    # 含义: 隐含波动率 / 实现波动率 → 溢价越高说明市场定价恐慌 → 反转信号
-    # 设置: TOP1000, truncation=0.1
-
-    # [种子] 原始因子（排名后中性化）
-    "group_neutralize(rank(implied_volatility_call_120 / parkinson_volatility_120), subindustry)",
-
-    # [变体1] 时序排名版（捕捉溢价的相对历史位置）
-    "group_neutralize(ts_rank(implied_volatility_call_120 / parkinson_volatility_120, 60), subindustry)",
-
-    # [变体2] Z-score 标准化（对极值更稳健）
-    "group_neutralize(ts_zscore(implied_volatility_call_120 / parkinson_volatility_120, 60), subindustry)",
-
-    # [变体3] 溢价变化率（捕捉溢价扩大/收窄的动量）
-    "group_neutralize(ts_delta(implied_volatility_call_120 / parkinson_volatility_120, 5), subindustry)",
-
-    # [变体4] 双腿做空高溢价（恐慌反弹）
-    "group_neutralize(-rank(implied_volatility_call_120 / parkinson_volatility_120), subindustry)",
-
-    # [变体5] 用 put 侧隐含波动（下行保护需求）
-    "group_neutralize(rank(implied_volatility_put_120 / parkinson_volatility_120), subindustry)",
-
-    # [变体6] call/put 偏斜（市场方向性情绪）
-    "group_neutralize(rank(implied_volatility_call_120 / implied_volatility_put_120), subindustry)",
-
-    # [变体7] trade_when 触发：溢价极高时才做空（高置信度信号）
-    "trade_when(ts_rank(implied_volatility_call_120 / parkinson_volatility_120, 60) > 0.8, group_neutralize(-rank(implied_volatility_call_120 / parkinson_volatility_120), subindustry), 0)",
-
-    # [变体8] 与量能结合（恐慌出量时溢价信号更强）
-    "trade_when(ts_delay(volume,1) / adv20 > 1.5, group_neutralize(rank(implied_volatility_call_120 / parkinson_volatility_120), subindustry), 0)",
-    # ════ END VRP TEMPLATES ════
-
-    # ════ 冷启动 D0 模板（使用 ts_corr/ts_regression/signed_power 等冷门算子）════
+    # ── D0-S2. 跨字段协方差/相关（ts_corr / ts_covariance）──
     "group_rank(ts_corr(open/ts_delay(close,1)-1, ts_delay({FUND_F},1), {W}), subindustry)",
-    "group_neutralize(ts_regression(ts_delay({FUND_F},1), open/ts_delay(close,1)-1, {W}, 0, 2), subindustry)",
+    "group_neutralize(ts_covariance(ts_delay({FUND_F},1), ts_delay({BLUE_F},1), {W}), subindustry)",
+
+    # ── D0-S3. 非线性幂次（signed_power）──
     "group_rank(signed_power(rank(open/ts_delay(close,1)-1) * rank({FUND_F}), 2), subindustry)",
-    "group_neutralize(ts_quantile(ts_delay({FUND_F},1), 0.25, {W}) * sign(open-ts_delay(close,1)), subindustry)",
-    "group_rank(ts_covariance(open/ts_delay(close,1)-1, ts_delay({FUND_F},1), {W}), subindustry)",
+    "group_neutralize(signed_power(ts_zscore(ts_delay({FUND_F},1), 20), 0.5), subindustry)",
+
+    # ── D0-S4. 极值时间位置（ts_arg_max）──
     "group_neutralize(ts_arg_max(ts_delay({FUND_F},1), {W}) * rank(open/ts_delay(close,1)-1), subindustry)",
+    "group_rank(({W} - ts_arg_max(ts_delay({BLUE_F},1), {W})) / {W}, subindustry)",
+
+    # ── D0-S5. 分位数 / 第k元素 ──
+    "group_neutralize(ts_quantile(ts_delay({FUND_F},1), 0.25, {W}) * sign(open-ts_delay(close,1)), subindustry)",
     "group_rank(kth_element(ts_delay({FUND_F},1), 3, {W}) * sign(open-ts_delay(close,1)), subindustry)",
-    "trade_when(ts_rank(ts_corr(open/ts_delay(close,1)-1, {BLUE_F}, 20), 60) > 0.7, group_rank({FUND_F}, subindustry), 0)",
-    # ════ END 冷启动 D0 TEMPLATES ════
+
+    # ── D0-S6. NaN / 数据质量 ──
+    "group_neutralize(ts_count_nans(ts_delay({BLUE_F},1), {W}), subindustry)",
+    "group_rank(days_from_last_change({FUND_F}), subindustry)",
+
+    # ── D0-S7. 条件触发 trade_when（不同条件骨架）──
+    "trade_when(ts_rank(ts_delay({BLUE_F},1), 20) > 0.8, group_rank(open/ts_delay(close,1)-1, subindustry), 0)",
+    "trade_when(ts_zscore(ts_delay({FUND_F},1), 20) > 1.5, group_neutralize(-rank(ts_delay(returns,1)), subindustry), 0)",
+    "trade_when(ts_delay(volume,1) / adv20 > 2, group_neutralize(rank(ts_delta(ts_delay({FUND_F},1), 5)), subindustry), 0)",
+
+    # ── D0-S8. 比率信号（跨字段）──
+    "group_rank(ts_delay({FUND_F},1) / (ts_delay({ANALYST_F},1) + 1e-6), subindustry)",
+    "group_neutralize(ts_delta(ts_delay({FUND_F},1) / (cap + 1e-6), 5), subindustry)",
+
+    # ── D0-S9. 动量加速度 ──
+    "group_neutralize(ts_delta(ts_delta(ts_delay({FUND_F},1), 5), 5), subindustry)",
+    "group_rank(ts_delta(ts_delay({FUND_F},1), 5) / (ts_std_dev(ts_delay({FUND_F},1), 20) + 1e-6), subindustry)",
+
+    # ── D0-S10. 复合信号（双字段加权）──
+    "ts_decay_exp_window(0.6 * group_rank(ts_delay({FUND_F},1), subindustry) + 0.4 * group_neutralize(ts_delay({BLUE_F},1), subindustry), {W}, 2)",
+
+    # ── D0-S11. 连乘累积 ──
+    "group_rank(ts_product(ts_delay({FUND_F},1) / (ts_delay({ANALYST_F},1) + 1e-6), {W}), subindustry)",
+
+    # ── D0-S12. 波动率截面 ──
+    "group_rank(ts_std_dev(ts_delay({FUND_F},1), {W}) / (ts_mean(abs(ts_delay({FUND_F},1)), {W}) + 1e-6), subindustry)",
+
+    # ── D0-S13. NaN缺失值补丁 ──
+    "group_neutralize(if_else(is_nan(ts_delay({BLUE_F},1)), ts_zscore(assets/cap, 20), ts_delay({BLUE_F},1)), subindustry)",
 ]
 
 # D0 禁用的日频字段（提交前必须净化）
@@ -1074,14 +946,22 @@ _SWEEP_STATE_PATH = os.path.join(
 )
 
 _SWEEP_SKELETONS = [
+    # 基础结构（保留3个经典）
     ("rank_ts_rank",      "group_rank(ts_rank({F}, {W}), subindustry)"),
     ("neut_ts_zscore",    "group_neutralize(ts_zscore({F}, {W}), subindustry)"),
     ("rank_delta_ratio",  "group_rank(ts_delta({F}, {W}) / (ts_std_dev({F}, {W}) + 1e-6), subindustry)"),
-    ("neut_decay_rank",   "group_neutralize(ts_decay_linear(rank({F}), {W}), subindustry)"),
-    ("rank_cap_ratio",    "group_rank({F}/cap, subindustry)"),
-    ("reverse_rank",      "-group_rank(ts_rank({F}, {W}), subindustry)"),
-    ("rank_f1_f2_ratio",  "group_rank({F}/({F2}+1e-6), subindustry)"),
-    ("neut_ts_mean",      "group_neutralize(ts_mean({F}, {W}), subindustry)"),
+    # 稀有算子（结构性差异最大化）
+    ("regression_resid",  "group_rank(ts_regression({F}, returns, {W}, 0, 2), subindustry)"),
+    ("signed_sqrt",       "group_rank(signed_power(ts_zscore({F}, {W}), 0.5), subindustry)"),
+    ("arg_max_signal",    "group_neutralize(({W} - ts_arg_max({F}, {W})) / {W}, subindustry)"),
+    ("product_accum",     "group_rank(ts_product({F}/(cap+1e-6), {W}), subindustry)"),
+    ("quantile_25",       "group_rank(ts_quantile({F}, 0.25, {W}), subindustry)"),
+    ("kth_elem",          "group_neutralize(kth_element({F}, 3, {W}), subindustry)"),
+    ("nan_count",         "group_neutralize(ts_count_nans({F}, {W}), subindustry)"),
+    ("vol_ratio",         "group_rank(ts_std_dev({F}, {W}) / (ts_mean(abs({F}), {W}) + 1e-6), subindustry)"),
+    ("accel_2nd",         "group_neutralize(ts_delta(ts_delta({F}, 5), 5), subindustry)"),
+    ("jump_decay_sig",    "group_rank(jump_decay({F}, {W}, 0.5, 252), subindustry)"),
+    ("hump_signal",       "group_neutralize(hump({F}, 0.3), subindustry)"),
 ]
 
 _SWEEP_WINDOWS = [5, 10, 15, 20, 30, 60, 120, 252]
