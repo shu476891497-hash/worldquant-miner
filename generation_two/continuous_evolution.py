@@ -672,123 +672,189 @@ VRP_EXPR_POOL = [
 
 _ALPHA_TEMPLATES = [
     # ════════════════════════════════════════════════════════════════
-    # 全新模板库 v2 —— 每个模板使用完全不同的算子骨架
-    # 设计原则: 最大化结构差异，最小化自相关
+    # 全新模板库 v3 —— 极致蓝海版
+    # 核心: ① 零硬编码热门字段 ② 全部用占位符 {F}/{F1}/{F2}
+    # ③ 算子骨架 100% 互不相同 ④ 大量冷门/生僻算子
     # ════════════════════════════════════════════════════════════════
 
-    # ── S1. 时序回归残差（别人没在用的 ts_regression）──
+    # ── S1. 时序回归残差 ──
     "group_rank(ts_regression({F1}, {F2}, {W}, 0, 2), subindustry)",
-    "group_neutralize(ts_regression({F}, returns, {W}, 0, 2) * rank({F}), subindustry)",
+    "group_neutralize(ts_regression({F1}, {F2}, {W}, 1, 2), subindustry)",
 
-    # ── S2. 协方差 / 相关性（跨字段联动信号）──
+    # ── S2. 协方差 / 相关性 ──
     "group_neutralize(ts_corr({F1}, {F2}, {W}), subindustry)",
     "group_rank(ts_covariance({F1}, {F2}, {W}) / (ts_std_dev({F1}, {W}) + 1e-6), subindustry)",
 
-    # ── S3. 非线性幂次变换（signed_power）──
+    # ── S3. 非线性幂次 signed_power ──
     "group_rank(signed_power(ts_zscore({F}, {W}), 0.5), subindustry)",
     "group_neutralize(signed_power(rank({F1}) - rank({F2}), 3), subindustry)",
 
-    # ── S4. 跳跃衰减 / 驼峰（rare算子）──
+    # ── S4. 跳跃衰减 / 驼峰 ──
     "group_rank(jump_decay({F}, {W}, 0.5, 252), subindustry)",
     "group_neutralize(hump({F}, 0.3) * rank({F2}), subindustry)",
 
     # ── S5. 分位数 / 第k元素 ──
     "group_rank(ts_quantile({F}, 0.25, {W}), subindustry)",
     "group_neutralize(kth_element({F}, 3, {W}), subindustry)",
+    "group_rank(ts_quantile({F}, 0.75, {W}) - ts_quantile({F}, 0.25, {W}), subindustry)",
 
-    # ── S6. 连乘累积 / 步长趋势 ──
-    "group_rank(ts_product({F}/({F2}+1e-6), {W}), subindustry)",
-    "group_neutralize(ts_step(1) * {F} / (cap + 1e-6), subindustry)",
+    # ── S6. 连乘累积 ──
+    "group_rank(ts_product({F1}/({F2}+1e-6), {W}), subindustry)",
 
-    # ── S7. 极值时间位置（ts_arg_max / ts_arg_min）──
+    # ── S7. 极值时间位置 ──
     "group_neutralize(ts_arg_max({F}, {W}) - ts_arg_min({F}, {W}), subindustry)",
     "group_rank(({W} - ts_arg_max({F}, {W})) / {W}, subindustry)",
+    "group_neutralize(ts_arg_min({F1}, {W}) - ts_arg_min({F2}, {W}), subindustry)",
 
-    # ── S8. NaN计数 / 数据断裂信号（数据质量因子）──
+    # ── S8. 数据质量 / NaN ──
     "group_neutralize(ts_count_nans({F}, {W}), subindustry)",
     "group_rank(days_from_last_change({F}), subindustry)",
     "group_neutralize(last_diff_value({F}, {W}), subindustry)",
 
-    # ── S9. 条件触发（trade_when，稀疏信号）──
-    "trade_when(ts_rank({F1}, 20) > 0.8, group_rank({F2}, subindustry), 0)",
-    "trade_when(ts_zscore({F1}, 20) > 1.5, group_neutralize(-rank({F2}), subindustry), 0)",
+    # ── S9. 条件触发（纯占位符版）──
+    "trade_when(ts_rank({F1}, {W}) > 0.8, group_rank({F2}, subindustry), 0)",
+    "trade_when(ts_zscore({F1}, {W}) > 1.5, group_neutralize(-rank({F2}), subindustry), 0)",
+    "trade_when(ts_zscore({F1}, {W}) < -1.5, group_rank({F2}, subindustry), 0)",
 
-    # ── S10. 比率信号（跨字段除法）──
+    # ── S10. 比率信号 ──
     "group_rank({F1} / ({F2} + 1e-6), subindustry)",
     "group_neutralize(ts_delta({F1} / ({F2} + 1e-6), {W}), subindustry)",
 
-    # ── S11. NaN缺失值补丁（if_else结构）──
-    "group_neutralize(if_else(is_nan({F}), ts_zscore(assets/cap, 20), {F}), industry)",
-    "group_rank(if_else(is_nan({F}), group_rank(sales/cap, subindustry), {F}), subindustry)",
+    # ── S11. 缺失值补丁 ──
+    "group_neutralize(if_else(is_nan({F1}), ts_zscore({F2}, 20), {F1}), industry)",
 
-    # ── S12. 波动率截面（ts_std_dev 为主骨架）──
+    # ── S12. 波动率截面 ──
     "group_rank(ts_std_dev({F}, {W}) / (ts_mean(abs({F}), {W}) + 1e-6), subindustry)",
 
-    # ── S13. 动量加速度（二阶差分）──
+    # ── S13. 二阶差分 ──
     "group_neutralize(ts_delta(ts_delta({F}, 5), 5), subindustry)",
     "group_rank(ts_delta({F}, 5) / (ts_std_dev({F}, {W}) + 1e-6), subindustry)",
 
     # ── S14. 非线性交互残差 ──
     "group_neutralize(rank({F1}) * rank({F2}) - rank({F1} * {F2}), subindustry)",
 
-    # ── S15. 加权衰减混合（双字段复合）──
+    # ── S15. 加权衰减混合 ──
     "ts_decay_exp_window(0.6 * group_rank({F1}, subindustry) + 0.4 * group_neutralize({F2}, subindustry), {W}, 2)",
+
+    # ══════════ v3 新增冷门算子骨架 ══════════
+
+    # ── S16. 信息比率 ts_ir ──
+    "group_rank(ts_ir({F}, {W}), subindustry)",
+    "group_neutralize(ts_ir({F1}, {W}) - ts_ir({F2}, {W}), subindustry)",
+
+    # ── S17. 偏度 / 峰度 ──
+    "group_rank(ts_skewness({F}, {W}), subindustry)",
+    "group_neutralize(ts_kurtosis({F}, {W}), subindustry)",
+
+    # ── S18. ts_moment (高阶矩) ──
+    "group_rank(ts_moment({F}, {W}, 3), subindustry)",
+    "group_neutralize(ts_moment({F1}, {W}, 4) - ts_moment({F2}, {W}, 4), subindustry)",
+
+    # ── S19. 截面分位数 (group_quantile) ──
+    "group_rank(group_quantile({F}, 0.1, subindustry), sector)",
+    "group_neutralize(group_rank({F1}, sector) - group_rank({F2}, sector), subindustry)",
+
+    # ── S20. ts_theilsen (稳健回归) ──
+    "group_rank(ts_theilsen({F1}, {F2}, {W}), subindustry)",
+    "group_neutralize(ts_theilsen({F}, ts_step(1), {W}), subindustry)",
+
+    # ── S21. 离散度 / 集中度 ──
+    "group_rank(ts_herfindahl({F}, {W}), subindustry)",
+    "group_neutralize(ts_entropy({F}, {W}), subindustry)",
+
+    # ── S22. ts_decay_linear (线性衰减) ──
+    "ts_decay_linear({F}, {W})",
+    "group_neutralize(ts_decay_linear(rank({F1}) * rank({F2}), {W}), subindustry)",
+
+    # ── S23. 多重条件嵌套 ──
+    "trade_when(ts_rank({F1}, {W}) > 0.9 & ts_rank({F2}, {W}) < 0.1, rank({F1})-rank({F2}), 0)",
+
+    # ── S24. zscore of rank spread ──
+    "group_rank(ts_zscore(group_rank({F1}, subindustry) - group_rank({F2}, subindustry), {W}), sector)",
+
+    # ── S25. 加速度 × 非线性 ──
+    "group_neutralize(signed_power(ts_delta(ts_delta({F}, 5), 5), 0.5), subindustry)",
 ]
 
 _D0_ALPHA_TEMPLATES = [
     # ════════════════════════════════════════════════════════════════
-    # D0 模板库 v2 —— 去除重复跳空信号，最大化结构多元性
-    # 每个模板骨架完全不同，严格 ts_delay 避免未来函数
+    # D0 模板库 v3 —— 极致蓝海版
+    # 核心: 全部用 {FUND_F}/{BLUE_F}/{ANALYST_F} 占位符填充
+    # 去除所有 open/close/volume 硬编码，用 {FUND_F} 代替
     # ════════════════════════════════════════════════════════════════
 
-    # ── D0-S1. 回归残差（ts_regression）──
-    "group_rank(ts_regression(open/ts_delay(close,1)-1, ts_delay({FUND_F},1), {W}, 0, 2), subindustry)",
-    "group_neutralize(ts_regression(ts_delay({FUND_F},1), ts_delay({ANALYST_F},1), {W}, 0, 2), subindustry)",
+    # ── D0-S1. 纯回归残差 ──
+    "group_rank(ts_regression(ts_delay({FUND_F},1), ts_delay({BLUE_F},1), {W}, 0, 2), subindustry)",
+    "group_neutralize(ts_regression(ts_delay({FUND_F},1), ts_delay({ANALYST_F},1), {W}, 1, 2), subindustry)",
 
-    # ── D0-S2. 跨字段协方差/相关（ts_corr / ts_covariance）──
-    "group_rank(ts_corr(open/ts_delay(close,1)-1, ts_delay({FUND_F},1), {W}), subindustry)",
-    "group_neutralize(ts_covariance(ts_delay({FUND_F},1), ts_delay({BLUE_F},1), {W}), subindustry)",
+    # ── D0-S2. 跨字段相关/协方差 ──
+    "group_rank(ts_corr(ts_delay({FUND_F},1), ts_delay({BLUE_F},1), {W}), subindustry)",
+    "group_neutralize(ts_covariance(ts_delay({FUND_F},1), ts_delay({ANALYST_F},1), {W}), subindustry)",
 
-    # ── D0-S3. 非线性幂次（signed_power）──
-    "group_rank(signed_power(rank(open/ts_delay(close,1)-1) * rank({FUND_F}), 2), subindustry)",
-    "group_neutralize(signed_power(ts_zscore(ts_delay({FUND_F},1), 20), 0.5), subindustry)",
+    # ── D0-S3. 非线性幂次 ──
+    "group_rank(signed_power(rank(ts_delay({FUND_F},1)) - rank(ts_delay({BLUE_F},1)), 2), subindustry)",
+    "group_neutralize(signed_power(ts_zscore(ts_delay({FUND_F},1), {W}), 0.5), subindustry)",
 
-    # ── D0-S4. 极值时间位置（ts_arg_max）──
-    "group_neutralize(ts_arg_max(ts_delay({FUND_F},1), {W}) * rank(open/ts_delay(close,1)-1), subindustry)",
-    "group_rank(({W} - ts_arg_max(ts_delay({BLUE_F},1), {W})) / {W}, subindustry)",
+    # ── D0-S4. 极值时间位置 ──
+    "group_neutralize(ts_arg_max(ts_delay({FUND_F},1), {W}) - ts_arg_min(ts_delay({BLUE_F},1), {W}), subindustry)",
+    "group_rank(({W} - ts_arg_max(ts_delay({FUND_F},1), {W})) / {W}, subindustry)",
 
     # ── D0-S5. 分位数 / 第k元素 ──
-    "group_neutralize(ts_quantile(ts_delay({FUND_F},1), 0.25, {W}) * sign(open-ts_delay(close,1)), subindustry)",
-    "group_rank(kth_element(ts_delay({FUND_F},1), 3, {W}) * sign(open-ts_delay(close,1)), subindustry)",
+    "group_neutralize(ts_quantile(ts_delay({FUND_F},1), 0.25, {W}), subindustry)",
+    "group_rank(kth_element(ts_delay({FUND_F},1), 3, {W}), subindustry)",
+    "group_rank(ts_quantile(ts_delay({BLUE_F},1), 0.75, {W}) - ts_quantile(ts_delay({BLUE_F},1), 0.25, {W}), subindustry)",
 
-    # ── D0-S6. NaN / 数据质量 ──
+    # ── D0-S6. 数据质量 / NaN ──
     "group_neutralize(ts_count_nans(ts_delay({BLUE_F},1), {W}), subindustry)",
     "group_rank(days_from_last_change({FUND_F}), subindustry)",
 
-    # ── D0-S7. 条件触发 trade_when（不同条件骨架）──
-    "trade_when(ts_rank(ts_delay({BLUE_F},1), 20) > 0.8, group_rank(open/ts_delay(close,1)-1, subindustry), 0)",
-    "trade_when(ts_zscore(ts_delay({FUND_F},1), 20) > 1.5, group_neutralize(-rank(ts_delay(returns,1)), subindustry), 0)",
-    "trade_when(ts_delay(volume,1) / adv20 > 2, group_neutralize(rank(ts_delta(ts_delay({FUND_F},1), 5)), subindustry), 0)",
+    # ── D0-S7. 条件触发 ──
+    "trade_when(ts_rank(ts_delay({BLUE_F},1), {W}) > 0.8, group_rank(ts_delay({FUND_F},1), subindustry), 0)",
+    "trade_when(ts_zscore(ts_delay({FUND_F},1), {W}) > 1.5, group_neutralize(-rank(ts_delay({BLUE_F},1)), subindustry), 0)",
 
-    # ── D0-S8. 比率信号（跨字段）──
+    # ── D0-S8. 比率信号 ──
     "group_rank(ts_delay({FUND_F},1) / (ts_delay({ANALYST_F},1) + 1e-6), subindustry)",
-    "group_neutralize(ts_delta(ts_delay({FUND_F},1) / (cap + 1e-6), 5), subindustry)",
+    "group_neutralize(ts_delta(ts_delay({FUND_F},1) / (ts_delay({BLUE_F},1) + 1e-6), 5), subindustry)",
 
-    # ── D0-S9. 动量加速度 ──
+    # ── D0-S9. 二阶差分 ──
     "group_neutralize(ts_delta(ts_delta(ts_delay({FUND_F},1), 5), 5), subindustry)",
-    "group_rank(ts_delta(ts_delay({FUND_F},1), 5) / (ts_std_dev(ts_delay({FUND_F},1), 20) + 1e-6), subindustry)",
+    "group_rank(ts_delta(ts_delay({FUND_F},1), 5) / (ts_std_dev(ts_delay({FUND_F},1), {W}) + 1e-6), subindustry)",
 
-    # ── D0-S10. 复合信号（双字段加权）──
+    # ── D0-S10. 衰减复合 ──
     "ts_decay_exp_window(0.6 * group_rank(ts_delay({FUND_F},1), subindustry) + 0.4 * group_neutralize(ts_delay({BLUE_F},1), subindustry), {W}, 2)",
 
-    # ── D0-S11. 连乘累积 ──
+    # ── D0-S11. 连乘 ──
     "group_rank(ts_product(ts_delay({FUND_F},1) / (ts_delay({ANALYST_F},1) + 1e-6), {W}), subindustry)",
 
     # ── D0-S12. 波动率截面 ──
     "group_rank(ts_std_dev(ts_delay({FUND_F},1), {W}) / (ts_mean(abs(ts_delay({FUND_F},1)), {W}) + 1e-6), subindustry)",
 
-    # ── D0-S13. NaN缺失值补丁 ──
-    "group_neutralize(if_else(is_nan(ts_delay({BLUE_F},1)), ts_zscore(assets/cap, 20), ts_delay({BLUE_F},1)), subindustry)",
+    # ══════════ v3 新增: 极致冷门算子 ══════════
+
+    # ── D0-S13. 信息比率 ──
+    "group_rank(ts_ir(ts_delay({FUND_F},1), {W}), subindustry)",
+    "group_neutralize(ts_ir(ts_delay({FUND_F},1), {W}) - ts_ir(ts_delay({BLUE_F},1), {W}), subindustry)",
+
+    # ── D0-S14. 偏度 / 峰度 ──
+    "group_rank(ts_skewness(ts_delay({FUND_F},1), {W}), subindustry)",
+    "group_neutralize(ts_kurtosis(ts_delay({BLUE_F},1), {W}), subindustry)",
+
+    # ── D0-S15. 高阶矩 ──
+    "group_rank(ts_moment(ts_delay({FUND_F},1), {W}, 3), subindustry)",
+
+    # ── D0-S16. 稳健回归 ts_theilsen ──
+    "group_rank(ts_theilsen(ts_delay({FUND_F},1), ts_delay({BLUE_F},1), {W}), subindustry)",
+    "group_neutralize(ts_theilsen(ts_delay({FUND_F},1), ts_step(1), {W}), subindustry)",
+
+    # ── D0-S17. 熵 / 集中度 ──
+    "group_rank(ts_herfindahl(ts_delay({FUND_F},1), {W}), subindustry)",
+    "group_neutralize(ts_entropy(ts_delay({BLUE_F},1), {W}), subindustry)",
+
+    # ── D0-S18. 线性衰减 ──
+    "ts_decay_linear(group_rank(ts_delay({FUND_F},1), subindustry), {W})",
+
+    # ── D0-S19. zscore of rank spread ──
+    "group_rank(ts_zscore(group_rank(ts_delay({FUND_F},1), subindustry) - group_rank(ts_delay({BLUE_F},1), subindustry), {W}), sector)",
 ]
 
 # D0 禁用的日频字段（提交前必须净化）
@@ -946,22 +1012,39 @@ _SWEEP_STATE_PATH = os.path.join(
 )
 
 _SWEEP_SKELETONS = [
-    # 基础结构（保留3个经典）
+    # ═══ v3 极致蓝海扫描骨架（25种完全不同的算子结构）═══
+    # 零硬编码热门字段，全部用 {F} 占位符
+
+    # 经典保留（3个）
     ("rank_ts_rank",      "group_rank(ts_rank({F}, {W}), subindustry)"),
     ("neut_ts_zscore",    "group_neutralize(ts_zscore({F}, {W}), subindustry)"),
     ("rank_delta_ratio",  "group_rank(ts_delta({F}, {W}) / (ts_std_dev({F}, {W}) + 1e-6), subindustry)"),
+
     # 稀有算子（结构性差异最大化）
-    ("regression_resid",  "group_rank(ts_regression({F}, returns, {W}, 0, 2), subindustry)"),
+    ("regression_resid",  "group_rank(ts_regression({F}, ts_step(1), {W}, 0, 2), subindustry)"),
     ("signed_sqrt",       "group_rank(signed_power(ts_zscore({F}, {W}), 0.5), subindustry)"),
     ("arg_max_signal",    "group_neutralize(({W} - ts_arg_max({F}, {W})) / {W}, subindustry)"),
-    ("product_accum",     "group_rank(ts_product({F}/(cap+1e-6), {W}), subindustry)"),
+    ("product_accum",     "group_rank(ts_product({F}, {W}), subindustry)"),
     ("quantile_25",       "group_rank(ts_quantile({F}, 0.25, {W}), subindustry)"),
+    ("quantile_iqr",      "group_rank(ts_quantile({F}, 0.75, {W}) - ts_quantile({F}, 0.25, {W}), subindustry)"),
     ("kth_elem",          "group_neutralize(kth_element({F}, 3, {W}), subindustry)"),
     ("nan_count",         "group_neutralize(ts_count_nans({F}, {W}), subindustry)"),
     ("vol_ratio",         "group_rank(ts_std_dev({F}, {W}) / (ts_mean(abs({F}), {W}) + 1e-6), subindustry)"),
     ("accel_2nd",         "group_neutralize(ts_delta(ts_delta({F}, 5), 5), subindustry)"),
     ("jump_decay_sig",    "group_rank(jump_decay({F}, {W}, 0.5, 252), subindustry)"),
     ("hump_signal",       "group_neutralize(hump({F}, 0.3), subindustry)"),
+
+    # v3 新增极致冷门
+    ("info_ratio",        "group_rank(ts_ir({F}, {W}), subindustry)"),
+    ("skewness",          "group_rank(ts_skewness({F}, {W}), subindustry)"),
+    ("kurtosis",          "group_neutralize(ts_kurtosis({F}, {W}), subindustry)"),
+    ("moment_3rd",        "group_rank(ts_moment({F}, {W}, 3), subindustry)"),
+    ("theilsen_trend",    "group_neutralize(ts_theilsen({F}, ts_step(1), {W}), subindustry)"),
+    ("herfindahl",        "group_rank(ts_herfindahl({F}, {W}), subindustry)"),
+    ("entropy",           "group_neutralize(ts_entropy({F}, {W}), subindustry)"),
+    ("decay_linear",      "ts_decay_linear({F}, {W})"),
+    ("days_change",       "group_rank(days_from_last_change({F}), subindustry)"),
+    ("last_diff",         "group_neutralize(last_diff_value({F}, {W}), subindustry)"),
 ]
 
 _SWEEP_WINDOWS = [5, 10, 15, 20, 30, 60, 120, 252]
@@ -1557,10 +1640,17 @@ def generate_template_alphas(n: int, wq_fields: list, evaluated_alphas: set = No
     # 蓝海字段 ID 列表（用于 30% 强制采样）
     _blue_ids = [b['id'] for b in blue_ocean_fields] if blue_ocean_fields else []
 
-    # 准备数据集类别列表用于轮询（Round-Robin），确保每个 Dataset 必定被选中
-    category_list = list(wq_fields_by_category.keys()) if wq_fields_by_category else []
-    if category_list:
-        random.shuffle(category_list)  # 打乱顺序，避免每次生成的头几个类别都是固定的
+    # 准备数据集类别列表——蓝海冷门类别优先排列
+    _COLD_CATEGORIES = ['model', 'sentiment', 'socialmedia', 'macro', 'news', 'option', 'analyst']
+    _HOT_CATEGORIES  = ['fundamental', 'pv']  # 热门类别排最后
+    if wq_fields_by_category:
+        cold = [c for c in _COLD_CATEGORIES if c in wq_fields_by_category and wq_fields_by_category[c]]
+        hot  = [c for c in _HOT_CATEGORIES  if c in wq_fields_by_category and wq_fields_by_category[c]]
+        rest = [c for c in wq_fields_by_category if c not in _COLD_CATEGORIES + _HOT_CATEGORIES and wq_fields_by_category[c]]
+        category_list = cold + rest + hot   # 冷门优先
+        random.shuffle(cold)  # 冷门之间打乱
+    else:
+        category_list = []
 
     blue_count = 0  # 统计蓝海采样次数
     attempts = 0
@@ -1571,8 +1661,8 @@ def generate_template_alphas(n: int, wq_fields: list, evaluated_alphas: set = No
             template = _tracker_template.pick_one(_ALPHA_TEMPLATES)
             window = random.choice(_TEMPLATE_WINDOWS)
 
-            # ★★★ 蓝海强制采样：30% 概率从蓝海池选 F1 ★★★
-            use_blue_ocean = _blue_ids and random.random() < 0.30
+            # ★★★ 蓝海强制采样：80% 概率从蓝海池选 F1（大幅降低自相关）★★★
+            use_blue_ocean = _blue_ids and random.random() < 0.80
             if use_blue_ocean:
                 f1 = random.choice(_blue_ids)
                 blue_count += 1
@@ -1670,7 +1760,9 @@ def generate_d0_leg(n: int, wq_fields: list, wq_fields_by_category: dict,
         wq_fields_by_category.get("sentiment", []) +
         wq_fields_by_category.get("socialmedia", []) +
         wq_fields_by_category.get("option", []) +
-        wq_fields_by_category.get("news", [])
+        wq_fields_by_category.get("news", []) +
+        wq_fields_by_category.get("model", []) +
+        wq_fields_by_category.get("macro", [])
     )
     analyst_pool = _filter_by_whitelist(wq_fields_by_category.get("analyst", []))
 
@@ -1752,8 +1844,8 @@ def generate_d0_leg(n: int, wq_fields: list, wq_fields_by_category: dict,
             expr = tmpl
 
             # 随机选双字段（保证每次不同）
-            # 30% 概率用蓝海字段替代基本面字段（强制跨域融合，降低自相关）
-            if random.random() < 0.3 and blue_pool:
+            # 80% 概率用蓝海字段替代基本面字段（强制跨域融合，最大化降低自相关）
+            if random.random() < 0.80 and blue_pool:
                 fund_f = random.choice(blue_pool)
             else:
                 fund_f  = random.choice(fund_pool)   if fund_pool   else "sales"
