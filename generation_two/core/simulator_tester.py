@@ -92,6 +92,75 @@ class SimulatorTester:
         self.template_generator = template_generator  # For re-authentication if needed
         self.executor = ThreadPoolExecutor(max_workers=8)
         self.active_simulations = {}  # {alpha_id: Future}
+        self._relogin_count = 0  # Track re-login attempts
+    
+    def _try_relogin(self) -> bool:
+        """
+        Attempt to re-authenticate when session expires (401).
+        Uses credential.txt for password-based re-login.
+        Returns True if re-login succeeded.
+        """
+        self._relogin_count += 1
+        logger.info(f"🔄 Re-login attempt #{self._relogin_count}")
+        
+        try:
+            # Method 1: Use CredentialManager to re-authenticate
+            from .credential_manager import CredentialManager
+            from pathlib import Path
+            
+            base_path = Path(__file__).parent.parent
+            cm = CredentialManager(base_path=str(base_path))
+            
+            if cm.authenticate(auto_load=True, auto_prompt=False):
+                new_session = cm.get_session()
+                if new_session:
+                    # Update the session used by this simulator
+                    self.sess = new_session
+                    # Also update template_generator's session if available
+                    if self.template_generator and hasattr(self.template_generator, 'sess'):
+                        self.template_generator.sess = new_session
+                    logger.info(f"✅ Re-login successful via CredentialManager")
+                    return True
+            
+            # Method 2: Direct BasicAuth re-login as fallback
+            credential_paths = [
+                base_path / 'credential.txt',
+                base_path / 'credentials.txt',
+                base_path.parent / 'credential.txt',
+            ]
+            
+            for cred_path in credential_paths:
+                if cred_path.exists():
+                    with open(cred_path, 'r') as f:
+                        lines = f.read().strip().split('\n')
+                    if len(lines) >= 2:
+                        username, password = lines[0].strip(), lines[1].strip()
+                        from requests.auth import HTTPBasicAuth
+                        auth = HTTPBasicAuth(username, password)
+                        resp = self.sess.post(
+                            'https://api.worldquantbrain.com/authentication',
+                            auth=auth, timeout=10
+                        )
+                        if resp.status_code == 201:
+                            self.sess.auth = auth
+                            logger.info(f"✅ Re-login successful via BasicAuth ({username})")
+                            return True
+                        elif resp.status_code == 401:
+                            body = resp.json() if resp.content else {}
+                            if body.get('inquiry'):
+                                logger.error(f"❌ Biometrics required (inquiry={body['inquiry']}), cannot auto-relogin")
+                            else:
+                                logger.error(f"❌ BasicAuth 401: {resp.text[:200]}")
+                        else:
+                            logger.error(f"❌ BasicAuth failed: {resp.status_code}")
+                    break
+            
+            logger.error("❌ All re-login methods failed")
+            return False
+            
+        except Exception as e:
+            logger.error(f"❌ Re-login exception: {e}")
+            return False
     
     def submit_simulation(
         self, 
@@ -181,8 +250,29 @@ class SimulatorTester:
                 logger.info(f"Submitted simulation: {progress_url} for region {region}")
                 return progress_url
             elif response.status_code == 401:
-                logger.error(f"Authentication expired - session cookies may have been lost")
-                logger.error(f"Response: {response.text}")
+                logger.warning(f"🔄 Session expired (401), attempting auto re-login...")
+                if self._try_relogin():
+                    logger.info("✅ Re-login successful, retrying simulation submission...")
+                    # Retry with refreshed session
+                    if self.template_generator and hasattr(self.template_generator, 'make_api_request'):
+                        response = self.template_generator.make_api_request(
+                            'POST',
+                            'https://api.worldquantbrain.com/simulations',
+                            json=simulation_data
+                        )
+                    else:
+                        response = self.sess.post(
+                            'https://api.worldquantbrain.com/simulations',
+                            json=simulation_data
+                        )
+                    if response.status_code == 201:
+                        progress_url = response.headers.get('Location')
+                        if progress_url:
+                            logger.info(f"Submitted simulation after re-login: {progress_url}")
+                            return progress_url
+                    logger.error(f"Still failing after re-login: {response.status_code} - {response.text[:200]}")
+                else:
+                    logger.error(f"❌ Re-login failed, cannot recover session")
                 return None
             else:
                 logger.error(f"Failed to submit simulation: {response.status_code} - {response.text}")
