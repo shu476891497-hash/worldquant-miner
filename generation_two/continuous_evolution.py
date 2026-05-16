@@ -1000,6 +1000,108 @@ def _add_forbidden_structure(expr: str):
 
 
 # =========================================================
+# 🔪 字段耗尽黑名单（Field Exhaustion Kill List）
+# 挖到好因子后，提取其主字段加入永久黑名单，强制探索其他蓝海字段
+# 解决"贪婪锁定"问题：发现一个好字段后反复利用，忽略其他蓝海
+# =========================================================
+_EXHAUSTED_FIELDS_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "exhausted_fields.json"
+)
+
+def _extract_primary_fields(expr: str) -> set:
+    """从因子表达式中提取所有使用的数据字段名。
+    排除算子名、数字、分组标识符等，只保留真正的数据字段。"""
+    import re as _r
+    # 提取所有看起来像标识符的 token
+    tokens = set(_r.findall(r'\b([a-z][a-z0-9_]{2,})\b', expr.lower()))
+    # 排除已知的算子/关键词/分组标识符
+    _OPERATORS = {
+        'ts_mean', 'ts_rank', 'ts_zscore', 'ts_delta', 'ts_std_dev',
+        'ts_decay_linear', 'ts_decay_exp_window', 'ts_sum', 'ts_delay',
+        'ts_av_diff', 'ts_corr', 'ts_covariance', 'ts_regression',
+        'ts_arg_max', 'ts_arg_min', 'ts_product', 'ts_quantile',
+        'ts_count_nans', 'ts_ir', 'ts_skewness', 'ts_kurtosis',
+        'ts_moment', 'ts_theilsen', 'ts_herfindahl', 'ts_entropy',
+        'ts_step', 'rank', 'group_rank', 'group_neutralize',
+        'group_zscore', 'group_quantile', 'winsorize', 'trade_when',
+        'divide', 'subtract', 'log', 'abs', 'signed_power',
+        'jump_decay', 'hump', 'kth_element', 'days_from_last_change',
+        'last_diff_value', 'if_else', 'is_nan',
+        'subindustry', 'industry', 'sector',  # 分组标识符
+    }
+    # 排除纯标价格字段（这些是公共的，不需要 kill）
+    _COMMON_FIELDS = {
+        'close', 'open', 'high', 'low', 'volume', 'vwap', 'returns',
+        'cap', 'adv20', 'adv60', 'adv120', 'turnover',
+    }
+    fields = tokens - _OPERATORS - _COMMON_FIELDS
+    # 再排除纯数字 token 和太短的
+    fields = {f for f in fields if not f.isdigit() and len(f) > 2}
+    return fields
+
+
+def _load_exhausted_fields() -> dict:
+    """加载已耗尽字段集合。
+    返回: dict {field_id: {"killed_at": timestamp, "alpha_expr": ..., "sharpe": ...}}
+    """
+    if not os.path.exists(_EXHAUSTED_FIELDS_PATH):
+        return {}
+    try:
+        with open(_EXHAUSTED_FIELDS_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_exhausted_fields(exhausted: dict):
+    """持久化已耗尽字段集合。"""
+    try:
+        with open(_EXHAUSTED_FIELDS_PATH, 'w', encoding='utf-8') as f:
+            json.dump(exhausted, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logging.debug(f"保存耗尽字段失败: {e}")
+
+
+def _get_exhausted_field_set() -> set:
+    """快速获取所有已耗尽字段 ID 的集合。"""
+    return set(_load_exhausted_fields().keys())
+
+
+def _kill_fields_from_alpha(expr: str, sharpe: float = 0, fitness: float = 0):
+    """从成功的 alpha 中提取主字段并加入耗尽黑名单。
+    只 kill 非公共字段（排除 close/volume 等通用字段）。"""
+    fields = _extract_primary_fields(expr)
+    if not fields:
+        return
+    exhausted = _load_exhausted_fields()
+    newly_killed = []
+    for f in fields:
+        if f not in exhausted:
+            exhausted[f] = {
+                "killed_at": time.strftime('%Y-%m-%d %H:%M'),
+                "alpha_expr": expr[:120],
+                "sharpe": round(sharpe, 3),
+                "fitness": round(fitness, 3),
+            }
+            newly_killed.append(f)
+    if newly_killed:
+        _save_exhausted_fields(exhausted)
+        logging.warning(
+            f"🔪 字段耗尽! 已杀死 {len(newly_killed)} 个字段: {newly_killed} | "
+            f"总耗尽={len(exhausted)} | 来源: {expr[:60]}"
+        )
+
+
+def _filter_exhausted_from_list(field_list: list, exhausted_set: set = None) -> list:
+    """从字段列表中移除已耗尽的字段。"""
+    if exhausted_set is None:
+        exhausted_set = _get_exhausted_field_set()
+    if not exhausted_set:
+        return field_list
+    return [f for f in field_list if f not in exhausted_set]
+
+
+# =========================================================
 
 
 # =========================================================
@@ -1081,6 +1183,17 @@ def generate_systematic_sweep(wq_fields, wq_fields_by_category,
     all_fields = wq_fields if wq_fields else _FUNDAMENTAL_FIELDS
     if not fund_fields:
         fund_fields = [f for f in _FUNDAMENTAL_FIELDS if f in set(all_fields)] or _FUNDAMENTAL_FIELDS
+    # ★ 字段耗尽过滤：跳过已产出好因子的字段
+    _exhausted = _get_exhausted_field_set()
+    if _exhausted:
+        all_fields = _filter_exhausted_from_list(all_fields, _exhausted) or all_fields
+        fund_fields = _filter_exhausted_from_list(fund_fields, _exhausted) or fund_fields
+        # 也过滤类别内的字段
+        if wq_fields_by_category:
+            wq_fields_by_category = {
+                cat: _filter_exhausted_from_list(flds, _exhausted) or flds
+                for cat, flds in wq_fields_by_category.items()
+            }
 
     # ★ 类别轮询：从 state 恢复当前类别和每类别的进度
     cat_list = sorted(wq_fields_by_category.keys()) if wq_fields_by_category else []
@@ -1637,8 +1750,13 @@ def generate_template_alphas(n: int, wq_fields: list, evaluated_alphas: set = No
     all_fields = wq_fields if wq_fields else _FUNDAMENTAL_FIELDS
     # 基本面字段优先用于双字段模板的 F2（分母/配对字段）
     fund_fields = [f for f in _FUNDAMENTAL_FIELDS if f in all_fields] or _FUNDAMENTAL_FIELDS
-    # 蓝海字段 ID 列表（用于 30% 强制采样）
-    _blue_ids = [b['id'] for b in blue_ocean_fields] if blue_ocean_fields else []
+    # ★ 字段耗尽过滤：移除已产出好因子的字段，强制探索新领域
+    _exhausted = _get_exhausted_field_set()
+    if _exhausted:
+        all_fields = _filter_exhausted_from_list(all_fields, _exhausted) or all_fields
+        fund_fields = _filter_exhausted_from_list(fund_fields, _exhausted) or fund_fields
+    # 蓝海字段 ID 列表（用于 30% 强制采样）— 同样过滤已耗尽字段
+    _blue_ids = [b['id'] for b in blue_ocean_fields if b['id'] not in _exhausted] if blue_ocean_fields else []
 
     # 准备数据集类别列表——蓝海冷门类别优先排列
     _COLD_CATEGORIES = ['model', 'sentiment', 'socialmedia', 'macro', 'news', 'option', 'analyst']
@@ -2318,6 +2436,13 @@ def main(mode: str = "d0"):
         _blue_ocean_cache, max_users=30, max_alphas=50, min_coverage=0.30
     )
     if _blue_ocean_pool:
+        # ★ 从蓝海池中移除已耗尽字段
+        _exhausted_init = _get_exhausted_field_set()
+        if _exhausted_init:
+            _before = len(_blue_ocean_pool)
+            _blue_ocean_pool = [b for b in _blue_ocean_pool if b['id'] not in _exhausted_init]
+            if _before != len(_blue_ocean_pool):
+                logging.info(f"🔪 蓝海池耗尽过滤: {_before} → {len(_blue_ocean_pool)} (已杀死 {_before - len(_blue_ocean_pool)} 个)")
         # 按类别统计蓝海分布
         _bo_cats = {}
         for bo in _blue_ocean_pool:
@@ -2326,6 +2451,7 @@ def main(mode: str = "d0"):
             f"🌊 蓝海类别分布: " +
             " | ".join(f"{k}({v}个)" for k, v in sorted(_bo_cats.items(), key=lambda x: -x[1]))
         )
+        logging.info(f"🔪 已耗尽字段总数: {len(_exhausted_init)} | 剩余蓝海: {len(_blue_ocean_pool)}")
 
     
     # ── 从 operatorRAW.json 动态加载全量算子池 ──────────────────────
@@ -3091,6 +3217,12 @@ def main(mode: str = "d0"):
                 is_d0 = res.template in _d0_template_set
                 source = "D0-Template" if is_d0 else ("AI-Ollama" if res.template in locals().get("ai_alphas_neutralized", []) else "Genetic-D1")
                 _log_discovery(res.template, res.sharpe, res.fitness, res.alpha_id, source=source)
+
+                # ★★★ 字段耗尽：发现好因子后，杀死其使用的字段，强制探索新领域 ★★★
+                _kill_fields_from_alpha(res.template, res.sharpe, res.fitness)
+                # 动态更新蓝海池：移除刚被杀死的字段
+                _newly_exhausted = _get_exhausted_field_set()
+                _blue_ocean_pool[:] = [b for b in _blue_ocean_pool if b['id'] not in _newly_exhausted]
 
                 logging.warning(
                     f"📋 待手动提交: Alpha ID={res.alpha_id} | "
