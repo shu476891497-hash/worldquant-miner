@@ -3218,11 +3218,24 @@ def main(mode: str = "d0"):
                 source = "D0-Template" if is_d0 else ("AI-Ollama" if res.template in locals().get("ai_alphas_neutralized", []) else "Genetic-D1")
                 _log_discovery(res.template, res.sharpe, res.fitness, res.alpha_id, source=source)
 
-                # ★★★ 字段耗尽：发现好因子后，杀死其使用的字段，强制探索新领域 ★★★
-                _kill_fields_from_alpha(res.template, res.sharpe, res.fitness)
-                # 动态更新蓝海池：移除刚被杀死的字段
-                _newly_exhausted = _get_exhausted_field_set()
-                _blue_ocean_pool[:] = [b for b in _blue_ocean_pool if b['id'] not in _newly_exhausted]
+                # ★★★ 字段耗尽：只有真正优秀的因子才杀字段（高门槛防误杀）★★★
+                # 门槛: Sharpe>1.5 & Fitness>1.25 & Turnover<30% & Returns>15%
+                _should_kill = (
+                    abs(res.sharpe) > 1.5
+                    and abs(res.fitness) > 1.25
+                    and res.turnover is not None and 0 < res.turnover < 0.30
+                    and res.returns is not None and abs(res.returns) > 0.15
+                )
+                if _should_kill:
+                    _kill_fields_from_alpha(res.template, res.sharpe, res.fitness)
+                    # 动态更新蓝海池：移除刚被杀死的字段
+                    _newly_exhausted = _get_exhausted_field_set()
+                    _blue_ocean_pool[:] = [b for b in _blue_ocean_pool if b['id'] not in _newly_exhausted]
+                else:
+                    logging.info(
+                        f"  ⏳ 字段暂不杀死 (未达门槛): S={res.sharpe:.3f} F={res.fitness:.3f} "
+                        f"T={res.turnover:.2f} R={res.returns:.3f}"
+                    )
 
                 logging.warning(
                     f"📋 待手动提交: Alpha ID={res.alpha_id} | "
