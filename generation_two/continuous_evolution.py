@@ -1102,7 +1102,135 @@ def _filter_exhausted_from_list(field_list: list, exhausted_set: set = None) -> 
 
 
 # =========================================================
+# 🧊 骨架冷却系统（Skeleton Cooldown）
+# 同一骨架连续产出好因子后，冷却 N 代，强制引擎切换到新骨架
+# 不永久杀死——冷却到期自动解封，防止骨架枯竭
+# =========================================================
+_SKELETON_COOLDOWN_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "skeleton_cooldown.json"
+)
+_SKELETON_COOLDOWN_GENERATIONS = 20   # 冷却代数（到期自动解封）
+_SKELETON_KILL_THRESHOLD = 3          # 同骨架产出 N 个好因子后触发冷却
 
+
+def _extract_skeleton(expr: str) -> str:
+    """提取表达式的结构骨架指纹。
+    将所有字段名替换为 {F}，数字替换为 {N}，只保留算子结构。
+    例如: ts_rank(implied_volatility_call_30, 60) → ts_rank({F}, {N})
+    """
+    import re as _r
+    # Step 1: 用已知算子/关键词列表来识别非字段 token
+    _KNOWN_OPS = {
+        'ts_mean', 'ts_rank', 'ts_zscore', 'ts_delta', 'ts_std_dev',
+        'ts_decay_linear', 'ts_decay_exp_window', 'ts_sum', 'ts_delay',
+        'ts_av_diff', 'ts_corr', 'ts_covariance', 'ts_regression',
+        'ts_arg_max', 'ts_arg_min', 'ts_product', 'ts_quantile',
+        'ts_count_nans', 'ts_ir', 'ts_skewness', 'ts_kurtosis',
+        'ts_moment', 'ts_theilsen', 'ts_herfindahl', 'ts_entropy',
+        'ts_step', 'ts_backfill', 'ts_decay_exp',
+        'rank', 'group_rank', 'group_neutralize', 'group_zscore',
+        'group_quantile', 'winsorize', 'trade_when', 'bucket',
+        'divide', 'subtract', 'log', 'abs', 'signed_power', 'power',
+        'sqrt', 'sign', 'inverse', 'normalize', 'scale', 'zscore',
+        'jump_decay', 'hump', 'kth_element', 'days_from_last_change',
+        'last_diff_value', 'if_else', 'is_nan', 'not', 'and', 'or',
+        'vec_avg', 'vec_sum', 'vec_min', 'vec_max',
+        'reduce_ir', 'reduce_skewness', 'reduce_avg', 'reduce_sum',
+        'subindustry', 'industry', 'sector', 'std', 'range',
+    }
+    # Step 2: 先替换数字（保留算子名不变）
+    skeleton = _r.sub(r'(?<!\w)\d+\.?\d*(?!\w)', '{N}', expr)
+    # Step 3: 替换字段名（非算子/关键词的标识符 → {F}）
+    def _replace_field(m):
+        token = m.group(0)
+        if token.lower() in _KNOWN_OPS:
+            return token
+        return '{F}'
+    skeleton = _r.sub(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', _replace_field, skeleton)
+    # Step 4: 归一化空白
+    skeleton = _r.sub(r'\s+', ' ', skeleton).strip()
+    return skeleton
+
+
+def _load_skeleton_cooldown() -> dict:
+    """加载骨架冷却状态。
+    返回: {skeleton_fingerprint: {"hits": N, "cooldown_until_gen": M, "last_alpha": ..., "first_hit": ...}}
+    """
+    if not os.path.exists(_SKELETON_COOLDOWN_PATH):
+        return {}
+    try:
+        with open(_SKELETON_COOLDOWN_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_skeleton_cooldown(data: dict):
+    """持久化骨架冷却状态。"""
+    try:
+        with open(_SKELETON_COOLDOWN_PATH, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logging.debug(f"保存骨架冷却失败: {e}")
+
+
+def _record_skeleton_hit(expr: str, current_gen: int, sharpe: float = 0):
+    """记录一个骨架的成功命中。当命中达到阈值时，触发冷却。"""
+    skeleton = _extract_skeleton(expr)
+    if not skeleton or len(skeleton) < 10:
+        return
+    cooldown = _load_skeleton_cooldown()
+    entry = cooldown.get(skeleton, {
+        "hits": 0, "cooldown_until_gen": 0,
+        "last_alpha": "", "first_hit": current_gen
+    })
+    entry["hits"] = entry.get("hits", 0) + 1
+    entry["last_alpha"] = expr[:120]
+    entry["last_sharpe"] = round(sharpe, 3)
+
+    if entry["hits"] >= _SKELETON_KILL_THRESHOLD and entry.get("cooldown_until_gen", 0) <= current_gen:
+        entry["cooldown_until_gen"] = current_gen + _SKELETON_COOLDOWN_GENERATIONS
+        logging.warning(
+            f"🧊 骨架冷却! 骨架已产出 {entry['hits']} 个好因子，冷却至第 {entry['cooldown_until_gen']} 代 | "
+            f"骨架: {skeleton[:80]}"
+        )
+    cooldown[skeleton] = entry
+    _save_skeleton_cooldown(cooldown)
+
+
+def _is_skeleton_cooled(expr: str, current_gen: int) -> bool:
+    """检查表达式的骨架是否在冷却期内。"""
+    skeleton = _extract_skeleton(expr)
+    if not skeleton:
+        return False
+    cooldown = _load_skeleton_cooldown()
+    entry = cooldown.get(skeleton)
+    if not entry:
+        return False
+    return entry.get("cooldown_until_gen", 0) > current_gen
+
+
+def _get_cooled_skeletons(current_gen: int) -> set:
+    """获取当前仍在冷却中的骨架指纹集合。"""
+    cooldown = _load_skeleton_cooldown()
+    return {sk for sk, v in cooldown.items() if v.get("cooldown_until_gen", 0) > current_gen}
+
+
+def _enforce_pool_diversity(pool: list, max_per_skeleton: int = 2) -> list:
+    """强制精英池多样性：同一骨架最多保留 max_per_skeleton 个种子。
+    保证池中骨架种类最大化，防止近亲繁殖。"""
+    skeleton_counts = {}
+    diverse_pool = []
+    for expr in pool:
+        sk = _extract_skeleton(expr)
+        count = skeleton_counts.get(sk, 0)
+        if count < max_per_skeleton:
+            diverse_pool.append(expr)
+            skeleton_counts[sk] = count + 1
+    return diverse_pool
+
+
+# =========================================================
 
 # =========================================================
 # Phase 1: Systematic Sweep Engine (GrandMaster Core Strategy)
@@ -2932,6 +3060,7 @@ def main(mode: str = "d0"):
         else:
             d1_knowledge_pool.append(seed)
     knowledge_pool = d1_knowledge_pool
+    knowledge_pool_backup = list(knowledge_pool)  # 安全备份：用于骨架全冷却时的兜底恢复
     logging.info(f"🧬 初始种子池自动分流: D1遗传池={len(knowledge_pool)}个 | D0特种池={len(d0_knowledge_pool)}个")
 
     # ── 从 WQ API 拉取你的 D0 历史精英因子（已验证的高分 delay=0 alpha）─────
@@ -2978,6 +3107,11 @@ def main(mode: str = "d0"):
 
         logging.info(f"========= GENERATION {generation} =========")
         alphas_to_test = []
+
+        # ── 骨架冷却状态报告 ──
+        _cooled_set = _get_cooled_skeletons(generation)
+        if _cooled_set:
+            logging.info(f"🧊 当前冷却中骨架: {len(_cooled_set)} 个 | 精英池骨架种类: {len(set(_extract_skeleton(s) for s in knowledge_pool))}")
 
         # ── 优先消耗上一代后台预生成的 AI 因子及战略（如有）─────
         with _prefetch_lock:
@@ -3041,17 +3175,27 @@ def main(mode: str = "d0"):
         # ★ 从 30→15 seeds，减少裂变腿对种子池的过度依赖，降低自相关
         d1_genetic = []
         if mode in ("d1", "both"):
-            for seed in pool_snapshot[:15]:
+            # ★ 过滤掉冷却中的骨架种子，强制骨架轮换
+            _active_seeds = [s for s in pool_snapshot if not _is_skeleton_cooled(s, generation)]
+            if len(_active_seeds) < 5:
+                # 冷却太多？从蓝海模板注入新鲜血液
+                _fresh = generate_template_alphas(
+                    10, wq_fields, evaluated_alphas, wq_fields_by_category,
+                    blue_ocean_fields=_blue_ocean_pool
+                )
+                _active_seeds = _active_seeds + _fresh
+                logging.info(f"🧊 骨架冷却导致种子不足，注入 {len(_fresh)} 个新鲜模板")
+            for seed in _active_seeds[:15]:
                 neutralized_seed = inject_neutralization(seed)
                 d1_genetic += [
                     neutralized_seed,
                     f"ts_decay_exp_window({neutralized_seed}, 5, 2)",
                     inject_neutralization(smart_mutate(seed)),
                 ]
-            num_crossovers = min(15, len(pool_snapshot))
+            num_crossovers = min(15, len(_active_seeds))
             for _ in range(num_crossovers):
-                pa = random.choice(pool_snapshot)
-                pb = random.choice([s for s in pool_snapshot if s != pa] or pool_snapshot)
+                pa = random.choice(_active_seeds)
+                pb = random.choice([s for s in _active_seeds if s != pa] or _active_seeds)
                 d1_genetic.append(crossover_factors(pa, pb))
 
         # 腿三：蓝海模板工厂（★ 扩容 20→40，D1，Round-Robin 均衡采样 + 30% 蓝海强制采样）
@@ -3217,6 +3361,9 @@ def main(mode: str = "d0"):
                 is_d0 = res.template in _d0_template_set
                 source = "D0-Template" if is_d0 else ("AI-Ollama" if res.template in locals().get("ai_alphas_neutralized", []) else "Genetic-D1")
                 _log_discovery(res.template, res.sharpe, res.fitness, res.alpha_id, source=source)
+
+                # ★★★ 骨架冷却：每个好因子都记录骨架命中（低门槛）★★★
+                _record_skeleton_hit(res.template, generation, res.sharpe)
 
                 # ★★★ 字段耗尽：只有真正优秀的因子才杀字段（高门槛防误杀）★★★
                 # 门槛: Sharpe>1.5 & Fitness>1.25 & Turnover<30% & Returns>15%
@@ -3464,7 +3611,15 @@ def main(mode: str = "d0"):
         # Self-Optimization / Genetic Feedback mechanism
         if high_performers:
             knowledge_pool = high_performers + knowledge_pool
-            knowledge_pool = list(set(knowledge_pool))[:10]
+            # ★ 骨架多样性强制：同骨架最多占 2 个席位，防止近亲繁殖
+            knowledge_pool = _enforce_pool_diversity(list(dict.fromkeys(knowledge_pool)), max_per_skeleton=2)[:15]
+            # ★ 过滤掉冷却中的骨架种子
+            knowledge_pool = [s for s in knowledge_pool if not _is_skeleton_cooled(s, generation)]
+            if not knowledge_pool:
+                # 安全兜底：如果全部冷却了，从初始种子池恢复
+                knowledge_pool = d1_knowledge_pool[:5] if d1_knowledge_pool else knowledge_pool_backup[:5]
+            _sk_types = len(set(_extract_skeleton(s) for s in knowledge_pool))
+            logging.info(f"🧬 精英池更新: {len(knowledge_pool)} 条种子 | {_sk_types} 种不同骨架")
 
         # D0 精英池独立更新（不混入 D1 遗传池）
         if d0_high_performers:
