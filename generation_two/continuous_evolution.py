@@ -776,6 +776,26 @@ _ALPHA_TEMPLATES = [
     "group_neutralize(signed_power(ts_delta(ts_delta({F}, 5), 5), 0.5), subindustry)",
 ]
 
+# ★★★ 骨架工厂扩容：从 40 个手工骨架 → 1500+ 个有金融意义的骨架 ★★★
+try:
+    from generation_two.skeleton_factory import get_skeleton_pool as _get_factory_skeletons
+    _factory_pool = _get_factory_skeletons()
+    _existing = set(_ALPHA_TEMPLATES)
+    _new_skeletons = [s for s in _factory_pool if s not in _existing]
+    _ALPHA_TEMPLATES.extend(_new_skeletons)
+    logging.info(f"🏭 骨架工厂: 手工={len(_existing)} + 工厂={len(_new_skeletons)} = 总计 {len(_ALPHA_TEMPLATES)} 个骨架")
+except ImportError:
+    try:
+        from skeleton_factory import get_skeleton_pool as _get_factory_skeletons
+        _factory_pool = _get_factory_skeletons()
+        _existing = set(_ALPHA_TEMPLATES)
+        _new_skeletons = [s for s in _factory_pool if s not in _existing]
+        _ALPHA_TEMPLATES.extend(_new_skeletons)
+        logging.info(f"🏭 骨架工厂: 手工={len(_existing)} + 工厂={len(_new_skeletons)} = 总计 {len(_ALPHA_TEMPLATES)} 个骨架")
+    except ImportError:
+        logging.warning("⚠️ skeleton_factory.py 未找到，使用原始 40 个手工骨架")
+
+
 _D0_ALPHA_TEMPLATES = [
     # ════════════════════════════════════════════════════════════════
     # D0 模板库 v3 —— 极致蓝海版
