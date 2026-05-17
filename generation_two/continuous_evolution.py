@@ -776,9 +776,13 @@ _ALPHA_TEMPLATES = [
     "group_neutralize(signed_power(ts_delta(ts_delta({F}, 5), 5), 0.5), subindustry)",
 ]
 
-# ★★★ 骨架工厂扩容：从 40 个手工骨架 → 1500+ 个有金融意义的骨架 ★★★
+# ★★★ 骨架工厂扩容：从 40 个手工骨架 → 2200+ 个有金融意义的骨架 ★★★
+# ★★★ 冷门算子优先：90% 概率抽冷门骨架（pasteurize/bucket/kth_element/ts_entropy...）★★★
+_sample_skeleton_func = None  # 冷门优先抽样函数
 try:
     from generation_two.skeleton_factory import get_skeleton_pool as _get_factory_skeletons
+    from generation_two.skeleton_factory import sample_skeleton as _sample_skeleton_func_impl
+    _sample_skeleton_func = _sample_skeleton_func_impl
     _factory_pool = _get_factory_skeletons()
     _existing = set(_ALPHA_TEMPLATES)
     _new_skeletons = [s for s in _factory_pool if s not in _existing]
@@ -787,6 +791,8 @@ try:
 except ImportError:
     try:
         from skeleton_factory import get_skeleton_pool as _get_factory_skeletons
+        from skeleton_factory import sample_skeleton as _sample_skeleton_func_impl
+        _sample_skeleton_func = _sample_skeleton_func_impl
         _factory_pool = _get_factory_skeletons()
         _existing = set(_ALPHA_TEMPLATES)
         _new_skeletons = [s for s in _factory_pool if s not in _existing]
@@ -1923,8 +1929,11 @@ def generate_template_alphas(n: int, wq_fields: list, evaluated_alphas: set = No
     while len(results) < n and attempts < n * 15:
         attempts += 1
         try:
-            # ★ 反重复模板采样：用过的模板降温，冷门模板优先
-            template = _tracker_template.pick_one(_ALPHA_TEMPLATES)
+            # ★ 冷门算子优先抽样：90% 概率选含冷门算子的骨架 ★
+            if _sample_skeleton_func:
+                template = _sample_skeleton_func(cold_ratio=0.90)
+            else:
+                template = _tracker_template.pick_one(_ALPHA_TEMPLATES)
             window = random.choice(_TEMPLATE_WINDOWS)
 
             # ★★★ 蓝海强制采样：80% 概率从蓝海池选 F1（大幅降低自相关）★★★
@@ -2155,7 +2164,11 @@ def generate_d0_leg(n: int, wq_fields: list, wq_fields_by_category: dict,
         if len(results) >= target_from_template + target_from_d1:
             break
         try:
-            tmpl = _tracker_template.pick_one(_ALPHA_TEMPLATES)
+            # ★ 冷门算子优先抽样
+            if _sample_skeleton_func:
+                tmpl = _sample_skeleton_func(cold_ratio=0.90)
+            else:
+                tmpl = _tracker_template.pick_one(_ALPHA_TEMPLATES)
             f1 = random.choice(wq_fields)
             f2 = random.choice(fund_pool) if fund_pool else "sales"
             window = random.choice(d0_windows)

@@ -252,9 +252,52 @@ def build_skeleton_pool() -> list:
     logging.info(f"🏭 骨架工厂: 生成 {len(result)} 个有金融意义的唯一骨架")
     return result
 
+# ════════════════════════════════════════════════════════════
+# 6. 冷门/热门算子分级系统
+# ════════════════════════════════════════════════════════════
 
-# 缓存：只在首次调用时生成
+# 热门算子 — WQ上烂大街的、几乎所有人都用的
+_HOT_OPS = frozenset({
+    'rank', 'ts_rank', 'ts_delta', 'ts_mean', 'ts_zscore',
+    'ts_std_dev', 'ts_backfill', 'ts_decay_linear',
+    'group_rank', 'group_neutralize', 'ts_sum', 'ts_ir',
+    'ts_corr', 'ts_decay_exp_window', 'ts_skewness',
+})
+
+# 冷门算子 — 很少人用、加分的
+_COLD_OPS = frozenset({
+    'pasteurize', 'purify', 'densify', 'hedge_volatility',
+    'bucket', 'kth_element', 'hump', 'jump_decay',
+    'ts_entropy', 'ts_herfindahl', 'ts_kurtosis', 'ts_moment',
+    'ts_arg_max', 'ts_arg_min', 'ts_product', 'ts_count_nans',
+    'ts_theilsen', 'ts_quantile', 'ts_percentage', 'ts_scale',
+    'ts_returns', 'ts_decay_exp',
+    'left_tail', 'right_tail', 'fraction', 'inverse',
+    'signed_power', 'sign', 'days_from_last_change', 'last_diff_value',
+    'group_normalize', 'group_scale', 'group_percentage', 'group_quantile',
+    'group_zscore', 'ts_regression', 'ts_covariance',
+    'winsorize', 'ts_av_diff', 'log', 'sqrt',
+})
+
+
+def _classify_skeleton(skeleton: str) -> str:
+    """将骨架分为 'cold'(含冷门算子) / 'hot'(只含热门算子) / 'mixed'"""
+    import re
+    ops = set(re.findall(r'[a-z_]+(?=\()', skeleton))
+    has_cold = bool(ops & _COLD_OPS)
+    # 只要含有任何冷门算子就算冷门骨架
+    if has_cold:
+        return 'cold'
+    # 全是热门算子
+    if ops and ops <= _HOT_OPS:
+        return 'hot'
+    return 'mixed'
+
+
+# 缓存：分级后的骨架池
 _CACHED_POOL = None
+_CACHED_COLD = None
+_CACHED_HOT = None
 
 def get_skeleton_pool() -> list:
     """获取骨架池（带缓存）。"""
@@ -264,21 +307,70 @@ def get_skeleton_pool() -> list:
     return _CACHED_POOL
 
 
+def get_classified_pools() -> tuple:
+    """获取分级后的骨架池: (cold_skeletons, hot_skeletons)
+    
+    cold = 含有至少一个冷门算子的骨架
+    hot  = 只含热门算子的骨架 + mixed
+    """
+    global _CACHED_COLD, _CACHED_HOT
+    if _CACHED_COLD is None:
+        pool = get_skeleton_pool()
+        cold, hot = [], []
+        for sk in pool:
+            cls = _classify_skeleton(sk)
+            if cls == 'cold':
+                cold.append(sk)
+            else:
+                hot.append(sk)
+        _CACHED_COLD = cold
+        _CACHED_HOT = hot
+        logging.info(f"🧊 骨架分级: 冷门={len(cold)} ({100*len(cold)/len(pool):.0f}%) | 热门={len(hot)} ({100*len(hot)/len(pool):.0f}%)")
+    return _CACHED_COLD, _CACHED_HOT
+
+
+def sample_skeleton(cold_ratio: float = 0.90) -> str:
+    """按冷门优先策略抽样一个骨架。
+    
+    cold_ratio: 从冷门池抽样的概率（默认90%）
+    """
+    import random
+    cold_pool, hot_pool = get_classified_pools()
+    if cold_pool and random.random() < cold_ratio:
+        return random.choice(cold_pool)
+    elif hot_pool:
+        return random.choice(hot_pool)
+    else:
+        return random.choice(get_skeleton_pool())
+
+
 if __name__ == "__main__":
+    import re
     # 测试：打印统计和样例
     pool = build_skeleton_pool()
     print(f"\n总骨架数: {len(pool)}")
-    print(f"\n前20个样例:")
-    for i, sk in enumerate(pool[:20]):
+    
+    cold_pool, hot_pool = get_classified_pools()
+    print(f"\n冷门骨架: {len(cold_pool)} ({100*len(cold_pool)/len(pool):.0f}%)")
+    print(f"热门骨架: {len(hot_pool)} ({100*len(hot_pool)/len(pool):.0f}%)")
+    
+    print(f"\n冷门骨架样例 (前15个):")
+    for i, sk in enumerate(cold_pool[:15]):
+        ops = set(re.findall(r'[a-z_]+(?=\()', sk))
+        cold_ops = ops & _COLD_OPS
+        print(f"  {i+1}. [冷门算子: {','.join(cold_ops)}]")
+        print(f"     {sk}")
+    
+    print(f"\n热门骨架样例 (前5个):")
+    for i, sk in enumerate(hot_pool[:5]):
         print(f"  {i+1}. {sk}")
     
-    # 统计骨架类型分布
-    trade_when_count = sum(1 for s in pool if "trade_when" in s)
-    group_rank_count = sum(1 for s in pool if s.startswith("group_rank"))
-    group_neut_count = sum(1 for s in pool if s.startswith("group_neutralize"))
-    decay_count = sum(1 for s in pool if "ts_decay" in s)
-    print(f"\n类型分布:")
-    print(f"  trade_when 门控: {trade_when_count}")
-    print(f"  group_rank 起始: {group_rank_count}")
-    print(f"  group_neutralize: {group_neut_count}")
-    print(f"  含衰减: {decay_count}")
+    # 模拟抽样分布
+    from collections import Counter
+    samples = Counter()
+    for _ in range(1000):
+        sk = sample_skeleton(0.90)
+        samples[_classify_skeleton(sk)] += 1
+    print(f"\n1000次抽样分布 (90%冷门):")
+    for k, v in sorted(samples.items()):
+        print(f"  {k}: {v} ({100*v/1000:.0f}%)")
