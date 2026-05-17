@@ -45,6 +45,28 @@ _SINGLE_SIGNALS = [
     ("ranked",          "rank({F})"),                                       # 截面排名
     ("quantile_low",    "ts_quantile({F}, 0.25, {W})"),                     # 下四分位
     ("quantile_high",   "ts_quantile({F}, 0.75, {W})"),                     # 上四分位
+    # ═══ 冷门算子补充 ═══
+    ("ts_max",          "ts_max({F}, {W})"),                                # 区间最大值
+    ("ts_min",          "ts_min({F}, {W})"),                                # 区间最小值
+    ("lagged",          "ts_delay({F}, {W})"),                              # 滞后值
+    ("returns",         "ts_returns({F}, {W}, 1)"),                         # 收益率
+    ("pct_position",    "ts_percentage({F}, {W})"),                         # 百分比位置
+    ("scaled_ts",       "ts_scale({F}, {W})"),                              # 时序缩放
+    ("kth_val",         "kth_element({F}, 3, {W})"),                        # 第k大值
+    ("hump_decay",      "hump({F}, 0.3)"),                                  # 驼峰函数
+    ("bucketed",        "bucket({F}, 5)"),                                  # 分桶离散化
+    ("densified",       "densify({F})"),                                    # 密集化(填NaN)
+    ("pasteurized",     "pasteurize({F})"),                                 # 巴氏消毒(去异常)
+    ("purified",        "purify({F})"),                                     # 纯化(去噪声)
+    ("vol_hedged",      "hedge_volatility({F})"),                           # 波动率对冲
+    ("left_tail_r",     "left_tail({F}, 0.1)"),                             # 左尾(下行风险)
+    ("right_tail_r",    "right_tail({F}, 0.9)"),                            # 右尾(上行潜力)
+    ("fractional",      "fraction({F})"),                                   # 取小数部分
+    ("inverted",        "inverse({F})"),                                    # 倒数
+    ("log_transform",   "log(abs({F}) + 1e-6)"),                            # 对数变换
+    ("sqrt_transform",  "sqrt(abs({F}))"),                                  # 平方根变换
+    ("sign_of",         "sign({F})"),                                       # 符号函数
+    ("decay_exp",       "ts_decay_exp({F}, {W})"),                          # 指数衰减(简版)
 ]
 
 # 复合单字段信号 — 二层嵌套，每个都有独立金融含义
@@ -69,6 +91,19 @@ _COMPOUND_SIGNALS = [
     ("jump_signal",     "jump_decay({F}, {W}, 0.5, 252)"),                         # 跳跃衰减信号
     ("sqrt_zscore",     "signed_power(ts_zscore({F}, {W}), 0.5)"),                 # 压缩极值的z分数
     ("neg_skew_adj",    "ts_skewness({F}, {W}) * ts_ir({F}, {W})"),                # 偏度调整收益
+    # ═══ 冷门复合信号补充 ═══
+    ("purified_mom",    "ts_delta(pasteurize({F}), {W})"),                         # 纯化后动量
+    ("dense_zscore",    "ts_zscore(densify({F}), {W})"),                           # 密集化z分数
+    ("hedged_rank",     "ts_rank(hedge_volatility({F}), {W})"),                   # 对冲后排名
+    ("max_min_ratio",   "ts_max({F}, {W}) / (ts_min({F}, {W}) + 1e-6)"),          # 极值比率
+    ("range_pct",       "({F} - ts_min({F}, {W})) / (ts_max({F}, {W}) - ts_min({F}, {W}) + 1e-6)"), # 区间位置
+    ("delayed_diff",    "ts_delta({F}, {W}) - ts_delta(ts_delay({F}, {W}), {W})"), # 延迟差分
+    ("tail_asym",       "right_tail({F}, 0.9) - left_tail({F}, 0.1)"),             # 尾部不对称
+    ("bucket_rank",     "ts_rank(bucket({F}, 5), {W})"),                          # 分桶后排名
+    ("log_momentum",    "ts_delta(log(abs({F}) + 1e-6), {W})"),                   # 对数动量
+    ("inv_vol",         "inverse(ts_std_dev({F}, {W}) + 1e-6)"),                  # 波动率倒数(低波优先)
+    ("sign_momentum",   "sign(ts_delta({F}, {W})) * ts_ir({F}, {W})"),            # 方向×质量
+    ("kth_spread",      "kth_element({F}, 1, {W}) - kth_element({F}, 5, {W})"),   # 极值展幅
 ]
 
 # 双字段信号 — 捕捉两个字段之间的关系
@@ -88,6 +123,13 @@ _DUAL_SIGNALS = [
     ("moment_diff",     "ts_moment({F1}, {W}, 3) - ts_moment({F2}, {W}, 3)"),      # 高阶矩差
     ("ratio_momentum",  "ts_delta({F1} / ({F2} + 1e-6), {W})"),                    # 比率动量
     ("rel_strength",    "ts_rank({F1}, {W}) - ts_rank({F2}, {W})"),                # 相对强度
+    # ═══ 冷门双字段补充 ═══
+    ("log_ratio",       "log(divide({F1}, {F2}))"),                                 # 对数比率
+    ("peak_diff",       "ts_arg_max({F1}, {W}) - ts_arg_max({F2}, {W})"),           # 峰值时差
+    ("vol_ratio",       "ts_std_dev({F1}, {W}) / (ts_std_dev({F2}, {W}) + 1e-6)"), # 波动率比
+    ("purified_spread", "pasteurize({F1}) - pasteurize({F2})"),                     # 纯化价差
+    ("skew_diff",       "ts_skewness({F1}, {W}) - ts_skewness({F2}, {W})"),        # 偏度差
+    ("tail_corr",       "ts_corr(left_tail({F1}, 0.2), left_tail({F2}, 0.2), {W})"), # 尾部相关性
 ]
 
 # ════════════════════════════════════════════════════════════
@@ -102,6 +144,11 @@ _WRAPPERS = [
     ("gn_ind",   "group_neutralize({S}, industry)"),
     ("gz_sub",   "group_zscore({S}, subindustry)"),
     ("raw_rank", "rank({S})"),
+    # ═══ 冷门截面算子 ═══
+    ("gnorm_sub","group_normalize({S}, subindustry)"),
+    ("gscale",   "group_scale({S}, subindustry)"),
+    ("gpct_sub", "group_percentage({S}, subindustry)"),
+    ("gq_sub",   "group_quantile({S}, 0.1, subindustry)"),
 ]
 
 # ════════════════════════════════════════════════════════════
