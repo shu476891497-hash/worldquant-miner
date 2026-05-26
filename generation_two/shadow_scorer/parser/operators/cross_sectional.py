@@ -78,9 +78,9 @@ def op_quantile(
     ranked = ranked.clip(0.001, 0.999)
 
     if driver == "gaussian":
-        result = ranked.applymap(lambda v: _stats.norm.ppf(v) * sigma_val if not np.isnan(v) else np.nan)
+        result = ranked.map(lambda v: _stats.norm.ppf(v) * sigma_val if not np.isnan(v) else np.nan)
     elif driver == "cauchy":
-        result = ranked.applymap(lambda v: _stats.cauchy.ppf(v) * sigma_val if not np.isnan(v) else np.nan)
+        result = ranked.map(lambda v: _stats.cauchy.ppf(v) * sigma_val if not np.isnan(v) else np.nan)
     else:
         # uniform: shift by mean
         result = ranked - ranked.mean(axis=1).values[:, np.newaxis]
