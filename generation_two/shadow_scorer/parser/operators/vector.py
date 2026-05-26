@@ -17,16 +17,11 @@ import pandas as pd
 def op_vec_min(x: Any) -> Any:
     """Minimum of vector field x per row."""
     if isinstance(x, pd.DataFrame):
+        vals = x.min(axis=1).values
         return pd.DataFrame(
-            x.min(axis=1).values[:, np.newaxis],
+            np.tile(vals.reshape(-1, 1), (1, len(x.columns))),
             index=x.index,
             columns=x.columns,
-        ).reindex(columns=x.columns, fill_value=np.nan).pipe(
-            lambda df: pd.DataFrame(
-                np.tile(x.min(axis=1).values.reshape(-1, 1), (1, len(x.columns))),
-                index=x.index,
-                columns=x.columns,
-            )
         )
     return np.nanmin(x)
 
