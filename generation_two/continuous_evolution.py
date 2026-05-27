@@ -988,12 +988,8 @@ _FORBIDDEN_STRUCTURES_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "forbidden_structures.txt"
 )
 
-def _extract_skeleton(expr: str) -> str:
-    """提取因子骨架：把所有字段名替换为 X，数字替换为 N，只保留算子结构"""
-    import re as _r
-    skeleton = _r.sub(r'\b[a-z][a-z0-9_]{3,}\b', 'X', expr)
-    skeleton = _r.sub(r'\b\d+\.?\d*\b', 'N', skeleton)
-    return skeleton.strip()
+# [H1 fix] _extract_skeleton 的正式定义在 line 1142（含算子识别）
+# 此处旧版简陋定义已删除
 
 def _load_forbidden_skeletons() -> set:
     """加载禁用骨架集合"""
@@ -1937,7 +1933,7 @@ def generate_template_alphas(n: int, wq_fields: list, evaluated_alphas: set = No
             window = random.choice(_TEMPLATE_WINDOWS)
 
             # ★★★ 蓝海强制采样：80% 概率从蓝海池选 F1（大幅降低自相关）★★★
-            use_blue_ocean = _blue_ids and random.random() < 0.80
+            use_blue_ocean = _blue_ids and random.random() < 0.45  # 45% 蓝海（平衡冷门探索和热门成功率）
             if use_blue_ocean:
                 f1 = random.choice(_blue_ids)
                 blue_count += 1
@@ -3238,7 +3234,7 @@ def main(mode: str = "d0"):
                 )
                 _active_seeds = _active_seeds + _fresh
                 logging.info(f"🧊 骨架冷却导致种子不足，注入 {len(_fresh)} 个新鲜模板")
-            for seed in _active_seeds[:15]:
+            for seed in _active_seeds[:8]:  # 减少裂变浪费（15→8），匹配 d1_limit=15
                 neutralized_seed = inject_neutralization(seed)
                 d1_genetic += [
                     neutralized_seed,
@@ -3255,23 +3251,12 @@ def main(mode: str = "d0"):
         d1_blueocean = []
         if mode in ("d1", "both"):
             d1_blueocean = generate_template_alphas(
-                40, wq_fields, evaluated_alphas, wq_fields_by_category,
+                15, wq_fields, evaluated_alphas, wq_fields_by_category,  # 40→15，减少浪费
                 blue_ocean_fields=_blue_ocean_pool
             )
             d1_blueocean = [inject_neutralization(a) for a in d1_blueocean]
 
-        # 预加载后台 AI 缓冲的 D1 因子 — 仅 D1/both 模式
-        if mode in ("d1", "both"):
-            with _prefetch_lock:
-                if _prefetch_strategy_fields:
-                    wq_fields[:] = _prefetch_strategy_fields + [f for f in wq_fields if f not in _prefetch_strategy_fields]
-                    logging.info(f"🧭 [主线程] 应用后台缓冲战略字段: {_prefetch_strategy_fields[:5]}")
-                    _prefetch_strategy_fields.clear()
-                if _prefetch_ai_pool:
-                    prefetched_d1 = [inject_neutralization(a) for a in _prefetch_ai_pool if a not in evaluated_alphas]
-                    d1_genetic.extend(prefetched_d1)
-                    logging.info(f"  🤖 [预加载] 消耗后台AI缓冲: {len(prefetched_d1)} 个 D1 因子")
-                    _prefetch_ai_pool.clear()
+        # [C3 fix] 移除了重复的预加载消耗代码（已在 3170-3181 行处理）
 
         # 旧逻辑兼容：把所有 D1 因子合并打包
         # Phase 1: Systematic sweep (GrandMaster strategy)
@@ -3279,7 +3264,7 @@ def main(mode: str = "d0"):
         if mode in ("d1", "both"):
             d1_sweep = generate_systematic_sweep(
                 wq_fields, wq_fields_by_category, evaluated_alphas,
-                n=30, fund_fields=None
+                n=10, fund_fields=None  # 30→10，匹配 d1_limit=15
             )
             d1_sweep = [inject_neutralization(a) for a in d1_sweep]
 
@@ -3289,7 +3274,7 @@ def main(mode: str = "d0"):
         )
 
         d1_combined = d1_genetic + d1_blueocean + d1_sweep
-        alphas_to_test = d1_combined  # 留给下方 validator 使用
+        alphas_to_test = alphas_to_test + d1_combined  # 保留预加载的 AI/情报因子
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
         # ---- 阶段 4：Validator 过滤非法表达式 + 禁用骨架黑名单过滤 ----
@@ -3363,11 +3348,24 @@ def main(mode: str = "d0"):
             unique_alphas = retries + [a for a in unique_alphas if a not in retries]
             
         # Hard limit：匹配 WQ 实际并发能力（~3 个同时模拟）
-        # ★ D0 优先策略：D0 配额更大、先提交
-        # 线程池 2+2=4 workers，每代 8+7=15 个因子，流水线式处理
-        # Phase 5: Increased throughput (was 8+7=15, now 15+15=30)
         d0_limit = 15 if mode in ("d0", "both") else 0
         d1_limit = 15 if mode in ("d1", "both") else 0
+
+        # [C5 fix] D0 候选也需要经过 Validator + dedup 过滤
+        if d0_candidates:
+            validated_d0 = []
+            _forbidden_set_d0 = _load_forbidden_skeletons()
+            for expr in set(d0_candidates):
+                if _is_forbidden_structure(expr, _forbidden_set_d0):
+                    continue
+                is_valid, cleaned = validate_alpha(validator, expr)
+                if is_valid and cleaned not in evaluated_alphas:
+                    if not _is_sub_dup(cleaned):
+                        validated_d0.append(cleaned)
+                        _record_sub(cleaned)
+            d0_candidates = validated_d0
+            logging.info(f"  🛡️ D0 Validator: {len(d0_candidates)} 条通过")
+
         d0_candidates = d0_candidates[:d0_limit]
         unique_alphas = unique_alphas[:d1_limit]
         logging.info(f"Submitting D0={len(d0_candidates)}(优先) + D1={len(unique_alphas)} to simulator. [mode={mode.upper()}]")

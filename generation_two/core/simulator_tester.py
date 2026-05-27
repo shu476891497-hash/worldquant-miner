@@ -90,7 +90,7 @@ class SimulatorTester:
         self.sess = session
         self.region_configs = region_configs
         self.template_generator = template_generator  # For re-authentication if needed
-        self.executor = ThreadPoolExecutor(max_workers=8)
+        self.executor = ThreadPoolExecutor(max_workers=4)  # 多实例安全：3实例×4线程=12总并发
         self.active_simulations = {}  # {alpha_id: Future}
         self._relogin_count = 0  # Track re-login attempts
     
@@ -199,7 +199,10 @@ class SimulatorTester:
             # Update settings with region-specific values
             settings_dict = asdict(settings)
             settings_dict['region'] = region
-            settings_dict['universe'] = region_config.universe
+            # Preserve user-specified universe (e.g. Near-Miss TOP2000/TOP1000/TOP500)
+            # Only override with region default if universe matches the SimulationSettings default
+            # meaning the caller did NOT explicitly set a different universe
+            # settings_dict['universe'] already has the value from the caller's SimulationSettings
             settings_dict['instrumentType'] = settings.instrumentType
             
             # Ensure neutralization is always risk neutralized (never "NONE")
