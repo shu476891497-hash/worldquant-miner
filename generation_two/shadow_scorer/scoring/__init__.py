@@ -101,6 +101,11 @@ def _round(v: float, decimals: int = 4) -> Optional[float]:
 # Core scoring functions
 # ---------------------------------------------------------------------------
 
+def _clean_series(s: pd.Series) -> pd.Series:
+    """Remove both NaN and inf values from a Series."""
+    return s[np.isfinite(s)]
+
+
 def neutralize_weights(weights: pd.DataFrame) -> pd.DataFrame:
     """Dollar-neutralize: demean cross-sectionally so long = short exposure."""
     row_mean = weights.mean(axis=1)
@@ -108,9 +113,16 @@ def neutralize_weights(weights: pd.DataFrame) -> pd.DataFrame:
 
 
 def normalize_weights(weights: pd.DataFrame) -> pd.DataFrame:
-    """Normalize so abs(weights).sum(axis=1) == 1 each day (booksize = 1)."""
+    """Normalize so abs(weights).sum(axis=1) == 1 each day (booksize = 1).
+
+    Rows where all weights are zero (or NaN) get NaN weights,
+    which are later dropped from PnL.
+    """
     abs_sum = weights.abs().sum(axis=1).replace(0, np.nan)
-    return weights.div(abs_sum, axis=0)
+    result = weights.div(abs_sum, axis=0)
+    # Replace any inf that might arise from division edge cases
+    result = result.replace([np.inf, -np.inf], np.nan)
+    return result
 
 
 def compute_pnl(
@@ -118,15 +130,21 @@ def compute_pnl(
     returns: pd.DataFrame,
 ) -> pd.Series:
     """Compute daily PnL from weights and forward returns.
-    
+
     weights[t] are the positions taken at end of day t.
     returns[t+1] are the returns earned from day t to t+1.
     So PnL[t+1] = sum(weights[t] * returns[t+1]).
+
+    Inf values in the product (from extreme returns on small-cap stocks)
+    are replaced with NaN before summation to prevent inf contamination.
     """
     # Shift weights by 1 day (positions from yesterday)
     shifted_w = weights.shift(1)
-    # Daily PnL = sum of (position × return) across stocks
-    pnl = (shifted_w * returns).sum(axis=1)
+    # Product of position × return; replace inf with NaN
+    product = shifted_w * returns
+    product = product.replace([np.inf, -np.inf], np.nan)
+    # Daily PnL = sum of valid (position × return) across stocks
+    pnl = product.sum(axis=1, min_count=1)  # min_count=1: return NaN if all NaN
     return pnl
 
 
@@ -140,7 +158,7 @@ def compute_turnover(weights: pd.DataFrame) -> float:
 
 def compute_sharpe(pnl: pd.Series) -> float:
     """Annualized Sharpe ratio from daily PnL series."""
-    pnl_clean = pnl.dropna()
+    pnl_clean = _clean_series(pnl)  # removes both NaN and inf
     if len(pnl_clean) < 10:
         return np.nan
     mean_daily = pnl_clean.mean()
@@ -228,23 +246,31 @@ def score_alpha(
     if thresholds is None:
         thresholds = DEFAULT_THRESHOLDS["D1"] if delay >= 1 else DEFAULT_THRESHOLDS["D0"]
     
-    # 1. Neutralize and normalize weights
+    # 1. Sanitize inputs: replace inf with NaN in weights and returns
     weights = alpha_weights.copy()
+    weights = weights.replace([np.inf, -np.inf], np.nan)
+
+    # 2. Neutralize and normalize weights
     weights = neutralize_weights(weights)
     weights = normalize_weights(weights)
     
-    # 2. Apply delay
+    # 3. Apply delay
     if delay > 0:
         weights = weights.shift(delay)
     
-    # 3. Align indices
+    # 4. Align indices
     common_idx = weights.index.intersection(stock_returns.index)
     common_cols = weights.columns.intersection(stock_returns.columns)
     weights = weights.loc[common_idx, common_cols]
     returns = stock_returns.loc[common_idx, common_cols]
+
+    # Sanitize returns: cap extreme returns and replace inf
+    returns = returns.replace([np.inf, -np.inf], np.nan)
+    returns = returns.clip(-1.0, 10.0)  # cap at -100% to +1000%
     
-    # 4. Compute PnL
+    # 5. Compute PnL
     pnl = compute_pnl(weights, returns)
+    pnl = pnl.replace([np.inf, -np.inf], np.nan)  # defense in depth
     pnl = pnl.dropna()
     
     if len(pnl) < 20:
@@ -255,16 +281,17 @@ def score_alpha(
     result.daily_pnl = pnl
     result.cumulative_pnl = cumulative
     
-    # 5. Full-period metrics
+    # 6. Full-period metrics
     result.sharpe = compute_sharpe(pnl)
-    result.annualized_return = float(pnl.mean() * TRADING_DAYS_PER_YEAR)
+    pnl_finite = _clean_series(pnl)
+    result.annualized_return = float(pnl_finite.mean() * TRADING_DAYS_PER_YEAR) if len(pnl_finite) > 0 else np.nan
     result.turnover = compute_turnover(weights)
     result.fitness = compute_fitness(result.sharpe, result.annualized_return, result.turnover)
     result.max_drawdown = compute_max_drawdown(cumulative)
     result.weight_concentration_top10 = compute_weight_concentration(weights, 10)
     result.weight_concentration_top50 = compute_weight_concentration(weights, 50)
     
-    # 6. IS / OOS split
+    # 7. IS / OOS split
     is_mask = (pnl.index >= is_start) & (pnl.index <= is_end)
     oos_mask = (pnl.index >= oos_start) & (pnl.index <= oos_end)
     
@@ -273,14 +300,16 @@ def score_alpha(
     
     if len(is_pnl) > 10:
         result.is_sharpe = compute_sharpe(is_pnl)
-        result.is_return = float(is_pnl.mean() * TRADING_DAYS_PER_YEAR)
+        is_clean = _clean_series(is_pnl)
+        result.is_return = float(is_clean.mean() * TRADING_DAYS_PER_YEAR) if len(is_clean) > 0 else np.nan
         is_weights = weights.loc[is_pnl.index] if is_pnl.index.isin(weights.index).all() else weights[is_mask[:len(weights)]]
         result.is_turnover = compute_turnover(is_weights) if len(is_weights) > 1 else np.nan
         result.is_fitness = compute_fitness(result.is_sharpe, result.is_return, result.is_turnover)
     
     if len(oos_pnl) > 10:
         result.oos_sharpe = compute_sharpe(oos_pnl)
-        result.oos_return = float(oos_pnl.mean() * TRADING_DAYS_PER_YEAR)
+        oos_clean = _clean_series(oos_pnl)
+        result.oos_return = float(oos_clean.mean() * TRADING_DAYS_PER_YEAR) if len(oos_clean) > 0 else np.nan
         oos_weights = weights.loc[oos_pnl.index] if oos_pnl.index.isin(weights.index).all() else weights[oos_mask[:len(weights)]]
         result.oos_turnover = compute_turnover(oos_weights) if len(oos_weights) > 1 else np.nan
         result.oos_fitness = compute_fitness(result.oos_sharpe, result.oos_return, result.oos_turnover)
