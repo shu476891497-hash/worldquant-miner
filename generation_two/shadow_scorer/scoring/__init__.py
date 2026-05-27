@@ -125,6 +125,31 @@ def normalize_weights(weights: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def truncate_weights(
+    weights: pd.DataFrame, max_position: float = 0.08,
+) -> pd.DataFrame:
+    """Truncate individual position weights to ±max_position.
+
+    WQ's truncation=0.08 limits any single stock to 8% of booksize.
+    After clipping, re-normalize so abs sum = 1.
+    """
+    clipped = weights.clip(-max_position, max_position)
+    # Re-normalize after clipping
+    abs_sum = clipped.abs().sum(axis=1).replace(0, np.nan)
+    result = clipped.div(abs_sum, axis=0)
+    return result.replace([np.inf, -np.inf], np.nan)
+
+
+def pasteurize_weights(weights: pd.DataFrame) -> pd.DataFrame:
+    """WQ Pasteurization: replace NaN weights with 0.
+
+    This prevents NaN stocks from being excluded from the universe,
+    which could create look-ahead bias. After filling NaN with 0,
+    the neutralization and normalization steps treat them as 'no opinion'.
+    """
+    return weights.fillna(0.0)
+
+
 def compute_pnl(
     weights: pd.DataFrame,
     returns: pd.DataFrame,
@@ -216,9 +241,11 @@ def score_alpha(
     stock_returns: pd.DataFrame,
     delay: int = 1,
     is_start: str = "2019-01-01",
-    is_end: str = "2022-12-31",
-    oos_start: str = "2023-01-01",
+    is_end: str = "2023-12-31",
+    oos_start: str = "2024-01-01",
     oos_end: str = "2026-04-30",
+    truncation: float = 0.08,
+    pasteurization: bool = True,
     thresholds: Optional[Dict] = None,
     sub_universe_masks: Optional[Dict[str, pd.DataFrame]] = None,
 ) -> ScoringResult:
@@ -233,9 +260,14 @@ def score_alpha(
     delay : int
         Signal delay (1 = D1, 0 = D0). D1 means extra 1-day shift.
     is_start, is_end : str
-        In-sample date range.
+        In-sample date range.  WQ default: 2019-01-01 ~ 2023-12-31.
     oos_start, oos_end : str
         Out-of-sample date range.
+    truncation : float
+        Max single-stock position weight (WQ default: 0.08 = 8%).
+        Set to 0 or None to disable.
+    pasteurization : bool
+        If True, NaN weights → 0 before neutralization (WQ default: ON).
     thresholds : dict, optional
         Quality thresholds. If None, uses D1 defaults.
     sub_universe_masks : dict, optional
@@ -250,9 +282,17 @@ def score_alpha(
     weights = alpha_weights.copy()
     weights = weights.replace([np.inf, -np.inf], np.nan)
 
+    # 1b. Pasteurization: NaN → 0 (WQ default: ON)
+    if pasteurization:
+        weights = pasteurize_weights(weights)
+
     # 2. Neutralize and normalize weights
     weights = neutralize_weights(weights)
     weights = normalize_weights(weights)
+
+    # 2b. Truncation: clip max position (WQ default: 0.08)
+    if truncation and truncation > 0:
+        weights = truncate_weights(weights, max_position=truncation)
     
     # 3. Apply delay
     if delay > 0:
