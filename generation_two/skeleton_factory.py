@@ -102,8 +102,26 @@ _COMPOUND_SIGNALS = [
     ("bucket_rank",     "ts_rank(bucket({F}, 5), {W})"),                          # 分桶后排名
     ("log_momentum",    "ts_delta(log(abs({F}) + 1e-6), {W})"),                   # 对数动量
     ("inv_vol",         "inverse(ts_std_dev({F}, {W}) + 1e-6)"),                  # 波动率倒数(低波优先)
-    ("sign_momentum",   "sign(ts_delta({F}, {W})) * ts_ir({F}, {W})"),            # 方向×质量
-    ("kth_spread",      "kth_element({F}, 1, {W}) - kth_element({F}, 5, {W})"),   # 极值展幅
+    ("sign_momentum",   "sign(ts_delta({F}, {W})) * ts_ir({F}, {W})"),            # direction x quality
+    ("kth_spread",      "kth_element({F}, 1, {W}) - kth_element({F}, 5, {W})"),   # extreme spread
+]
+
+# Three-layer nested compound signals (deeper alpha hypotheses)
+_TRIPLE_SIGNALS = [
+    ("regime_switch",   "ts_rank(ts_zscore(ts_delta({F}, {W}), {W}), {W})"),       # regime-adjusted momentum
+    ("vol_adjusted_mom","ts_delta({F}, {W}) / (ts_std_dev({F}, {W}) + 1e-6) * sign(ts_delta({F}, 5))"), # vol-adj signed momentum
+    ("fading_reversal", "ts_decay_linear(-ts_zscore(ts_delta({F}, {W}), {W}), {W})"), # mean-reversion with recency
+    ("momentum_of_ir",  "ts_delta(ts_ir({F}, {W}), {W})"),                          # acceleration of risk-adj return
+    ("volatility_breakout", "ts_rank(ts_std_dev({F}, {W}), {W}) * sign(ts_delta({F}, 5))"), # vol breakout direction
+    ("ranked_entropy",  "ts_rank(ts_entropy({F}, {W}), {W})"),                      # info disorder regime
+    ("persistent_shock","ts_mean(ts_delta({F}, 5), {W}) / (ts_std_dev(ts_delta({F}, 5), {W}) + 1e-6)"), # sustained shock
+    ("cross_sectional_ir", "rank(ts_ir({F}, {W})) * rank(ts_delta({F}, 5))"),       # cross-sect quality x direction
+    ("decay_of_surprise","ts_decay_exp({F} - ts_mean({F}, {W}), {W})"),             # surprise with exponential decay
+    ("anchoring_bias",  "({F} - ts_quantile({F}, 0.5, {W})) / (ts_std_dev({F}, {W}) + 1e-6)"), # distance from median
+    ("jump_detection",  "ts_delta({F}, 1) / (ts_std_dev({F}, {W}) + 1e-6)"),        # standardized daily change
+    ("range_breakout",  "({F} - ts_min({F}, {W})) / (ts_max({F}, {W}) - ts_min({F}, {W}) + 1e-6) - 0.5"), # centered range position
+    ("herfindahl_change","ts_delta(ts_herfindahl({F}, {W}), 5)"),                   # concentration shift
+    ("kurtosis_regime", "ts_rank(ts_kurtosis({F}, {W}), {W})"),                     # tail risk regime rank
 ]
 
 # 双字段信号 — 捕捉两个字段之间的关系
@@ -155,20 +173,30 @@ _WRAPPERS = [
 # 3. 组合模式（两个信号如何交互）
 # ════════════════════════════════════════════════════════════
 _COMBINERS = [
-    ("sum",      "rank({A}) + rank({B})"),                    # 等权叠加
-    ("diff",     "rank({A}) - rank({B})"),                    # 多空价差
-    ("product",  "rank({A}) * rank({B})"),                    # 交互增强
-    ("weighted", "0.6 * rank({A}) + 0.4 * rank({B})"),        # 加权混合
+    ("sum",      "rank({A}) + rank({B})"),                    # equal weight
+    ("diff",     "rank({A}) - rank({B})"),                    # long-short spread
+    ("product",  "rank({A}) * rank({B})"),                    # interaction
+    ("weighted", "0.6 * rank({A}) + 0.4 * rank({B})"),        # weighted blend
+    # Anti-pattern combiners (structurally unique for low self-correlation)
+    ("conditional_blend", "trade_when(rank({A}) > 0.5, {B}, -1 * {B})"),  # A gates B direction
+    ("residual_alpha",    "ts_regression({A}, {B}, 20, 0, 2)"),            # alpha after removing B's effect
+    ("regime_switch",     "trade_when(ts_rank({A}, 60) > 0.7, {B}, -1 * {A})"),  # regime-based switching
+    ("ratio_rank",        "rank({A} / ({B} + 1e-6))"),                      # cross-sectional ratio
+    ("divergence",        "ts_delta(rank({A}), 10) - ts_delta(rank({B}), 10)"),  # ranking divergence
 ]
 
 # ════════════════════════════════════════════════════════════
 # 4. 条件门控（择时 + 信号）
 # ════════════════════════════════════════════════════════════
 _CONDITIONS = [
-    ("high_rank",    "trade_when(ts_rank({C}, {W}) > 0.8, {S}, 0)"),          # 高分位才交易
-    ("low_rank",     "trade_when(ts_rank({C}, {W}) < 0.2, {S}, 0)"),          # 低分位才交易
-    ("extreme_z",    "trade_when(abs(ts_zscore({C}, {W})) > 1.5, {S}, 0)"),   # 极端偏离才交易
-    ("trend_up",     "trade_when(ts_delta({C}, {W}) > 0, {S}, -1)"),          # 趋势向上才交易
+    ("high_rank",    "trade_when(ts_rank({C}, {W}) > 0.8, {S}, 0)"),          # high quantile only
+    ("low_rank",     "trade_when(ts_rank({C}, {W}) < 0.2, {S}, 0)"),          # low quantile only
+    ("extreme_z",    "trade_when(abs(ts_zscore({C}, {W})) > 1.5, {S}, 0)"),   # extreme deviation only
+    ("trend_up",     "trade_when(ts_delta({C}, {W}) > 0, {S}, -1)"),          # trend-up only
+    # New conditions for diverse gating
+    ("vol_regime",   "trade_when(ts_rank(ts_std_dev({C}, {W}), {W}) > 0.6, {S}, 0)"),  # high-vol regime
+    ("mean_revert",  "trade_when(ts_zscore({C}, {W}) < -1, {S}, 0)"),         # oversold condition
+    ("quality_gate", "trade_when(rank({C}) > 0.6, {S}, -1)"),                 # quality threshold
 ]
 
 # ════════════════════════════════════════════════════════════
@@ -203,6 +231,11 @@ def build_skeleton_pool() -> list:
     
     # ── 层级2: 复合单字段信号 × 包裹器 ──
     for _, sig in _COMPOUND_SIGNALS:
+        for _, wrap in _WRAPPERS:
+            skeletons.add(wrap.replace("{S}", sig))
+    
+    # ── 层级2.5: 三层嵌套信号 × 包裹器（深层alpha假说）──
+    for _, sig in _TRIPLE_SIGNALS:
         for _, wrap in _WRAPPERS:
             skeletons.add(wrap.replace("{S}", sig))
     

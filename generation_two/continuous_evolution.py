@@ -2731,24 +2731,25 @@ def main(mode: str = "d0"):
     def smart_mutate(expr: str) -> str:
         """真正做字段/算子/参数替换的变异
         
-        变异类型概率分布（全量算子版 v3）：
-          0.00-0.20 (20%) 字段替换（按类别均匀采样）
-          0.20-0.32 (12%) 参数微调（±30%）
-          0.32-0.44 (12%) 外层包裹（单字段 ts 算子）
-          0.44-0.56 (12%) ★ 算子注入（双字段/特殊/截面变换）
-          0.56-0.64 (8%)  中性化方式变异
-          0.64-0.74 (10%) 结构移植（冷门复合结构替换字段）
-          0.74-0.80 (6%)  内层算子替换（ts_rank→ts_corr 等）
-          0.80-0.88 (8%)  ★ vec/reduce 聚合注入（新增！）
-          0.88-0.94 (6%)  ★ trade_when 条件包裹（新增！）
-          0.94-1.00 (6%)  符号翻转
+        变异类型概率分布（v4 深度变异版）：
+          0.00-0.30 (30%) 字段替换（按类别均匀采样，强制换字段）
+          0.30-0.40 (10%) ★ 双字段强制替换（同时换2个字段，最大结构变化）
+          0.40-0.46 (6%)  参数微调（±30%）
+          0.46-0.56 (10%) 外层包裹（单字段 ts 算子）
+          0.56-0.66 (10%) ★ 算子注入（双字段/特殊/截面变换）
+          0.66-0.72 (6%)  中性化方式变异
+          0.72-0.80 (8%)  结构移植（冷门复合结构替换字段）
+          0.80-0.86 (6%)  内层算子替换（ts_rank→ts_corr 等）
+          0.86-0.92 (6%)  ★ vec/reduce 聚合注入
+          0.92-0.96 (4%)  ★ trade_when 条件包裹
+          0.96-1.00 (4%)  符号翻转
         """
         import re
         mutated = expr
         roll = random.random()
         
-        if roll < 0.20:
-            # 字段替换：按类别均匀采样
+        if roll < 0.30:
+            # 字段替换：按类别均匀采样（强制换字段，最重要的多样性来源）
             present = [f for f in wq_fields if f in mutated]
             if present:
                 old_f = random.choice(present)
@@ -2761,7 +2762,26 @@ def main(mode: str = "d0"):
                     new_f = random.choice([f for f in wq_fields if f != old_f])
                 mutated = mutated.replace(old_f, new_f, 1)
 
-        elif roll < 0.32:
+        elif roll < 0.40:
+            # ★ 双字段强制替换：同时换2个字段，最大化结构变化
+            present = [f for f in wq_fields if f in mutated]
+            if len(present) >= 2:
+                fields_to_replace = random.sample(present, 2)
+                for old_f in fields_to_replace:
+                    if wq_fields_by_category:
+                        chosen_cat = _tracker_field_cat.pick_one(list(wq_fields_by_category.keys()))
+                        cat_fields = [f for f in wq_fields_by_category[chosen_cat] if f not in present and f not in mutated]
+                        new_f = random.choice(cat_fields) if cat_fields else random.choice(
+                            [f for f in wq_fields if f != old_f and f not in mutated])
+                    else:
+                        new_f = random.choice([f for f in wq_fields if f != old_f and f not in mutated])
+                    mutated = mutated.replace(old_f, new_f, 1)
+            elif present:
+                old_f = present[0]
+                new_f = random.choice([f for f in wq_fields if f != old_f])
+                mutated = mutated.replace(old_f, new_f, 1)
+
+        elif roll < 0.46:
             # 参数微调：把数字 ±30%
             def tweak(m):
                 n = int(m.group())
@@ -2770,7 +2790,7 @@ def main(mode: str = "d0"):
                 return str(max(1, n + random.choice([-delta, delta])))
             mutated = re.sub(r'(?<!\w)\d+(?!\w)', tweak, mutated)
 
-        elif roll < 0.44:
+        elif roll < 0.56:
             # 外层包裹：加一层单字段时间序列算子（从全量27个 ts_1arg 中选）
             op = _tracker_operator.pick_one(wq_ts_ops_1arg)
             window = random.choice([5, 8, 10, 15, 20, 30, 60])
@@ -2780,7 +2800,7 @@ def main(mode: str = "d0"):
             else:
                 mutated = f"{op}({mutated}, {window})"
 
-        elif roll < 0.56:
+        elif roll < 0.66:
             # ★ 算子注入（核心新增！）：用冷门算子替换/包裹内层结构
             inject_roll = random.random()
             present = [f for f in wq_fields if f in mutated]
@@ -2812,7 +2832,7 @@ def main(mode: str = "d0"):
                     op = _tracker_operator.pick_one(wq_transform_ops)
                     mutated = mutated.replace(target_f, f"{op}({target_f})", 1)
 
-        elif roll < 0.64:
+        elif roll < 0.72:
             # 中性化方式变异
             neutralizer = random.choice(wq_neutralizers)
             if "group_neutralize" in mutated:
@@ -2821,7 +2841,7 @@ def main(mode: str = "d0"):
             else:
                 mutated = f"group_neutralize({mutated}, {neutralizer})"
 
-        elif roll < 0.74:
+        elif roll < 0.80:
             # 结构移植：把内层字段替换为冷门算子复合结构
             _cold_f1 = random.choice(wq_fields)
             _cold_f2 = random.choice([f for f in wq_fields if f != _cold_f1] or wq_fields)
@@ -2840,7 +2860,7 @@ def main(mode: str = "d0"):
                 old_f = random.choice(present)
                 mutated = mutated.replace(old_f, random.choice(cold_structures), 1)
 
-        elif roll < 0.80:
+        elif roll < 0.86:
             # ★ 内层算子替换：把已有的 ts_rank/ts_zscore 替换为其他 ts 算子
             # 这是直接改变因子骨架结构的最有效手段
             replaceable_ops = [
@@ -2854,7 +2874,7 @@ def main(mode: str = "d0"):
                 new_op = _tracker_operator.pick_one([op for op in wq_ts_ops_1arg if op != old_op])
                 mutated = mutated.replace(old_op, new_op, 1)
 
-        elif roll < 0.88:
+        elif roll < 0.92:
             # ★ vec/reduce 聚合注入（新增！）
             # vec_xxx: 把两个字段聚合 → vec_avg(F1, F2) / vec_sum(F1, F2)
             # reduce_xxx: 时间序列降维 → reduce_ir(x) 提取信息比率
@@ -2885,7 +2905,7 @@ def main(mode: str = "d0"):
                     new_sub = f"{red_op}({target_f})"
                 mutated = mutated.replace(target_f, new_sub, 1)
 
-        elif roll < 0.94:
+        elif roll < 0.96:
             # ★ trade_when 条件交易包裹（新增！）
             # trade_when(condition, alpha, -1) — 只在条件满足时持仓
             present = [f for f in wq_fields if f in mutated]
@@ -3291,12 +3311,25 @@ def main(mode: str = "d0"):
         if rejected_count > 0 or forbidden_count > 0:
             logging.info(f"  🛡️  Validator 拦截 {rejected_count} 条非法因子 | 🚫 黑名单拦截 {forbidden_count} 条")
 
-        # ---- 去重（跳过已评估过的）----
+        # ---- dedup (skip already evaluated + submission dedup) ----
+        try:
+            from generation_two.submission_dedup import is_duplicate as _is_sub_dup, record_submission as _record_sub, dedup_stats as _dedup_stats
+        except ImportError:
+            _is_sub_dup = lambda x: False
+            _record_sub = lambda x: None
+            _dedup_stats = lambda: "dedup N/A"
         unique_alphas = []
+        _sub_dedup_count = 0
         for x in validated_alphas:
             if x not in evaluated_alphas:
+                if _is_sub_dup(x):
+                    _sub_dedup_count += 1
+                    continue
                 unique_alphas.append(x)
                 evaluated_alphas.add(x)
+                _record_sub(x)
+        if _sub_dedup_count > 0:
+            logging.info(f"  dedup: {_sub_dedup_count} near-duplicates skipped | {_dedup_stats()}")
 
         # Phase 2: Skeleton similarity filter (pre-submission SELF_CORR check)
         if unique_alphas and knowledge_pool:
