@@ -2919,29 +2919,7 @@ def main(mode: str = "d0"):
             mutated = f"-1 * ({mutated})"
         return mutated
     
-    def crossover_factors(parent_a: str, parent_b: str) -> str:
-        """真正的跨因子杂交：把两个不同家族的因子进行 DNA 重组"""
-        roll = random.random()
-        
-        if roll < 0.25:
-            # 算术组合：加权平均
-            w = round(random.uniform(0.3, 0.7), 2)
-            child = f"{w} * ({parent_a}) + {round(1-w, 2)} * ({parent_b})"
-        elif roll < 0.45:
-            # 乘法交互：捕捉非线性协同效应
-            child = f"rank({parent_a}) * rank({parent_b})"
-        elif roll < 0.60:
-            # 条件触发：用 A 的信号强度来决定是否执行 B
-            child = f"trade_when(rank({parent_a}) > 0.5, {parent_b}, -1)"
-        elif roll < 0.75:
-            # 差值信号：A 和 B 的相对强弱
-            child = f"({parent_a}) - ({parent_b})"
-        else:
-            # 嵌套排名组合
-            grp = random.choice(wq_neutralizers)
-            child = f"group_rank(rank({parent_a}) + rank({parent_b}), {grp})"
-        
-        return inject_neutralization(child)
+    # [已删除] crossover_factors — 杂交产生低质量膨胀表达式，用多样性变异替代
     
     # ── 主进化循环 ───────────────────────────────────────────
     generation = 1
@@ -3241,11 +3219,11 @@ def main(mode: str = "d0"):
                     f"ts_decay_exp_window({neutralized_seed}, 5, 2)",
                     inject_neutralization(smart_mutate(seed)),
                 ]
-            num_crossovers = min(15, len(_active_seeds))
-            for _ in range(num_crossovers):
-                pa = random.choice(_active_seeds)
-                pb = random.choice([s for s in _active_seeds if s != pa] or _active_seeds)
-                d1_genetic.append(crossover_factors(pa, pb))
+            # [替代杂交] 多样性深度变异：对种子做2-3次连续变异，产生更新颖的结构
+            for seed in _active_seeds[:5]:
+                # 连续变异2次 = 更大的结构变化
+                double_mutant = smart_mutate(smart_mutate(seed))
+                d1_genetic.append(inject_neutralization(double_mutant))
 
         # 腿三：蓝海模板工厂（★ 扩容 20→40，D1，Round-Robin 均衡采样 + 30% 蓝海强制采样）
         d1_blueocean = []
