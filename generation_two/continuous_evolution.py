@@ -2727,25 +2727,16 @@ def main(mode: str = "d0"):
     def smart_mutate(expr: str) -> str:
         """真正做字段/算子/参数替换的变异
         
-        变异类型概率分布（v4 深度变异版）：
-          0.00-0.30 (30%) 字段替换（按类别均匀采样，强制换字段）
-          0.30-0.40 (10%) ★ 双字段强制替换（同时换2个字段，最大结构变化）
-          0.40-0.46 (6%)  参数微调（±30%）
-          0.46-0.56 (10%) 外层包裹（单字段 ts 算子）
-          0.56-0.66 (10%) ★ 算子注入（双字段/特殊/截面变换）
-          0.66-0.72 (6%)  中性化方式变异
-          0.72-0.80 (8%)  结构移植（冷门复合结构替换字段）
-          0.80-0.86 (6%)  内层算子替换（ts_rank→ts_corr 等）
-          0.86-0.92 (6%)  ★ vec/reduce 聚合注入
-          0.92-0.96 (4%)  ★ trade_when 条件包裹
-          0.96-1.00 (4%)  符号翻转
+        变异类型（奥卡姆剃刀版）：
+          0.00-0.70 (70%) 字段替换（按类别均匀采样，强制换字段）
+          0.70-1.00 (30%) 参数微调（±30%）
         """
         import re
         mutated = expr
         roll = random.random()
         
-        if roll < 0.30:
-            # 字段替换：按类别均匀采样（强制换字段，最重要的多样性来源）
+        if roll < 0.70:
+            # 字段替换：按类别均匀采样（唯一的多样性来源）
             present = [f for f in wq_fields if f in mutated]
             if present:
                 old_f = random.choice(present)
@@ -2758,26 +2749,7 @@ def main(mode: str = "d0"):
                     new_f = random.choice([f for f in wq_fields if f != old_f])
                 mutated = mutated.replace(old_f, new_f, 1)
 
-        elif roll < 0.40:
-            # ★ 双字段强制替换：同时换2个字段，最大化结构变化
-            present = [f for f in wq_fields if f in mutated]
-            if len(present) >= 2:
-                fields_to_replace = random.sample(present, 2)
-                for old_f in fields_to_replace:
-                    if wq_fields_by_category:
-                        chosen_cat = _tracker_field_cat.pick_one(list(wq_fields_by_category.keys()))
-                        cat_fields = [f for f in wq_fields_by_category[chosen_cat] if f not in present and f not in mutated]
-                        new_f = random.choice(cat_fields) if cat_fields else random.choice(
-                            [f for f in wq_fields if f != old_f and f not in mutated])
-                    else:
-                        new_f = random.choice([f for f in wq_fields if f != old_f and f not in mutated])
-                    mutated = mutated.replace(old_f, new_f, 1)
-            elif present:
-                old_f = present[0]
-                new_f = random.choice([f for f in wq_fields if f != old_f])
-                mutated = mutated.replace(old_f, new_f, 1)
-
-        elif roll < 0.46:
+        else:
             # 参数微调：把数字 ±30%
             def tweak(m):
                 n = int(m.group())
@@ -2786,137 +2758,6 @@ def main(mode: str = "d0"):
                 return str(max(1, n + random.choice([-delta, delta])))
             mutated = re.sub(r'(?<!\w)\d+(?!\w)', tweak, mutated)
 
-        elif roll < 0.56:
-            # 外层包裹：加一层单字段时间序列算子（从全量27个 ts_1arg 中选）
-            op = _tracker_operator.pick_one(wq_ts_ops_1arg)
-            window = random.choice([5, 8, 10, 15, 20, 30, 60])
-            if op == "ts_quantile":
-                q = random.choice([0.1, 0.25, 0.5, 0.75, 0.9])
-                mutated = f"{op}({mutated}, {q}, {window})"
-            else:
-                mutated = f"{op}({mutated}, {window})"
-
-        elif roll < 0.66:
-            # ★ 算子注入（核心新增！）：用冷门算子替换/包裹内层结构
-            inject_roll = random.random()
-            present = [f for f in wq_fields if f in mutated]
-            
-            if inject_roll < 0.35 and len(present) >= 2:
-                # 类型A：双字段算子注入 — 找到表达式中两个不同字段，用 ts_corr/ts_covariance/ts_regression 包裹
-                f1, f2 = random.sample(present, 2)
-                op = _tracker_operator.pick_one(wq_ts_ops_2arg)
-                window = random.choice([10, 20, 30, 60])
-                if op == "ts_regression":
-                    new_sub = f"{op}({f1}, {f2}, {window}, 0, 2)"
-                else:
-                    new_sub = f"{op}({f1}, {f2}, {window})"
-                # 替换第一个字段为新结构
-                mutated = mutated.replace(f1, new_sub, 1)
-            
-            elif inject_roll < 0.65 and present:
-                # 类型B：特殊算子包裹 — 用 signed_power/winsorize/hump 等包裹一个字段
-                target_f = random.choice(present)
-                op_name, op_template = random.choice(wq_special_ops)  # special_ops uses (name, tmpl) tuples
-                window = random.choice([10, 20, 30, 60])
-                new_sub = op_template.replace("{X}", target_f).replace("{W}", str(window))
-                mutated = mutated.replace(target_f, new_sub, 1)
-            
-            else:
-                # 类型C：无状态变换注入 — 用 rank/log/abs/sign 包裹字段
-                if present:
-                    target_f = random.choice(present)
-                    op = _tracker_operator.pick_one(wq_transform_ops)
-                    mutated = mutated.replace(target_f, f"{op}({target_f})", 1)
-
-        elif roll < 0.72:
-            # 中性化方式变异
-            neutralizer = random.choice(wq_neutralizers)
-            if "group_neutralize" in mutated:
-                for n in wq_neutralizers:
-                    mutated = mutated.replace(n, neutralizer)
-            else:
-                mutated = f"group_neutralize({mutated}, {neutralizer})"
-
-        elif roll < 0.80:
-            # 结构移植：把内层字段替换为冷门算子复合结构
-            _cold_f1 = random.choice(wq_fields)
-            _cold_f2 = random.choice([f for f in wq_fields if f != _cold_f1] or wq_fields)
-            _cold_w = random.choice([10, 20, 30, 60])
-            cold_structures = [
-                f"ts_corr({_cold_f1}, {_cold_f2}, {_cold_w})",
-                f"ts_regression({_cold_f1}, {_cold_f2}, {_cold_w}, 0, 2)",
-                f"signed_power(rank({_cold_f1}), 2)",
-                f"ts_quantile({_cold_f1}, 0.25, {_cold_w})",
-                f"ts_covariance({_cold_f1}, {_cold_f2}, {_cold_w})",
-                f"ts_arg_max({_cold_f1}, {_cold_w})",
-                f"kth_element({_cold_f1}, 3, {_cold_w})",
-            ]
-            present = [f for f in wq_fields if f in mutated]
-            if present:
-                old_f = random.choice(present)
-                mutated = mutated.replace(old_f, random.choice(cold_structures), 1)
-
-        elif roll < 0.86:
-            # ★ 内层算子替换：把已有的 ts_rank/ts_zscore 替换为其他 ts 算子
-            # 这是直接改变因子骨架结构的最有效手段
-            replaceable_ops = [
-                "ts_rank", "ts_zscore", "ts_mean", "ts_delta", "ts_std_dev",
-                "ts_decay_linear", "ts_sum", "ts_av_diff",
-            ]
-            present_ops = [op for op in replaceable_ops if op in mutated]
-            if present_ops:
-                old_op = random.choice(present_ops)
-                # 从全量单字段算子池中选替换（排除自己）
-                new_op = _tracker_operator.pick_one([op for op in wq_ts_ops_1arg if op != old_op])
-                mutated = mutated.replace(old_op, new_op, 1)
-
-        elif roll < 0.92:
-            # ★ vec/reduce 聚合注入（新增！）
-            # vec_xxx: 把两个字段聚合 → vec_avg(F1, F2) / vec_sum(F1, F2)
-            # reduce_xxx: 时间序列降维 → reduce_ir(x) 提取信息比率
-            inject_type = random.random()
-            present = [f for f in wq_fields if f in mutated]
-            if inject_type < 0.5 and wq_vec_ops and len(present) >= 2:
-                # vec 聚合：把两个字段用 vec_avg/vec_sum 合并
-                f1, f2 = random.sample(present, 2)
-                vec_op = _tracker_operator.pick_one(wq_vec_ops)
-                new_sub = f"{vec_op}({f1}, {f2})"
-                mutated = mutated.replace(f1, new_sub, 1)
-            elif wq_reduce_ops and present:
-                # reduce 降维：把一个字段用 reduce_ir/reduce_skewness 包裹
-                target_f = random.choice(present)
-                red_op = _tracker_operator.pick_one(wq_reduce_ops)
-                # 部分 reduce 算子有额外参数
-                if red_op in ('reduce_percentage',):
-                    new_sub = f"{red_op}({target_f}, 0.5)"
-                elif red_op in ('reduce_count',):
-                    new_sub = f"{red_op}({target_f}, 0)"
-                elif red_op in ('reduce_powersum',):
-                    new_sub = f"{red_op}({target_f}, 2)"
-                elif red_op in ('reduce_choose',):
-                    new_sub = f"{red_op}({target_f}, 1)"
-                elif red_op in ('reduce_avg', 'reduce_stddev'):
-                    new_sub = f"{red_op}({target_f})"
-                else:
-                    new_sub = f"{red_op}({target_f})"
-                mutated = mutated.replace(target_f, new_sub, 1)
-
-        elif roll < 0.96:
-            # ★ trade_when 条件交易包裹（新增！）
-            # trade_when(condition, alpha, -1) — 只在条件满足时持仓
-            present = [f for f in wq_fields if f in mutated]
-            if present:
-                cond_field = random.choice(wq_fields)
-                cond_window = random.choice([5, 10, 20, 30])
-                cond_threshold = random.choice([0.3, 0.5, 0.7])
-                condition = f"rank(ts_delta({cond_field}, {cond_window})) > {cond_threshold}"
-                mutated = f"trade_when({condition}, {mutated}, -1)"
-            else:
-                mutated = f"-1 * ({mutated})"
-
-        else:
-            # 符号翻转：对整个因子取反（捕捉反向信号）
-            mutated = f"-1 * ({mutated})"
         return mutated
     
     # [已删除] crossover_factors — 杂交产生低质量膨胀表达式，用多样性变异替代
@@ -3198,61 +3039,31 @@ def main(mode: str = "d0"):
                     if t.count("(") == t.count(")") and t not in evaluated_alphas:
                         d0_candidates.append(t)
 
-        # 腿二：遗传裂变（精简版，D1，单因子变异+杂交）— 仅 D1/both 模式
-        # ★ 从 30→15 seeds，减少裂变腿对种子池的过度依赖，降低自相关
-        d1_genetic = []
-        if mode in ("d1", "both"):
-            # ★ 过滤掉冷却中的骨架种子，强制骨架轮换
-            _active_seeds = [s for s in pool_snapshot if not _is_skeleton_cooled(s, generation)]
-            if len(_active_seeds) < 5:
-                # 冷却太多？从蓝海模板注入新鲜血液
-                _fresh = generate_template_alphas(
-                    10, wq_fields, evaluated_alphas, wq_fields_by_category,
-                    blue_ocean_fields=_blue_ocean_pool
-                )
-                _active_seeds = _active_seeds + _fresh
-                logging.info(f"🧊 骨架冷却导致种子不足，注入 {len(_fresh)} 个新鲜模板")
-            for seed in _active_seeds[:8]:  # 减少裂变浪费（15→8），匹配 d1_limit=15
-                neutralized_seed = inject_neutralization(seed)
-                d1_genetic += [
-                    neutralized_seed,
-                    f"ts_decay_exp_window({neutralized_seed}, 5, 2)",
-                    inject_neutralization(smart_mutate(seed)),
-                ]
-            # [替代杂交] 多样性深度变异：对种子做2-3次连续变异，产生更新颖的结构
-            for seed in _active_seeds[:5]:
-                # 连续变异2次 = 更大的结构变化
-                double_mutant = smart_mutate(smart_mutate(seed))
-                d1_genetic.append(inject_neutralization(double_mutant))
+        # ━━━━━━━━ 奥卡姆剃刀：纯模板遍历蓝海字段 ━━━━━━━━
+        # 不再有裂变腿/杂交腿，只有模板×蓝海字段的组合
 
-        # 腿三：蓝海模板工厂（★ 扩容 20→40，D1，Round-Robin 均衡采样 + 30% 蓝海强制采样）
-        d1_blueocean = []
+        # 腿一：蓝海模板遍历（主力，30个）
+        d1_template = []
         if mode in ("d1", "both"):
-            d1_blueocean = generate_template_alphas(
-                15, wq_fields, evaluated_alphas, wq_fields_by_category,  # 40→15，减少浪费
+            d1_template = generate_template_alphas(
+                30, wq_fields, evaluated_alphas, wq_fields_by_category,
                 blue_ocean_fields=_blue_ocean_pool
             )
-            d1_blueocean = [inject_neutralization(a) for a in d1_blueocean]
+            d1_template = [inject_neutralization(a) for a in d1_template]
 
-        # [C3 fix] 移除了重复的预加载消耗代码（已在 3170-3181 行处理）
-
-        # 旧逻辑兼容：把所有 D1 因子合并打包
-        # Phase 1: Systematic sweep (GrandMaster strategy)
-        d1_sweep = []
-        if mode in ("d1", "both"):
-            d1_sweep = generate_systematic_sweep(
-                wq_fields, wq_fields_by_category, evaluated_alphas,
-                n=10, fund_fields=None  # 30→10，匹配 d1_limit=15
-            )
-            d1_sweep = [inject_neutralization(a) for a in d1_sweep]
+        # 腿二：简单字段替换变异补充（5个）— 对模板做纯字段替换，不加层
+        d1_mutated = []
+        if mode in ("d1", "both") and d1_template:
+            for t in random.sample(d1_template, min(5, len(d1_template))):
+                d1_mutated.append(inject_neutralization(smart_mutate(t)))
 
         logging.info(
-            f"  📊 D0腿={len(d0_candidates)} | 裂变腿={len(d1_genetic)} | 蓝海腿={len(d1_blueocean)} | 遍历腿={len(d1_sweep)} | 模式={mode.upper()}\n"
+            f"  📊 D0腿={len(d0_candidates)} | 模板遍历={len(d1_template)} | 变异补充={len(d1_mutated)} | 模式={mode.upper()}\n"
             f"  🔥 探索覆盖: {_tracker_operator.stats()} | {_tracker_template.stats()}"
         )
 
-        d1_combined = d1_genetic + d1_blueocean + d1_sweep
-        alphas_to_test = alphas_to_test + d1_combined  # 保留预加载的 AI/情报因子
+        d1_combined = d1_template + d1_mutated
+        alphas_to_test = alphas_to_test + d1_combined  # 保留预加载的因子
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
         # ---- 阶段 4：Validator 过滤非法表达式 + 禁用骨架黑名单过滤 ----
@@ -3260,7 +3071,12 @@ def main(mode: str = "d0"):
         rejected_count = 0
         forbidden_count = 0
         _forbidden_set = _load_forbidden_skeletons()  # 每代只加载一次
+        _too_long_count = 0
         for expr in set(alphas_to_test):
+            # 奥卡姆剃刀：超过150字符的表达式直接丢弃
+            if len(expr) > 150:
+                _too_long_count += 1
+                continue
             # 骨架黑名单检查（跳过已知会 SELF_CORRELATION 失败的结构）
             if _is_forbidden_structure(expr, _forbidden_set):
                 forbidden_count += 1
@@ -3272,7 +3088,7 @@ def main(mode: str = "d0"):
                 rejected_count += 1
         
         if rejected_count > 0 or forbidden_count > 0:
-            logging.info(f"  🛡️  Validator 拦截 {rejected_count} 条非法因子 | 🚫 黑名单拦截 {forbidden_count} 条")
+            logging.info(f"  🛡️  Validator 拦截 {rejected_count} 条非法 | 🚫 黑名单 {forbidden_count} 条 | ✂️ 过长 {_too_long_count} 条")
 
         # ---- dedup (skip already evaluated + submission dedup) ----
         try:
