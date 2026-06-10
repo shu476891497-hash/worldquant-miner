@@ -496,7 +496,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fn_netincome_assets_zscore",
-        expression="group_neutralize(ts_zscore(net_income / (assets + 0.000001), 120), subindustry)",
+        expression="group_neutralize(ts_zscore(operating_income / (assets + 0.000001), 120), subindustry)",
         hypothesis="净利润/资产Z分数高 → 超出历史均值的盈利 → 买入",
         hint="ts_zscore标准化避免绝对值差异",
         dataset_category="fundamental",
@@ -586,7 +586,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fn_ebitda_vs_income_spread",
-        expression="group_rank(ts_rank(ebitda/(assets+0.000001) - net_income/(assets+0.000001), 120), subindustry)",
+        expression="group_rank(ts_rank(ebitda/(assets+0.000001) - operating_income/(assets+0.000001), 120), subindustry)",
         hypothesis="EBITDA/资产-净利润/资产差距扩大→高非现金费用→关注",
         hint="双字段归一化比率对比，衡量盈利质量",
         dataset_category="fundamental",
@@ -596,7 +596,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fn_fnd6_sale_at_entropy",
-        expression="group_rank(ts_entropy(fnd6_sale / (fnd6_at + 0.000001), 252), subindustry)",
+        expression="group_rank(ts_entropy(fnd6_sales / (assets + 0.000001), 252), subindustry)",
         hypothesis="销售/总资产熵值高→分布不确定性大→价格发现不充分",
         hint="ts_entropy是极稀有算子，理论上与其他因子零相关",
         dataset_category="fundamental",
@@ -606,7 +606,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fn_conditional_improvement",
-        expression="trade_when(ts_delta(net_income/(assets+0.000001), 60) > 0, group_rank(net_income/(assets+0.000001), subindustry), nan)",
+        expression="trade_when(ts_delta(operating_income/(assets+0.000001), 60) > 0, group_rank(operating_income/(assets+0.000001), subindustry), nan)",
         hypothesis="仅在ROA改善时交易 → 条件信号 → 降低噪音",
         hint="trade_when大幅降低turnover，只在条件满足时持仓",
         dataset_category="fundamental",
@@ -616,7 +616,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fn_gross_margin_iqr",
-        expression="group_rank(ts_quantile(gross_profit/(assets+0.000001), 0.75, 252) - ts_quantile(gross_profit/(assets+0.000001), 0.25, 252), subindustry)",
+        expression="group_rank(ts_quantile(ebitda/(assets+0.000001), 0.75, 252) - ts_quantile(ebitda/(assets+0.000001), 0.25, 252), subindustry)",
         hypothesis="毛利率IQR大→波动大→未被充分定价",
         hint="分位数价差是低相关性信号",
         dataset_category="fundamental",
