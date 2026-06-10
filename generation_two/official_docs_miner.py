@@ -245,7 +245,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="long_term_investment",
-        expression="ts_regression(ts_sum(ts_backfill(fnd6_newqv1300_ivltq, 60), 252), ts_step(1), 756, rettype=2)",
+        expression="ts_regression(ts_sum(ts_backfill(fnd6_newqv1300_ivltq, 60), 252), ts_step(1), 756, 0, 2)",
         hypothesis="持续增加长期投资的公司 → 未来更高利润",
         hint="给同时有收入增长的公司加更大权重",
         dataset_category="fundamental",
@@ -266,7 +266,7 @@ def get_official_templates() -> List[AlphaTemplate]:
     templates.append(AlphaTemplate(
         name="bull_trap",
         expression=(
-            "slope = ts_regression(ts_backfill(news_pct_1min, 60), ts_step(1), 5, rettype=2);\n"
+            "slope = ts_regression(ts_backfill(news_pct_1min, 60), ts_step(1), 5, 0, 2);\n"
             "winsorize(-ts_backfill(news_max_up_ret, 60) * abs(slope), std=4)"
         ),
         hypothesis="首分钟反应趋势恶化+今天大涨 → 多头陷阱",
@@ -458,7 +458,7 @@ def get_official_templates() -> List[AlphaTemplate]:
         name="beta_neutralized_momentum",
         expression=(
             "mkt = group_mean(returns, 1, market);\n"
-            "beta = ts_regression(returns, mkt, 252, rettype=2);\n"
+            "beta = ts_regression(returns, mkt, 252, 0, 2);\n"
             "raw = -ts_delta(close, 5);\n"
             "vector_neut(raw, beta)"
         ),
@@ -619,6 +619,397 @@ def get_official_templates() -> List[AlphaTemplate]:
         expression="group_rank(ts_quantile(ebitda/(assets+0.000001), 0.75, 252) - ts_quantile(ebitda/(assets+0.000001), 0.25, 252), subindustry)",
         hypothesis="毛利率IQR大→波动大→未被充分定价",
         hint="分位数价差是低相关性信号",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
+    ))
+
+    # ── ts_regression 系列模板 (强算子, 多种 rettype) ──
+
+    # rettype=2: slope (趋势斜率)
+    templates.append(AlphaTemplate(
+        name="fn_sales_trend_slope",
+        expression="group_rank(ts_regression(sales_ps, ts_step(1), 252, 0, 2), subindustry)",
+        hypothesis="每股销售长期趋势斜率为正 → 收入稳步增长 → 买入",
+        hint="ts_regression rettype=2返回斜率, ts_step(1)是时间序列",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fn_ebitda_trend_slope",
+        expression="group_rank(ts_regression(ebitda, ts_step(1), 252, 0, 2), subindustry)",
+        hypothesis="EBITDA趋势斜率为正 → 盈利能力持续提升 → 买入",
+        hint="长窗口(252天)捕捉年度趋势",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fn_eps_trend_slope",
+        expression="group_rank(ts_regression(eps, ts_step(1), 120, 0, 2), subindustry)",
+        hypothesis="EPS半年趋势为正 → 盈利改善 → 买入",
+        hint="120天窗口更敏感, 适合捕捉季报变化",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
+    ))
+
+    # rettype=0: residual (偏离趋势的异常值)
+    templates.append(AlphaTemplate(
+        name="fn_sales_resid_reversal",
+        expression="-1 * group_rank(ts_regression(sales_ps, ts_step(1), 252, 0, 0), subindustry)",
+        hypothesis="残差为正=高于趋势→均值回归做空; 残差为负→反弹做多",
+        hint="rettype=0返回残差, 捕捉偏离长期趋势的异常",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
+    ))
+
+    # rettype=1: R² (拟合度 → 趋势可靠性)
+    templates.append(AlphaTemplate(
+        name="fn_operating_income_r2",
+        expression="group_rank(ts_regression(operating_income, ts_step(1), 252, 0, 1), subindustry)",
+        hypothesis="经营收入趋势R²高→走势可预测→市场定价准确→动量有效",
+        hint="rettype=1返回R², 高R²意味着线性趋势强",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
+    ))
+
+    # 双因子回归: 用一个因子解释另一个
+    templates.append(AlphaTemplate(
+        name="fn_eps_vs_sales_beta",
+        expression="group_rank(ts_regression(eps, sales_ps, 252, 0, 2), subindustry)",
+        hypothesis="EPS对每股销售的beta高→利润率杠杆大→高弹性",
+        hint="两个基本面字段做回归, 衡量利润率弹性",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    # PV 回归
+    templates.append(AlphaTemplate(
+        name="pv_volume_trend_slope",
+        expression="group_rank(ts_regression(volume, ts_step(1), 60, 0, 2), subindustry)",
+        hypothesis="成交量趋势上升→关注度增加→可能有催化剂",
+        hint="60天短窗口适合PV信号",
+        dataset_category="pv",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
+    ))
+
+    # 回归残差 + 条件信号
+    templates.append(AlphaTemplate(
+        name="fn_equity_resid_signal",
+        expression=(
+            "resid = ts_regression(equity, ts_step(1), 252, 0, 0);\n"
+            "slope = ts_regression(equity, ts_step(1), 252, 0, 2);\n"
+            "trade_when(slope > 0, -group_rank(resid, subindustry), nan)"
+        ),
+        hypothesis="权益趋势向上时, 负残差=暂时低于趋势→买入反弹",
+        hint="组合slope+residual, 条件信号降低turnover",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
+    ))
+
+    # ══════════════════════════════════════════════════════════════════
+    # Option6 — Forecasted Volatility for Equity Options (133 fields)
+    # 文档要点: Market/Sector neutralization, 季度窗口, ts_delta/ts_zscore
+    # ══════════════════════════════════════════════════════════════════
+
+    # --- Dividend Cluster (文档: "最rewarding的起点") ---
+    templates.append(AlphaTemplate(
+        name="opt6_divyield_zscore",
+        expression="group_rank(ts_zscore(opt6_divyield, 252), sector)",
+        hypothesis="股息率Z分数高→近期股息提升→基本面改善→买入",
+        hint="文档: 股息字段比纯fundamental少拥挤; Sector neutralization",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="opt6_divamt_trend",
+        expression="group_rank(ts_regression(opt6_divamt, ts_step(1), 252, 0, 2), sector)",
+        hypothesis="股息金额长期趋势为正→持续回馈股东→质量信号",
+        hint="ts_regression slope; 股息数据在option dataset中更新",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    # --- Volatility Surface Shape (Slope/Skew) ---
+    templates.append(AlphaTemplate(
+        name="opt6_slope_mean_revert",
+        expression="group_rank(-ts_delta(opt6_slopeavg1m, 60), sector)",
+        hypothesis="Skew slope 1个月均值近期下降→put需求减少→看涨",
+        hint="文档: shape signals tend to mean-revert at sector level",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="opt6_slope_pctile_reversal",
+        expression="-group_rank(opt6_slopepctile, sector)",
+        hypothesis="Slope百分位极高→put demand过度→均值回归做空slope",
+        hint="文档: slope captures demand for downside puts vs upside calls",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="opt6_slope_vs_avg1y",
+        expression="group_rank(opt6_slopeavg1m - opt6_slopeavg1y, sector)",
+        hypothesis="短期slope>长期slope→近期put需求激增→反转信号",
+        hint="文档: 用价差而非ts_corr, 避免机械相关性",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="opt6_vired_rank",
+        expression="-group_rank(ts_zscore(opt6_vired, 60), sector)",
+        hypothesis="smile弯曲度异常高→尾部风险恐慌→均值回归做多",
+        hint="文档: vired衡量smile弯曲速度, large=sharp bend",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="opt6_derivinf_spread",
+        expression="group_rank(ts_zscore(opt6_derivinf, 60) - ts_zscore(opt6_slopeinf, 60), sector)",
+        hypothesis="curvature vs slope的Z分数价差→结构性定价偏差",
+        hint="文档建议: subtract(ts_zscore(X,60), ts_zscore(Y,60))",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    # --- Forecast Confidence as Gate ---
+    templates.append(AlphaTemplate(
+        name="opt6_gated_iv_signal",
+        expression="trade_when(ts_mean(opt6_fcstr2imp, 60) > 0.5, -ts_delta(opt6_20div, 60), -1)",
+        hypothesis="forecast R²高时IV下降→vol crush→做多",
+        hint="文档核心技巧: trade_when(ts_mean(fcstr2imp,60)>0.5, signal, -1)",
+        dataset_category="option",
+        level="custom",
+        neutralization="MARKET", decay=5, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="opt6_gated_slope_signal",
+        expression="trade_when(ts_mean(opt6_2rtscf, 60) > 0.3, -group_rank(opt6_slope, sector), nan)",
+        hypothesis="realized vol预测R²高时slope信号更可靠",
+        hint="文档: R²是confidence signal, 非directional",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    # --- Cross-Asset Ratios ---
+    templates.append(AlphaTemplate(
+        name="opt6_ivspyratio_zscore",
+        expression="ts_zscore(opt6_ivspyratio, 60)",
+        hypothesis="相对SPY的IV Z分数高→期权贵→做空; 低→便宜→做多",
+        hint="文档: ratio fields已去除cross-asset, 用MARKET neutralization",
+        dataset_category="option",
+        level="custom",
+        neutralization="MARKET", decay=5, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="opt6_ivetfratio_delta",
+        expression="-ts_delta(opt6_ivetfratioavg1m, 60)",
+        hypothesis="相对ETF的IV ratio近期上升→相对贵→做空",
+        hint="文档: ratio已有cross-asset adjustment, MARKET neutralization更干净",
+        dataset_category="option",
+        level="custom",
+        neutralization="MARKET", decay=5, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="opt6_corr_spy_regime",
+        expression="group_rank(-ts_delta(opt6_correlspy1m, 60), sector)",
+        hypothesis="与SPY相关性下降→独立定价→可能有idiosyncratic催化剂",
+        hint="相关性变化比绝对值更有信息量",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    # --- Earnings Effect ---
+    templates.append(AlphaTemplate(
+        name="opt6_implied_earnings_effect",
+        expression="group_rank(-ts_zscore(opt6_impliediee, 60), sector)",
+        hypothesis="隐含盈利效应Z分数异常高→市场预期极端→均值回归",
+        hint="文档: 从term structure equation求解, 不需aggressive backfill",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="opt6_earnings_move_rank",
+        expression="-group_rank(ts_delta(opt6_absavgernmv, 60), sector)",
+        hypothesis="预期盈利移动近期上升→不确定性增加→做空",
+        hint="文档: option model continuously computed, ts_backfill(5)足够",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    # --- IV Level Signals ---
+    templates.append(AlphaTemplate(
+        name="opt6_iv_term_structure",
+        expression="group_rank(opt6_30div - opt6_90div, sector)",
+        hypothesis="短期IV>长期IV→倒挂→近期事件风险→做空",
+        hint="文档: constant-maturity IV已经过插值滤波",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="opt6_iv_percentile_reversal",
+        expression="-ts_av_diff(opt6_ivpctile1m, 60)",
+        hypothesis="1个月IV百分位偏离均值→均值回归",
+        hint="文档: prefer ts_av_diff over short-window deltas",
+        dataset_category="option",
+        level="custom",
+        neutralization="MARKET", decay=5, truncation=0.08,
+    ))
+
+    # --- HV vs IV Spread ---
+    templates.append(AlphaTemplate(
+        name="opt6_iv_hv_spread",
+        expression="group_rank(opt6_20div - opt6_20dorhv, sector)",
+        hypothesis="IV>HV→期权溢价→vol sellers获利→做多underlying",
+        hint="IV-HV spread是经典vol trading信号",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    # --- Forecast vs Realized ---
+    templates.append(AlphaTemplate(
+        name="opt6_forecast_regime",
+        expression=(
+            "r2 = ts_mean(opt6_fcstr2imp, 60);\n"
+            "iv_chg = ts_delta(opt6_20div, 60);\n"
+            "trade_when(r2 > 0.5, group_rank(-iv_chg, sector), nan)"
+        ),
+        hypothesis="模型confidence高+IV下降→可靠的vol crush→做多",
+        hint="文档核心策略: forecast R²作为gate提升signal质量",
+        dataset_category="option",
+        level="custom",
+        neutralization="SECTOR", decay=5, truncation=0.08,
+    ))
+
+    # ══════════════════════════════════════════════════════════════════
+    # Fundamental7 — Comprehensive Fundamentals Data (311 fields)
+    # 文档要点: EPS quality, footnote vs primary alignment, cash flow
+    # ══════════════════════════════════════════════════════════════════
+
+    # --- EPS Quality (文档核心策略) ---
+    templates.append(AlphaTemplate(
+        name="fnd7_eps_quality",
+        expression="group_rank(ts_regression(fnd7_ointfund_qxspeo, fnd7_ointhstfund_hqxspeo, 252, 0, 2), subindustry)",
+        hypothesis="diluted EPS与footnote EPS回归斜率→高→报告一致→高质量",
+        hint="文档Alpha Idea: footnote reinforces primary → higher earnings quality",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_eps_footnote_spread",
+        expression="group_rank(ts_zscore(fnd7_ointfund_qxspeo - fnd7_ointhstfund_hqxspeo, 120), subindustry)",
+        hypothesis="主报告EPS-footnote EPS差异扩大→会计处理异常→关注",
+        hint="文档: alignment between standard reports and detailed footnotes",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
+    ))
+
+    # --- Income Quality ---
+    templates.append(AlphaTemplate(
+        name="fnd7_income_before_extraordinary",
+        expression="group_rank(ts_regression(fnd7_ointfund_qbi, ts_step(1), 252, 0, 2), subindustry)",
+        hypothesis="税前经常性收入趋势上升→核心盈利改善→买入",
+        hint="qbi = income before extraordinary items, 排除非经常性",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    # --- Cash Flow ---
+    templates.append(AlphaTemplate(
+        name="fnd7_operating_cashflow_trend",
+        expression="group_rank(ts_regression(fnd7_ointfund_qfcnif, ts_step(1), 252, 0, 2), subindustry)",
+        hypothesis="融资活动现金流趋势→反映资本结构变化",
+        hint="fnd7提供详细cash flow statement items",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_cash_position",
+        expression="group_rank(ts_delta(fnd7_ointfund_qehc, 60), subindustry)",
+        hypothesis="现金和短期投资增加→财务安全边际扩大→买入",
+        hint="qehc = Cash and short-term investments at quarter end",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    # --- Capital Expenditure vs Operations ---
+    templates.append(AlphaTemplate(
+        name="fnd7_capex_efficiency",
+        expression="-group_rank(fnd7_ointfund_qxpac / (fnd7_ointfund_qbi + 0.000001), subindustry)",
+        hypothesis="资本支出/收入比率低→高效运营→买入",
+        hint="qxpac=capex, qbi=income before extraordinary",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    # --- Retained Earnings ---
+    templates.append(AlphaTemplate(
+        name="fnd7_retained_earnings_growth",
+        expression="group_rank(ts_regression(fnd7_ointfund_qer, ts_step(1), 252, 0, 2), subindustry)",
+        hypothesis="留存收益趋势上升→内生增长→买入",
+        hint="qer = retained earnings, 公司自我积累能力",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
+    ))
+
+    # --- Cost Structure ---
+    templates.append(AlphaTemplate(
+        name="fnd7_cogs_margin",
+        expression="-group_rank(ts_delta(fnd7_ointfund_qsgoc, 120), subindustry)",
+        hypothesis="COGS增速放缓→毛利率改善→买入",
+        hint="qsgoc = cost of goods sold, quarterly",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    # --- EPS 12-month Trend ---
+    templates.append(AlphaTemplate(
+        name="fnd7_eps_12m_trend",
+        expression="group_rank(ts_regression(fnd7_ointfund_21speo, ts_step(1), 252, 0, 2), subindustry)",
+        hypothesis="12个月移动EPS趋势上升→持续盈利改善→买入",
+        hint="21speo = EPS from operations, trailing 12 months",
         dataset_category="fundamental",
         level="custom",
         neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
@@ -1044,7 +1435,7 @@ class OfficialDocsMiner:
         # 认证
         if not self.client.authenticate():
             log.error("❌ 认证失败, 退出")
-            return
+            return False  # Signal auth failure to caller
 
         # 筛选模板
         active_templates = self.templates
@@ -1265,6 +1656,7 @@ class OfficialDocsMiner:
         log.info(f"   总提交: {total_submitted} | 总通过: {total_passed}")
         log.info(f"{'='*60}")
         self.tracker.print_summary()
+        return True
 
 
 # ──────────────────────────── CLI ─────────────────────────────────
@@ -1322,18 +1714,28 @@ def main():
     if args.infinite:
         # 无限循环模式: 每轮结束后继续下一轮
         mega_round = 0
+        auth_fail_count = 0
         while True:
             mega_round += 1
             log.info(f"\n{'🔥'*30}")
             log.info(f"🔥 INFINITE MODE — Mega Round {mega_round}")
             log.info(f"{'🔥'*30}")
             try:
-                miner.run(
+                result = miner.run(
                     rounds=args.rounds,
                     templates_per_round=args.templates_per_round,
                     variants_per_template=args.variants,
                     level_filter=args.level,
                 )
+                if result is False:
+                    # 认证失败 — 指数退避等待
+                    auth_fail_count += 1
+                    wait = min(300, 30 * auth_fail_count)  # 30s, 60s, ... max 5min
+                    log.warning(f"⏳ Cookie可能过期, 等待 {wait}s 后重试 (第{auth_fail_count}次)")
+                    time.sleep(wait)
+                else:
+                    auth_fail_count = 0  # 重置
+                    time.sleep(10)  # Mega Round间隔
             except KeyboardInterrupt:
                 log.info("\n⏹️ 用户中断")
                 break

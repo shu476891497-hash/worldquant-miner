@@ -1,0 +1,1246 @@
+[
+  {
+    "id": "accounts_change_quarterly",
+    "description": "Quarterly cumulative effect of accounting changes reported for the period"
+  },
+  {
+    "id": "accounts_change_quarterly_data_code",
+    "description": "Data quality/validation code for ACCHGQ"
+  },
+  {
+    "id": "accounts_other_current",
+    "description": "Quarter-end balance of other current assets (quarterly)"
+  },
+  {
+    "id": "accounts_payable_quarter",
+    "description": "Accounts payable balance at quarter end"
+  },
+  {
+    "id": "accounts_receivable_quarterly",
+    "description": "Acquisitions (quarterly)"
+  },
+  {
+    "id": "adjusted_net_income_interim",
+    "description": "Income before extraordinary items, adjusted for common stock equivalents, quarterly"
+  },
+  {
+    "id": "adjusted_net_income_quarterly",
+    "description": "Unrestated quarterly figure for Income before extraordinary items, adjusted for common stock equivalents"
+  },
+  {
+    "id": "adjustment_factor_per_share_quarter",
+    "description": "Company adjustment factor cumulative by payable date for adjusting per-share data"
+  },
+  {
+    "id": "adjustment_factor_quarterly",
+    "description": "Company adjustment factor cumulative by ex-date (e.g., splits/dividends) for adjusting per-share data"
+  },
+  {
+    "id": "assets_other_quarter",
+    "description": "Quarter-end balance of other (noncurrent) assets (total)"
+  },
+  {
+    "id": "capital_expenditures_quarterly",
+    "description": "Capital expenditures (quarterly)"
+  },
+  {
+    "id": "capital_stock_quarterly_2",
+    "description": "Capital surplus/share premium reserve (quarterly)"
+  },
+  {
+    "id": "cash_dividends_quarterly",
+    "description": "Quarterly cash dividends from the statement of cash flows"
+  },
+  {
+    "id": "cash_equivalents_quarter",
+    "description": "Quarterly cash and short-term investments balance"
+  },
+  {
+    "id": "change_in_cash_quarterly",
+    "description": "Cash and cash equivalents – increase/(decrease) (quarterly)"
+  },
+  {
+    "id": "change_in_current_debt_quarterly",
+    "description": "Changes in current debt (statement of cash flows), quarterly"
+  },
+  {
+    "id": "common_equity_quarter",
+    "description": "Common/ordinary equity – total (quarterly)"
+  },
+  {
+    "id": "common_equity_quarterly_reported",
+    "description": "Total common equity, unrestated (quarterly)"
+  },
+  {
+    "id": "common_shares_diluted_quarterly",
+    "description": "Quarterly common shares used for diluted EPS"
+  },
+  {
+    "id": "common_shares_outstanding_quarterly_2",
+    "description": "Quarterly common shares outstanding"
+  },
+  {
+    "id": "common_shares_primary_quarterly",
+    "description": "Unrestated quarterly common shares used to calculate basic EPS"
+  },
+  {
+    "id": "common_shares_used_basic_eps_quarter",
+    "description": "Quarterly common shares used to calculate basic EPS"
+  },
+  {
+    "id": "common_stock_equity",
+    "description": "Common Stock Equivalents - Dollar Savings - Qtly"
+  },
+  {
+    "id": "common_stock_equity_quarterly",
+    "description": "Unrestated quarterly dollar savings due to common stock equivalents"
+  },
+  {
+    "id": "common_stock_issued_interim",
+    "description": "Proceeds from sale/issuance of common and preferred stock, quarterly"
+  },
+  {
+    "id": "common_stock_quarterly",
+    "description": "Common/Ordinary Stock (capital) balance, quarterly"
+  },
+  {
+    "id": "cost_goods_sold_quarterly_2",
+    "description": "Quarterly cost of goods sold"
+  },
+  {
+    "id": "cost_of_goods_sold_quarterly",
+    "description": "Unrestated quarterly cost of goods sold"
+  },
+  {
+    "id": "current_assets_quarterly_2",
+    "description": "Total current assets at quarter end"
+  },
+  {
+    "id": "current_liabilities_quarterly",
+    "description": "Quarterly total current liabilities"
+  },
+  {
+    "id": "debt_long_term",
+    "description": "Long-term debt, total, quarterly"
+  },
+  {
+    "id": "debt_long_term_current_quarterly",
+    "description": "Debt in current liabilities (current debt), quarterly"
+  },
+  {
+    "id": "debt_long_term_current_quarterly_data_code",
+    "description": "Data quality/validation code for Changes in current debt, quarterly"
+  },
+  {
+    "id": "debt_long_term_issuance_quarterly",
+    "description": "Long-term debt issuance (statement of cash flows), quarterly"
+  },
+  {
+    "id": "debt_long_term_quarterly_2",
+    "description": "Long-term debt reduction/repayments (statement of cash flows), quarterly"
+  },
+  {
+    "id": "deferred_income_tax_credit_quarterly_2",
+    "description": "Quarterly balance sheet amount for deferred taxes and investment tax credit"
+  },
+  {
+    "id": "deferred_income_tax_quarterly_2",
+    "description": "Quarterly deferred income tax expense or benefit (income statement)"
+  },
+  {
+    "id": "deferred_income_tax_quarterly_data_code",
+    "description": "Data code indicating validity for quarterly deferred income taxes"
+  },
+  {
+    "id": "depreciation_and_amortization_quarterly",
+    "description": "Quarter-end accumulated depreciation, depletion, and amortization (balance sheet)"
+  },
+  {
+    "id": "depreciation_expense_quarter",
+    "description": "Quarterly total depreciation and amortization expense"
+  },
+  {
+    "id": "depreciation_quarter",
+    "description": "Quarterly depreciation and amortization expense, unrestated"
+  },
+  {
+    "id": "depreciation_quarterly_data_code",
+    "description": "Data quality/validation code for quarterly total depreciation and amortization"
+  },
+  {
+    "id": "depreciation_quarterly_data_code_alt",
+    "description": "Data quality/validation code for unrestated quarterly depreciation and amortization"
+  },
+  {
+    "id": "diluted_average_shares_quarter",
+    "description": "Dilution available (excluding extraordinary items), quarterly"
+  },
+  {
+    "id": "diluted_average_shares_quarterly_2",
+    "description": "Dilution available (excluding extraordinary items), quarterly unrestated"
+  },
+  {
+    "id": "diluted_eps_excl_extra_items_quarterly",
+    "description": "Diluted earnings per share excluding extraordinary items, quarterly"
+  },
+  {
+    "id": "dilution_adjustment_quarterly",
+    "description": "Dilution adjustment, quarterly"
+  },
+  {
+    "id": "discontinued_operations_quarterly",
+    "description": "Quarterly discontinued operations amount"
+  },
+  {
+    "id": "dividend_per_share_excl_extra_items_interim",
+    "description": "Quarterly dividends per share by ex-date (gross)"
+  },
+  {
+    "id": "dividend_per_share_preferred_quarter",
+    "description": "Quarterly dividends per share based on payable date"
+  },
+  {
+    "id": "dividends_income_quarterly",
+    "description": "Current indicated annual dividend per share (as of the quarter)"
+  },
+  {
+    "id": "dividends_other_quarterly",
+    "description": "Quarterly discontinued operations amount, unrestated (initial)"
+  },
+  {
+    "id": "dividends_preferred_quarterly",
+    "description": "Quarterly depreciation and amortization as reported on the statement of cash flows"
+  },
+  {
+    "id": "earnings_per_share_basic_excl_items_quarter",
+    "description": "Basic earnings per share excluding extraordinary items, quarterly"
+  },
+  {
+    "id": "earnings_per_share_basic_excl_items_quarterly",
+    "description": "Basic EPS excluding extraordinary items, quarterly (unrestated)"
+  },
+  {
+    "id": "earnings_per_share_basic_incl_items_quarterly",
+    "description": "Basic earnings per share including extraordinary items, quarterly"
+  },
+  {
+    "id": "earnings_per_share_basic_quarterly_2",
+    "description": "Basic EPS including extraordinary items, quarterly (unrestated)"
+  },
+  {
+    "id": "earnings_per_share_basic_quarterly_data_code",
+    "description": "Data validation code for basic EPS including extraordinary items, quarterly (unrestated)"
+  },
+  {
+    "id": "earnings_per_share_diluted_12_months",
+    "description": "Diluted earnings per share excluding extraordinary items, trailing 12 months (moving)"
+  },
+  {
+    "id": "earnings_per_share_diluted_2",
+    "description": "Diluted earnings per share including extraordinary items, quarterly"
+  },
+  {
+    "id": "earnings_per_share_diluted_ex_items_quarterly_data_code",
+    "description": "Data validation code for diluted EPS excluding extraordinary items, quarterly (unrestated)"
+  },
+  {
+    "id": "earnings_per_share_diluted_incl_items_quarterly",
+    "description": "Diluted EPS including extraordinary items, quarterly (unrestated)"
+  },
+  {
+    "id": "earnings_subsidiaries_quarter",
+    "description": "Quarterly equity in net loss or earnings as reported in the statement of cash flows"
+  },
+  {
+    "id": "eps_basic_12_months",
+    "description": "Earnings per share from operations, trailing 12 months (moving)"
+  },
+  {
+    "id": "eps_basic_12m_moving",
+    "description": "Basic earnings per share excluding extraordinary items, trailing 12 months (moving)"
+  },
+  {
+    "id": "eps_basic_12m_rolling",
+    "description": "Unrestated basic EPS excluding extraordinary items on a 12-month moving basis"
+  },
+  {
+    "id": "eps_basic_extraordinary_excluded_quarter",
+    "description": "Diluted earnings per share from operations for the quarter"
+  },
+  {
+    "id": "eps_diluted_excl_extra_items_quarterly",
+    "description": "Diluted EPS excluding extraordinary items, quarterly (unrestated)"
+  },
+  {
+    "id": "eps_operating_12_months",
+    "description": "Diluted earnings per share from operations, trailing 12 months (moving)"
+  },
+  {
+    "id": "extraordinary_expense_quarterly",
+    "description": "Quarterly effect of exchange rate changes on cash and cash equivalents in the statement of cash flows"
+  },
+  {
+    "id": "extraordinary_item_quarter",
+    "description": "Unrestated quarterly income statement amount for Extraordinary Items and Discontinued Operations"
+  },
+  {
+    "id": "extraordinary_items",
+    "description": "Quarterly extraordinary items (income statement)"
+  },
+  {
+    "id": "extraordinary_items_interim",
+    "description": "Quarterly income statement amount for Extraordinary Items and Discontinued Operations"
+  },
+  {
+    "id": "extraordinary_items_quarterly",
+    "description": "Unrestated quarterly extraordinary items"
+  },
+  {
+    "id": "extraordinary_items_quarterly_2",
+    "description": "Quarterly cash flow amount for Extraordinary Items and Discontinued Operations"
+  },
+  {
+    "id": "extraordinary_items_quarterly_data_code_2",
+    "description": "Data quality/status code for the unrestated quarterly extraordinary items"
+  },
+  {
+    "id": "financial_cash_assets_quarter",
+    "description": "Quarterly foreign exchange gain or loss recognized in the income account"
+  },
+  {
+    "id": "financial_cash_assets_quarterly_data_code",
+    "description": "Data quality code for FCAQR"
+  },
+  {
+    "id": "financing_cash_flow",
+    "description": "Quarterly net cash flow from financing activities"
+  },
+  {
+    "id": "financing_cash_flow_quarterly",
+    "description": "Quarterly other cash flows from financing activities"
+  },
+  {
+    "id": "fnd7_ointfund_21fpeo",
+    "description": "Diluted earnings per share from operations, trailing 12 months"
+  },
+  {
+    "id": "fnd7_ointfund_21fspe",
+    "description": "Trailing 12-month diluted earnings per share excluding extraordinary items"
+  },
+  {
+    "id": "fnd7_ointfund_21speo",
+    "description": "Earnings per share from operations, trailing 12 months"
+  },
+  {
+    "id": "fnd7_ointfund_21xspe",
+    "description": "Trailing 12-month basic earnings per share excluding extraordinary items (consolidated)"
+  },
+  {
+    "id": "fnd7_ointfund_q21hsc",
+    "description": "Common shares used to calculate EPS on a 12-month moving basis"
+  },
+  {
+    "id": "fnd7_ointfund_qacf",
+    "description": "Foreign exchange income (loss), quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qagsx",
+    "description": "Selling, general, and administrative expense, quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qbi",
+    "description": "Income before extraordinary items (quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qbim",
+    "description": "Balance of redeemable noncontrolling interest on the balance sheet (quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qcbi",
+    "description": "Quarterly income before extraordinary items from the Statement of Cash Flows"
+  },
+  {
+    "id": "fnd7_ointfund_qcbuse",
+    "description": "Equity in net loss earnings in the cash flow statement quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qcdxt",
+    "description": "Quarterly deferred taxes reported in the statement of cash flows (non-cash operating item)"
+  },
+  {
+    "id": "fnd7_ointfund_qcktsrp",
+    "description": "Purchases of common and preferred stock cash outflow during the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qcld",
+    "description": "Current debt (debt in current liabilities), quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qcodix",
+    "description": "Quarterly extraordinary items and discontinued operations from the statement of cash flows"
+  },
+  {
+    "id": "fnd7_ointfund_qcpd",
+    "description": "Quarterly depreciation and amortization from the statement of cash flows (non-cash addback)"
+  },
+  {
+    "id": "fnd7_ointfund_qcqa",
+    "description": "Quarterly acquisitions amount as reported in the statement of cash flows"
+  },
+  {
+    "id": "fnd7_ointfund_qctidxt",
+    "description": "Quarterly balance sheet amount for deferred taxes and investment tax credit"
+  },
+  {
+    "id": "fnd7_ointfund_qdalid",
+    "description": "Dilution adjustment amount for the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qdfhsc",
+    "description": "Common shares used to calculate diluted EPS for the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qdpxt",
+    "description": "Income taxes paid (cash flow), quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qdrx",
+    "description": "Quarterly research and development expense"
+  },
+  {
+    "id": "fnd7_ointfund_qehc",
+    "description": "Cash and short-term investments at quarter end"
+  },
+  {
+    "id": "fnd7_ointfund_qektsc",
+    "description": "Dollar savings due to common stock equivalents during the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qelas",
+    "description": "Quarterly income statement item: net sales (sales/turnover)"
+  },
+  {
+    "id": "fnd7_ointfund_qepps",
+    "description": "Quarterly cash inflow from sale of property, plant, and equipment (statement of cash flows)"
+  },
+  {
+    "id": "fnd7_ointfund_qer",
+    "description": "Retained earnings, quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qerxe",
+    "description": "Exchange rate effect on cash as reported in the quarterly cash flow statement"
+  },
+  {
+    "id": "fnd7_ointfund_qfcnao",
+    "description": "Net cash flow from operating activities (cash flow statement, quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qfcnif",
+    "description": "Net cash flow from financing activities (cash flow statement, quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qfcnvi",
+    "description": "Net cash flow from investing activities during the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qhcaxt",
+    "description": "Quarterly change in accrued income taxes (increase/decrease) per statement of cash flows"
+  },
+  {
+    "id": "fnd7_ointfund_qhccer",
+    "description": "Quarterly cash flow item: change in accounts receivable (Decrease/Increase) from the statement of cash flows"
+  },
+  {
+    "id": "fnd7_ointfund_qhccld",
+    "description": "Changes in current debt (cash flow statement, quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qhcehc",
+    "description": "Increase/(decrease) in cash and cash equivalents reported on the statement of cash flows (quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qhclapa",
+    "description": "Accounts payable and accrued liabilities – increase/(decrease) (statement of cash flows, quarter)"
+  },
+  {
+    "id": "fnd7_ointfund_qhcoloa",
+    "description": "Other assets and liabilities – net change (statement of cash flows, quarter)"
+  },
+  {
+    "id": "fnd7_ointfund_qhctsvi",
+    "description": "Quarterly change in short-term investments reported on the statement of cash flows"
+  },
+  {
+    "id": "fnd7_ointfund_qhcvi",
+    "description": "Cash outflow for increases in investments during the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qhcvni",
+    "description": "Cash flow effect of change in inventories (decrease/increase) during the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qidxt",
+    "description": "Deferred income taxes for the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qifspe",
+    "description": "Quarterly diluted earnings per share including extraordinary items"
+  },
+  {
+    "id": "fnd7_ointfund_qiim",
+    "description": "Noncontrolling interest on the income statement for the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qiimbi",
+    "description": "Quarterly income before extraordinary items and noncontrolling interests"
+  },
+  {
+    "id": "fnd7_ointfund_qin",
+    "description": "Quarterly net income (loss)"
+  },
+  {
+    "id": "fnd7_ointfund_qip",
+    "description": "Quarterly pretax income"
+  },
+  {
+    "id": "fnd7_ointfund_qipon",
+    "description": "Quarterly nonoperating income (expense), as reported point-in-time"
+  },
+  {
+    "id": "fnd7_ointfund_qips",
+    "description": "Quarterly income statement item: abandonments and disallowances adjustment plus special items"
+  },
+  {
+    "id": "fnd7_ointfund_qipspe",
+    "description": "Quarterly basic earnings per share including extraordinary items"
+  },
+  {
+    "id": "fnd7_ointfund_qivd",
+    "description": "Current indicated annual dividend rate per share (as of the quarter)"
+  },
+  {
+    "id": "fnd7_ointfund_qjdabi",
+    "description": "Quarterly Income Before Extraordinary Items adjusted for common stock equivalents"
+  },
+  {
+    "id": "fnd7_ointfund_qktsc",
+    "description": "Common stock (capital) balance, quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qktsp",
+    "description": "Preferred stock at carrying value (capital), total, quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qktss",
+    "description": "Quarterly cash inflow from sale/issuance of common and preferred stock (statement of cash flows)"
+  },
+  {
+    "id": "fnd7_ointfund_qktst",
+    "description": "Treasury stock total dollar amount at quarter end"
+  },
+  {
+    "id": "fnd7_ointfund_qmocbi",
+    "description": "Income before extraordinary items available for common (quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qnbim",
+    "description": "Nonredeemable noncontrolling interest on the balance sheet at quarter end"
+  },
+  {
+    "id": "fnd7_ointfund_qnptni",
+    "description": "Net interest paid during the quarter per the cash flow statement"
+  },
+  {
+    "id": "fnd7_ointfund_qoa",
+    "description": "Other assets (quarter)"
+  },
+  {
+    "id": "fnd7_ointfund_qoaif",
+    "description": "Financing activities other (cash flow statement, quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qoca",
+    "description": "Other current assets – total (quarter)"
+  },
+  {
+    "id": "fnd7_ointfund_qocavi",
+    "description": "Other cash flows from investing activities during the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qocl",
+    "description": "Other current liabilities, total (quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qod",
+    "description": "Quarterly amount related to discontinued operations for the period"
+  },
+  {
+    "id": "fnd7_ointfund_qodix",
+    "description": "Extraordinary items and discontinued operations, quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qohsc",
+    "description": "Common shares outstanding at quarter end"
+  },
+  {
+    "id": "fnd7_ointfund_qol",
+    "description": "Other liabilities, total, quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qopof",
+    "description": "Funds from operations – other (cash flow statement, quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qpa",
+    "description": "Accounts payable (quarter)"
+  },
+  {
+    "id": "fnd7_ointfund_qpd",
+    "description": "Total depreciation and amortization expense for the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qpdbio",
+    "description": "Quarterly operating income before depreciation, as reported"
+  },
+  {
+    "id": "fnd7_ointfund_qpja",
+    "description": "Cumulative adjustment factor at dividend payable date used to adjust per share data for splits and dividends"
+  },
+  {
+    "id": "fnd7_ointfund_qpspvd",
+    "description": "Dividends per share by payable date (quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qpvd",
+    "description": "Preferred dividends for the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qpxt",
+    "description": "Quarterly income taxes payable (balance sheet current liability)"
+  },
+  {
+    "id": "fnd7_ointfund_qqec",
+    "description": "Total common equity (quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qqes",
+    "description": "Quarterly balance sheet item: total parent stockholders’ equity"
+  },
+  {
+    "id": "fnd7_ointfund_qqet",
+    "description": "Quarterly total stockholders’ equity"
+  },
+  {
+    "id": "fnd7_ointfund_qrktsp",
+    "description": "Redeemable preferred stock balance quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qrphsc",
+    "description": "Common shares used to calculate basic EPS for the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qrtld",
+    "description": "Reduction repayment of long-term debt as reported in the quarterly cash flow statement"
+  },
+  {
+    "id": "fnd7_ointfund_qsgoc",
+    "description": "Cost of goods sold for the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qsitld",
+    "description": "Cash inflow from issuance of long-term debt during the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qspac",
+    "description": "Capital surplus or share premium reserve (quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qspepo",
+    "description": "Quarterly earnings per share from operations, as reported"
+  },
+  {
+    "id": "fnd7_ointfund_qta",
+    "description": "Total assets at quarter end"
+  },
+  {
+    "id": "fnd7_ointfund_qtbim",
+    "description": "Quarterly total noncontrolling interests"
+  },
+  {
+    "id": "fnd7_ointfund_qtca",
+    "description": "Total current assets, quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qtcapd",
+    "description": "Accumulated depreciation, depletion, and amortization on the balance sheet (quarterly balance at period end)"
+  },
+  {
+    "id": "fnd7_ointfund_qtcer",
+    "description": "Total receivables quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qtcl",
+    "description": "Total current liabilities at quarter end"
+  },
+  {
+    "id": "fnd7_ointfund_qtgepp",
+    "description": "Gross property plant and equipment at quarter end"
+  },
+  {
+    "id": "fnd7_ointfund_qtl",
+    "description": "Total liabilities quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qtnepp",
+    "description": "Quarterly net property, plant and equipment (total)"
+  },
+  {
+    "id": "fnd7_ointfund_qtnix",
+    "description": "Interest expense (quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qtpaci",
+    "description": "Total invested capital as reported for the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qttld",
+    "description": "Total long-term debt outstanding at quarter end"
+  },
+  {
+    "id": "fnd7_ointfund_qtvni",
+    "description": "Total inventories at quarter end"
+  },
+  {
+    "id": "fnd7_ointfund_qtxt",
+    "description": "Total income taxes for the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qvalid",
+    "description": "Dilution available excluding extraordinary items, quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qvd",
+    "description": "Quarterly cash dividends paid (from the cash flow statement)"
+  },
+  {
+    "id": "fnd7_ointfund_qvipps",
+    "description": "Gain or loss from sale of property plant and equipment and investments reported in the cash flow statement for the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qvis",
+    "description": "Quarterly cash flow item: sale of investments"
+  },
+  {
+    "id": "fnd7_ointfund_qxeja",
+    "description": "Adjustment factor (company), cumulative by ex-date, quarterly"
+  },
+  {
+    "id": "fnd7_ointfund_qxfspe",
+    "description": "Diluted earnings per share excluding extraordinary items (quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qxpac",
+    "description": "Capital expenditures reported on the statement of cash flows (quarterly)"
+  },
+  {
+    "id": "fnd7_ointfund_qxpspe",
+    "description": "Basic earnings per share excluding extraordinary items for the quarter"
+  },
+  {
+    "id": "fnd7_ointfund_qxspeo",
+    "description": "Quarterly diluted earnings per share from operations, as reported"
+  },
+  {
+    "id": "fnd7_ointfund_qxspvd",
+    "description": "Quarterly dividends per share by ex-dividend date (gross of withholding), as known at the point in time"
+  },
+  {
+    "id": "fnd7_ointfund_r21fpeo",
+    "description": "Quarterly fundamental item: Earnings Per Share -> Diluted -> from Operations -> 12 Months Moving (unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_r21speo",
+    "description": "Quarterly Fundamental Item: Earnings per Share from Operations -> 12 Months Moving (Unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rq21hsc",
+    "description": "Quarterly fundamental item: Common shares used to calculate earnings per share -> 12 months moving (unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rqelas",
+    "description": "Quarterly Fundamental Item: Net Sales (Unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rqer",
+    "description": "Quarterly fundamental item: Retained earnings (unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rqoa",
+    "description": "Quarterly fundamental item: Other assets (unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rqpdbio",
+    "description": "Quarterly fundamental item: Operating income before depreciation (unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rqqec",
+    "description": "Quarterly Fundamental Item: Total Common Equity (Unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rqqes",
+    "description": "Quarterly fundamental item: Total Parent Stockholders' Equity (unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rqsgoc",
+    "description": "Quarterly fundamental item: Cost of Goods Sold (unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rqspac",
+    "description": "Quarterly fundamental item: Capital surplus (unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rqta",
+    "description": "Quarterly fundamental item: Assets - Total/Liabilities and Stockholders' Equity - Total (unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rqtca",
+    "description": "Quarterly fundamental item: Total Current Assets (unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rqtl",
+    "description": "Quarterly Fundamental Item: Total Liabilities (Unrestated)"
+  },
+  {
+    "id": "fnd7_ointfund_rqtpaci",
+    "description": "Quarterly fundamental item : Total invested capital (unrestated)"
+  },
+  {
+    "id": "fnd7_ointfundfn_fqsgoc",
+    "description": "Quarterly footnote information for Cost of goods sold (second file)"
+  },
+  {
+    "id": "fnd7_ointfundfn_fqspepo",
+    "description": "Quarterly footnote information: Earnings per share from operations"
+  },
+  {
+    "id": "fnd7_ointfundfn_fqta",
+    "description": "Quarterly footnote information for Total assets (second file)"
+  },
+  {
+    "id": "fnd7_ointfundfn_fqtnix",
+    "description": "Quarterly footnote information: Interest expense"
+  },
+  {
+    "id": "fnd7_ointhstfund_h21fpeo",
+    "description": "Diluted earnings per share from operations, trailing 12 months (historical)"
+  },
+  {
+    "id": "fnd7_ointhstfund_h21speo",
+    "description": "Earnings per share from operations, 12‑month moving (historical quarterly footnote)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hq21hsc",
+    "description": "Historical Quarterly footnote information: Common Shares Used to Calculate Earnings per Share -> 12-Months Moving (second file)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqagsx",
+    "description": "Historical Quarterly footnote information: Selling, General, and Administrative Expense (second file)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqelas",
+    "description": "Historical Quarterly footnote information: Net Sales (second file)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqer",
+    "description": "Historical Quarterly Footnote Information: Retained Earnings (Second File)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqipon",
+    "description": "Historical Quarterly footnote information: Nonoperating Income (Expense) (second file)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqoa",
+    "description": "Historical Quarterly footnote information: Other Assets (second file)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqpdbio",
+    "description": "Historical Quarterly footnote information: Operating Income Before Depreciation (second file)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqqec",
+    "description": "Historical Quarterly Footnote Information: Total Common Equity (Second File)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqqes",
+    "description": "Historical Quarterly footnote information: Total Parent Stockholder's equity (second file)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqsgoc",
+    "description": "Historical Quarterly Footnote Information: Cost of Goods Sold (Second File)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqspac",
+    "description": "Historical Quarterly Footnote Information: Capital Surplus (Second File)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqspepo",
+    "description": "Historical quarterly footnote information: Earnings per share from operations (second file)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqta",
+    "description": "Historical Quarterly Footnote Information: Total Gross Assets (Liabilities + Stockholder's Equity) (Second File)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqtca",
+    "description": "Historical Quarterly Footnote Information: Total Current Assets (Second File)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqtl",
+    "description": "Historical Quarterly Footnote Information: Total Liabilities (Includes Long-Term Debt + Deferred Credits as Well) (Second File)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqtpaci",
+    "description": "Historical Quarterly footnote information: Total Invested Capital (second file)"
+  },
+  {
+    "id": "fnd7_ointhstfund_hqxspeo",
+    "description": "Historical Quarterly footnote information: Earnings Per Share - Diluted - from Operations (second file)"
+  },
+  {
+    "id": "fnd7_ointhstfundfn_hfqohsc",
+    "description": "Historical Quarterly footnote information: Common shares outstanding (second file)"
+  },
+  {
+    "id": "fnd7_ointhstfundfn_hfqspepo",
+    "description": "Historical quarterly footnote information (second file) for earnings per share from operations"
+  },
+  {
+    "id": "future_option_other",
+    "description": "Other component of funds from operations for the quarter"
+  },
+  {
+    "id": "income_before_common",
+    "description": "Income before extraordinary items available for common, quarterly"
+  },
+  {
+    "id": "income_before_common_quarterly",
+    "description": "Unrestated quarterly figure for Income before extraordinary items available for common"
+  },
+  {
+    "id": "income_before_tax_quarterly",
+    "description": "Unrestated quarterly income before extraordinary items"
+  },
+  {
+    "id": "income_before_tax_quarterly_2",
+    "description": "Income before extraordinary items from the Statement of Cash Flows, quarterly"
+  },
+  {
+    "id": "income_tax_paid_quarterly",
+    "description": "Quarterly income taxes paid (cash flow statement)"
+  },
+  {
+    "id": "income_tax_provision_quarterly",
+    "description": "Quarterly income taxes payable (balance sheet)"
+  },
+  {
+    "id": "interest_expense_2",
+    "description": "Unrestated quarterly interest expense"
+  },
+  {
+    "id": "interest_expense_quarterly_2",
+    "description": "Total interest and related expense for the quarter"
+  },
+  {
+    "id": "interest_income_quarterly",
+    "description": "Net interest paid for the quarter (cash flow statement)"
+  },
+  {
+    "id": "inventory_change_quarterly_2",
+    "description": "Quarterly change in inventory, decrease (increase), cash flow item"
+  },
+  {
+    "id": "inventory_quarterly",
+    "description": "Total inventories (quarterly balance sheet)"
+  },
+  {
+    "id": "invested_capital_quarterly",
+    "description": "Total invested capital (quarterly)"
+  },
+  {
+    "id": "invested_capital_total_quarter",
+    "description": "Unrestated quarterly total invested capital"
+  },
+  {
+    "id": "investing_cash_flow_quarter",
+    "description": "Net cash flow from investing activities (quarterly)"
+  },
+  {
+    "id": "investment_and_other_assets_quarterly",
+    "description": "Other investing activities (quarterly cash flow item)"
+  },
+  {
+    "id": "investment_short_term_change_quarter",
+    "description": "Quarterly change in short-term investments (cash flow statement)"
+  },
+  {
+    "id": "lease_current_obligation_quarterly",
+    "description": "Quarterly total other current liabilities"
+  },
+  {
+    "id": "liabilities_total_quarter",
+    "description": "Quarterly total liabilities"
+  },
+  {
+    "id": "liabilities_total_quarterly",
+    "description": "Unrestated quarterly total liabilities"
+  },
+  {
+    "id": "long_term_obligation_quarterly",
+    "description": "Quarterly total other liabilities"
+  },
+  {
+    "id": "minority_interest_balance_quarterly",
+    "description": "Quarterly balance sheet amount of nonredeemable noncontrolling interests"
+  },
+  {
+    "id": "minority_interest_income_quarter",
+    "description": "Unrestated quarterly noncontrolling interest income"
+  },
+  {
+    "id": "minority_interest_income_quarterly",
+    "description": "Income before extraordinary items and noncontrolling interests, quarterly"
+  },
+  {
+    "id": "minority_interest_quarterly_2",
+    "description": "Quarterly balance sheet amount of noncontrolling interests"
+  },
+  {
+    "id": "minority_interest_quarterly_3",
+    "description": "Quarterly income attributable to noncontrolling interests (income statement)"
+  },
+  {
+    "id": "minority_interest_total_2",
+    "description": "Total noncontrolling interests (Balance Sheet), quarterly"
+  },
+  {
+    "id": "net_cash_flow_operating_quarterly",
+    "description": "Net cash flow from operating activities for the quarter"
+  },
+  {
+    "id": "net_income_quarter",
+    "description": "Income before extraordinary items, quarterly"
+  },
+  {
+    "id": "net_income_quarterly_2",
+    "description": "Net income (loss), quarterly, unrestated (initial)"
+  },
+  {
+    "id": "net_income_quarterly_3",
+    "description": "Net income (loss), quarterly"
+  },
+  {
+    "id": "net_income_quarterly_data_code",
+    "description": "Data quality/validation code for net income (loss), quarterly"
+  },
+  {
+    "id": "net_operating_income_quarterly",
+    "description": "Nonoperating income (expense) for the quarter"
+  },
+  {
+    "id": "net_operating_income_quarterly_2",
+    "description": "Unrestated (initial) quarterly nonoperating income (expense)"
+  },
+  {
+    "id": "net_sales_quarter",
+    "description": "Unrestated (initial) net sales/revenue for the quarter"
+  },
+  {
+    "id": "net_sales_quarterly_2",
+    "description": "Net sales/revenue for the quarter"
+  },
+  {
+    "id": "net_sales_quarterly_data_code",
+    "description": "Data code/quality indicator for SALEQ"
+  },
+  {
+    "id": "operating_eps_12_months_rolling",
+    "description": "Unrestated (initial) EPS from operations, trailing 12 months"
+  },
+  {
+    "id": "operating_eps_ex_items_quarterly",
+    "description": "Unrestated (initial) diluted quarterly EPS from operations"
+  },
+  {
+    "id": "operating_eps_quarterly",
+    "description": "Earnings per Share from Operations for the quarter (unrestated/as initially reported)"
+  },
+  {
+    "id": "operating_eps_quarterly_2",
+    "description": "Earnings per share from operations for the quarter"
+  },
+  {
+    "id": "operating_income_before_depreciation_quarter",
+    "description": "Unrestated (initial) operating income before depreciation, quarterly"
+  },
+  {
+    "id": "operating_income_before_depreciation_quarterly",
+    "description": "Operating income before depreciation, quarterly"
+  },
+  {
+    "id": "operating_lease_cash_flow_quarterly",
+    "description": "Net change in other assets and liabilities during the quarter (cash flow statement)"
+  },
+  {
+    "id": "preferred_dividends_paid_quarterly",
+    "description": "Quarterly preferred cash dividends, unrestated"
+  },
+  {
+    "id": "preferred_dividends_quarterly",
+    "description": "Quarterly preferred/preference cash dividends"
+  },
+  {
+    "id": "preferred_stock_quarterly_2",
+    "description": "Total redeemable preferred stock reported for the quarter"
+  },
+  {
+    "id": "preferred_stock_quarterly_3",
+    "description": "Total preferred/preference stock (capital) reported for the quarter"
+  },
+  {
+    "id": "preferred_stock_quarterly_value",
+    "description": "Purchase of common and preferred stock during the quarter (cash outflow for share repurchases)"
+  },
+  {
+    "id": "pretax_income_quarter",
+    "description": "Pretax income for the quarter"
+  },
+  {
+    "id": "pretax_income_quarterly",
+    "description": "Pretax income for the quarter (unrestated/as initially reported)"
+  },
+  {
+    "id": "property_plant_equipment_gross_quarter",
+    "description": "Total gross property, plant and equipment reported for the quarter"
+  },
+  {
+    "id": "property_plant_equipment_net_quarterly",
+    "description": "Total net property, plant and equipment reported for the quarter"
+  },
+  {
+    "id": "quarterly_change_in_accounts_payable",
+    "description": "Increase or decrease in accounts payable and accrued liabilities during the quarter (cash flow)"
+  },
+  {
+    "id": "quarterly_change_in_accruals",
+    "description": "Unrestated (initial) quarterly cumulative effect of accounting changes"
+  },
+  {
+    "id": "quarterly_change_in_accrued_taxes",
+    "description": "Change in accrued income taxes (increase/decrease), quarterly cash flow item"
+  },
+  {
+    "id": "quarterly_change_in_inventories",
+    "description": "Increase in investments (quarterly cash flow item)"
+  },
+  {
+    "id": "receivables_change_quarterly",
+    "description": "Quarterly change in accounts receivable (decrease/increase) from the cash flow statement"
+  },
+  {
+    "id": "receivables_total_quarterly",
+    "description": "Total receivables at quarter end"
+  },
+  {
+    "id": "research_development_expense_quarterly_2",
+    "description": "Quarterly research and development expense"
+  },
+  {
+    "id": "retained_earnings_quarterly_rolling",
+    "description": "Retained earnings balance at quarter end"
+  },
+  {
+    "id": "selling_general_admin_expense_quarter",
+    "description": "Quarterly selling, general and administrative expense"
+  },
+  {
+    "id": "selling_general_admin_expense_quarterly_2",
+    "description": "Unrestated quarterly selling, general and administrative expense"
+  },
+  {
+    "id": "selling_general_admin_expense_quarterly_data_code",
+    "description": "Data quality/status code for the unrestated quarterly selling, general and administrative expense"
+  },
+  {
+    "id": "shares_for_eps_12m_moving",
+    "description": "Common shares used to calculate earnings per share, 12-month moving"
+  },
+  {
+    "id": "shares_used_for_eps_12m_moving_quarterly",
+    "description": "Unrestated 12-month moving common shares used to calculate EPS"
+  },
+  {
+    "id": "special_equity_quarterly",
+    "description": "Sale of property, plant, and equipment (cash inflow), quarterly"
+  },
+  {
+    "id": "special_items_data_code_2",
+    "description": "Data validation/quality code for Special Items (quarterly)"
+  },
+  {
+    "id": "special_items_quarterly_2",
+    "description": "Abandonments and Disallowances Adjustment plus Special Items, quarterly, unrestated (initial report)"
+  },
+  {
+    "id": "special_items_quarterly_3",
+    "description": "Special items for the quarter (unusual or one-time items)"
+  },
+  {
+    "id": "special_items_quarterly_data_code",
+    "description": "Data validation/quality code for SPIQR (unrestated quarterly special items)"
+  },
+  {
+    "id": "stockholders_equity_quarterly",
+    "description": "Total stockholders’ equity at quarter end"
+  },
+  {
+    "id": "stockholders_equity_quarterly_reported",
+    "description": "Unrestated (initial) total parent stockholders’ equity at quarter end"
+  },
+  {
+    "id": "supplemental_investment_quarterly",
+    "description": "Proceeds from sale of investments for the quarter"
+  },
+  {
+    "id": "supplemental_preferred_items_quarterly",
+    "description": "Gain (loss) on sale of property, plant and equipment and investments, quarterly"
+  },
+  {
+    "id": "tax_expense_quarterly",
+    "description": "Quarterly total income tax expense, unrestated"
+  },
+  {
+    "id": "total_assets_quarterly_2",
+    "description": "Total assets (quarterly)"
+  },
+  {
+    "id": "total_assets_quarterly_3",
+    "description": "Total assets (equals total liabilities and stockholders’ equity), unrestated (quarterly)"
+  },
+  {
+    "id": "total_equity_quarterly_2",
+    "description": "Total stockholders’ equity, quarterly"
+  },
+  {
+    "id": "total_taxes_quarterly_2",
+    "description": "Quarterly deferred taxes from the cash flow statement"
+  },
+  {
+    "id": "total_taxes_quarterly_rolling",
+    "description": "Quarterly total income tax expense"
+  },
+  {
+    "id": "treasury_stock_quarterly",
+    "description": "Total treasury stock dollar amount (contra-equity balance) at quarter end"
+  }
+]
