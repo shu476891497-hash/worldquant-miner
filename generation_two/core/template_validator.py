@@ -120,8 +120,10 @@ class TemplateValidator:
         cleaned = re.sub(r'\)\s+(\d+)', r'), \1', cleaned)  # ) 20 -> ), 20
         cleaned = re.sub(r'\)\s+([a-z][a-z0-9_]+)', r'), \1', cleaned)  # ) field -> ), field
         
-        # Fix double operators (rankrank -> rank, ts_meants_mean -> ts_mean)
-        cleaned = re.sub(r'([a-z_]+)\1', r'\1', cleaned, flags=re.IGNORECASE)
+        # Fix double operators (rankrank → rank, ts_meants_mean → ts_mean)
+        # NOTE: Only match complete WORD-level duplicates, not character-level!
+        # The old regex ([a-z_]+)\1 would destroy backfill→backfil, ts_corr→ts_cor
+        cleaned = re.sub(r'\b([a-z_]{2,})\1\b', r'\1', cleaned, flags=re.IGNORECASE)
         
         # Fix invalid operator combinations (add(field1 + field2) -> field1 + field2)
         cleaned = re.sub(r'\b(add|multiply|subtract|divide)\s*\(([^)]+\+[^)]+)\)', r'(\2)', cleaned, flags=re.IGNORECASE)

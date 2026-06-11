@@ -378,19 +378,28 @@ class CredentialManager:
         """Check if user is authenticated"""
         return self.authenticated
     
-    def authenticate(self, auto_load: bool = True, auto_prompt: bool = True) -> bool:
+    def authenticate(self, auto_load: bool = True, auto_prompt: bool = True, skip_auth_json: bool = False) -> bool:
         """
         Complete authentication flow.
         Priority: auth.json cookies > credential.txt password > prompt
+        
+        Args:
+            auto_load: Try to load credentials from file automatically
+            auto_prompt: Prompt user for credentials if file not found
+            skip_auth_json: If True, skip auth.json cookie login (for multi-instance safety)
         
         Returns:
             True if authenticated, False otherwise
         """
         # Step 0: Try saved cookies first (bypasses Biometrics completely)
-        logger.info("尝试 auth.json Cookie 登录...")
-        if self.try_auth_json():
-            return True
-        logger.info("auth.json 不可用，尝试密码登录...")
+        # SKIP this in multi-instance mode to prevent silent account switching!
+        if not skip_auth_json:
+            logger.info("尝试 auth.json Cookie 登录...")
+            if self.try_auth_json():
+                return True
+            logger.info("auth.json 不可用，尝试密码登录...")
+        else:
+            logger.info("跳过 auth.json (multi-instance safety mode)")
 
         # Step 1: Try to load from credential file
         if auto_load:

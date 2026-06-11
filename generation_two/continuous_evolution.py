@@ -2,6 +2,20 @@ import json
 import logging
 import os
 import sys
+
+# Fix Windows GBK encoding issue - MUST be before any generation_two imports
+# (ollama_manager.py prints Unicode ✓/ℹ during import)
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 import time
 import threading
 import random
@@ -267,60 +281,6 @@ def _load_ai_cache_seeds(min_sharpe: float = 0.5, limit: int = 30) -> list:
         return []
 
 
-# =========================================================
-# ② AI Manager — 优先使用 DeepSeek API，回退到本地 Ollama
-#    DeepSeek-V3 (deepseek-chat): ~¥0.5/M input, ¥2/M output，速度快，质量远超本地小模型
-#    配置文件: generation_two/ai_config.json
-# =========================================================
-def _build_ollama_manager():
-    """
-    初始化 AI 生成器。
-    优先级：DeepSeek API (云端) > 本地 Ollama
-    DeepSeek-V3 推荐用 deepseek-chat，性价比最高。
-    """
-    # ---- 优先尝试 DeepSeek API ----
-    try:
-        ai_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai_config.json")
-        if os.path.exists(ai_config_path):
-            with open(ai_config_path, "r", encoding="utf-8") as f:
-                ai_cfg = json.load(f)
-            if ai_cfg.get("provider") == "deepseek" and ai_cfg.get("api_key"):
-                from generation_two.ollama.deepseek_manager import DeepSeekManager
-                manager = DeepSeekManager(
-                    api_key=ai_cfg["api_key"],
-                    model=ai_cfg.get("model", "deepseek-chat"),
-                    timeout=ai_cfg.get("timeout", 60),
-                    max_retries=ai_cfg.get("max_retries", 3),
-                )
-                if manager._check_availability():
-                    logging.info(f"[DeepSeek] 已连接，使用模型: {manager.model} (性价比最优)")
-                    return manager
-                else:
-                    logging.warning("[DeepSeek] API Key 验证失败，回退到本地 Ollama")
-    except Exception as e:
-        logging.warning(f"[DeepSeek] 初始化失败，回退到本地 Ollama: {e}")
-
-    # ---- 回退到本地 Ollama ----
-    try:
-        from generation_two.ollama.ollama_manager import OllamaManager
-        manager = OllamaManager(
-            base_url="http://localhost:11434",
-            model="qwen2.5-coder:7b",
-            timeout=90,
-            max_retries=2,
-            rate_limit=1.0
-        )
-        if manager._check_availability():
-            logging.info(f"[Ollama] 已连接，使用模型: {manager.model}")
-            return manager
-        else:
-            logging.warning("[Ollama] 服务不可用，AI 生成功能已禁用")
-            return None
-    except Exception as e:
-        logging.warning(f"[Ollama] 初始化失败，AI 生成功能已禁用: {e}")
-        return None
-
-
 
 # WQ Brain FASTEXPR 合法算子速查表（供 AI Prompt 参考）
 _WQ_OPERATOR_CHEATSHEET = """
@@ -410,158 +370,6 @@ def _parse_ai_alpha_response(raw: str) -> list:
 # 这是解决 SELF_CORRELATION 的根本手段 ——
 # 让每代因子来自不同的经济学逻辑家族
 # =========================================================
-_RESEARCH_THEMES = [
-    {
-        "name": "📊 波动率曲面 (Vol Surface)",
-        "hypothesis": "期权隐含波动率的期限结构和偏斜包含市场对个股未来风险的预期信息",
-        "hint": "使用 implied_volatility_call_120, implied_volatility_put_120, implied_volatility_call_30, implied_volatility_put_30 字段，"
-                "研究不同期限/方向的隐含波动率差异、比率、变化速度"
-    },
-    {
-        "name": "💰 盈利质量突变 (Earnings Quality Shock)",
-        "hypothesis": "资产负债表中权益/收入比例的异常变化预示利润质量的真实改变",
-        "hint": "使用 fnd6_teq, income, net_income, operating_income, ebitda 字段，研究比率的时间变化和截面异常"
-    },
-    {
-        "name": "🔄 资本结构动态 (Capital Structure Dynamics)",
-        "hypothesis": "公司主动改变杠杆率和资本密度的行为，预示未来股票收益",
-        "hint": "使用 debt_lt, equity, assets, cap, capex, cashflow_dividends 字段，"
-                "研究杠杆变化速度、资产增长减去收益增长的异常"
-    },
-    {
-        "name": "📈 分析师修正动量 (Analyst Revision Momentum)",
-        "hypothesis": "分析师对未来财务预测的修正方向和幅度包含私有信息",
-        "hint": "使用 anl4_adjusted_netincome_ft, anl4_bvps_flag, anl4_capex_flag 字段，研究预测变化的持续性"
-    },
-    {
-        "name": "📉 中短期均值回复 (Mean Reversion)",
-        "hypothesis": "过度反应导致短期价格偏离基本面，之后发生回复",
-        "hint": "使用 close, returns, vwap 字段，研究 ts_zscore, ts_av_diff 等标准化偏差，"
-                "然后取负号做反转信号，窗口 5-20 天"
-    },
-    {
-        "name": "🌊 成交量-价格交互 (Volume-Price Interaction)",
-        "hypothesis": "成交量与价格变化的组合模式揭示机构资金流向",
-        "hint": "使用 volume, close, vwap, returns 字段，研究成交量放大时的价格方向、量价背离"
-    },
-    {
-        "name": "🏭 行业相对强弱 (Sector Relative Strength)",
-        "hypothesis": "行业内部相对强度因子比绝对值因子有更强的选股能力",
-        "hint": "大量使用 group_rank(x, subindustry), group_zscore(x, industry), group_neutralize(x, sector)，"
-                "在组内比较而非全市场比较"
-    },
-    {
-        "name": "📦 现金流生成能力 (Free Cash Flow Generation)",
-        "hypothesis": "自由现金流（经营现金流 - 资本支出）的生成能力和稳定性预示价值",
-        "hint": "使用 cashflow_dividends, capex, ebitda, sales 字段，研究现金转化率、FCF/市值、FCF 增长稳定性"
-    },
-    {
-        "name": "⚡ 价格动量衰减 (Momentum Decay Structure)",
-        "hypothesis": "不同时间窗口的动量信号的半衰期不同，组合多窗口动量可以捕捉趋势转折",
-        "hint": "使用 close, returns 字段，构建 ts_decay_linear 或 ts_decay_exp_window 加权的多窗口动量组合"
-    },
-    {
-        "name": "🎯 盈利预期差 (Earnings Surprise)",
-        "hypothesis": "实际盈利数据与预期之间的差距（超预期/低于预期）驱动后续股价反应",
-        "hint": "使用 actual_eps_value_quarterly, actual_sales_value_quarterly, actual_cashflow_per_share_value_quarterly 字段，"
-                "研究实际值的时序变化（ts_delta, ts_av_diff）作为惊喜代理"
-    },
-    {
-        "name": "🔬 微观结构流动性 (Microstructure Liquidity)",
-        "hypothesis": "相对成交量（相对于历史均值的异动）反映机构交易意图",
-        "hint": "使用 volume, vwap, close 字段，研究成交量相对历史均值的偏离、高低波动率时期的成交量特征"
-    },
-    {
-        "name": "🌐 长期基本面趋势 (Long-Term Fundamental Trend)",
-        "hypothesis": "销售额、EBITDA、净利润在更长时间尺度（1-2年）的增长趋势包含价值信息",
-        "hint": "使用 sales, ebitda, net_income 字段，使用 ts_delta(x, 252), ts_delta(x, 504) 等长窗口，"
-                "研究同比增速的加速/减速"
-    },
-    # ════════════════════════════════════════════════════════════════
-    # 🌊 蓝海研究主题（覆盖 News/Sentiment/Social/Model/Event 等低竞争数据集）
-    # ════════════════════════════════════════════════════════════════
-    {
-        "name": "📰 新闻情绪动量 (News Sentiment Momentum)",
-        "hypothesis": "新闻发布密度和情绪极值包含短期方向性信息，新闻VWAP的变化速度预示价格趋势",
-        "hint": "使用 nws12_afterhsz_prevwap, news_all_vwap, news_mov_vol, nws12_afterhsz_nstories 字段，"
-                "研究新闻VWAP的时序动量、新闻数量异常、新闻波动率极值信号"
-    },
-    {
-        "name": "📱 社交媒体热度异常 (Social Buzz Anomaly)",
-        "hypothesis": "社交媒体讨论量的突然变化揭示零售投资者情绪极端，可作反转信号",
-        "hint": "使用 scl12_buzz, scl12_buzzvec, scl12_alltype_buzzvec 字段，"
-                "研究buzz的时序z-score、buzz与returns的负相关、buzz极值反转"
-    },
-    {
-        "name": "🎭 复合情绪信号 (Composite Sentiment Signal)",
-        "hypothesis": "多来源情绪指标（新闻+社媒+分析师）的分歧或共振包含alpha信息",
-        "hint": "使用 snt5_* 情绪字段和 news_* 新闻字段，研究情绪指标之间的相关性变化、"
-                "情绪极端值与基本面的背离"
-    },
-    {
-        "name": "🤖 模型因子交互 (Model-Derived Factor Interaction)",
-        "hypothesis": "WQ预构建的模型因子（如多因子模型残差）与原始基本面的偏差揭示定价错误",
-        "hint": "使用 mdl3_* 模型字段，研究模型信号的时序排名、模型信号与行业内排名的交互"
-    },
-    {
-        "name": "📋 事件驱动季报 (Event-Driven Quarterly Reports)",
-        "hypothesis": "季报事件前后的财务指标异常变化（非连续性）预示后续股价反应",
-        "hint": "使用 fnd6_newqeventv110_* 和 fnd6_eventv110_* 字段（如 pncwiepq, rcaq, prcepsq），"
-                "这些是极低竞争度字段(2-5用户)，研究事件变量的时序排名和截面异常"
-    },
-    {
-        "name": "🎯 期权Greeks截面 (Option Greeks Cross-Section)",
-        "hypothesis": "期权Greeks（delta/gamma/theta/vega）的截面分布揭示做市商对冲行为和隐含方向",
-        "hint": "使用 opt11_delta, opt11_gamma, put_breakeven_*, call_breakeven_* 字段，"
-                "研究Greeks的行业内排名、Greeks之间的比率信号"
-    },
-    {
-        "name": "📊 分析师指引差异 (Analyst Guidance Divergence)",
-        "hypothesis": "管理层指引值与分析师预期之间的差距（guidance gap）包含内部信息",
-        "hint": "使用 anl4_fsguidanceafv4_minguidance, anl4_fsguidanceafv4_maxguidance, "
-                "operating_profit_before_depr_amort_max_guidance_qtr 字段，"
-                "研究指引范围的宽度变化、指引与实际值的偏差"
-    },
-    {
-        "name": "🌐 宏观政策敏感度 (Macro Policy Sensitivity)",
-        "hypothesis": "个股对宏观政策风险指标（GPR/EPU）的敏感度差异预示不同宏观环境下的收益",
-        "hint": "使用 mdf_gpr, mdf_epu 等宏观字段，与基本面字段交互，"
-                "研究个股收益率与宏观指标的ts_corr及其变化"
-    },
-]
-
-
-# =========================================================
-# D0 专属研究主题（供 Ollama D0 因子生成使用）
-# D0 因子的核心信号：跳空缺口 open/ts_delay(close,1)-1、隔夜收益率、
-# 滞后价量、以及这些信号与基本面/情绪的交互
-# =========================================================
-_D0_RESEARCH_THEMES = [
-    {
-        "name": "🌅 跳空缺口信号 (Opening Gap Signal)",
-        "hypothesis": "隔夜信息在开盘跳空中被定价，跳空方向与基本面/情绪的交互预测日内收益",
-        "hint": "使用 open/ts_delay(close,1)-1 作为核心跳空信号，结合 fundamental/analyst 字段，"
-                "研究跳空幅度与盈利质量、杠杆率、现金流的关系"
-    },
-    {
-        "name": "📰 隔夜新闻定价 (Overnight News Pricing)",
-        "hypothesis": "新闻和社交媒体情绪在隔夜累积，次日开盘价反映这些信息的边际定价",
-        "hint": "使用 news/sentiment/socialmedia 类别字段的 ts_rank/ts_zscore，与 open/ts_delay(close,1) 交互，"
-                "研究情绪极值时跳空信号的预测能力变化"
-    },
-    {
-        "name": "⚡ 期权隐含波动率日内择时 (IV Intraday Timing)",
-        "hypothesis": "IV 的时序变化方向暗示做市商对次日波动的预期，可作为 D0 择时信号",
-        "hint": "使用 implied_volatility_call_120, implied_volatility_put_120, implied_volatility_call_30, implied_volatility_put_30，"
-                "研究 IV 变化速度与跳空信号的组合"
-    },
-    {
-        "name": "🔮 分析师修正 × 跳空反应 (Analyst Revision × Gap Reaction)",
-        "hypothesis": "分析师预测修正后的首个交易日，跳空方向和幅度揭示市场对修正的真实反应",
-        "hint": "使用 anl4_adjusted_netincome_ft, anl4_bvps_flag, anl4_capex_flag 的 ts_delta/days_from_last_change，"
-                "与 open/ts_delay(close,1) 交互"
-    },
-]
 
 
 # =========================================================
@@ -670,6 +478,35 @@ VRP_EXPR_POOL = [
     "trade_when(ts_delay(volume,1) / adv20 > 1.5, group_neutralize(rank(implied_volatility_call_120 / parkinson_volatility_120), subindustry), 0)",
 ]
 
+# =========================================================
+# Layer-F: Ret/DD 优化层 — 直接提升 IQC OS 分数
+# 当前 OS Score 瓶颈是 Ret/DD = 0.527
+# 目标：筛选 Sharpe 尚可 (>1.0) 但 Returns/Drawdown 比差的因子
+# 通过更激进的参数（紧截断、重衰减、小宇宙）降 DD 提 Returns
+# =========================================================
+RETDD_LAYER_F_SHARPE_MIN = 1.0    # 只要 Sharpe>1.0 就值得尝试
+RETDD_LAYER_F_SHARPE_MAX = 1.5    # Sharpe已经很好的不需要这层
+RETDD_LAYER_F_FITNESS_MIN = 0.8   # Fitness至少0.8
+MAX_RETDD_LAYER_F_PER_GEN = 5     # 每代最多优化5个
+
+RETDD_NEAR_MISS_VARIANTS = [
+    # 策略1: 超紧截断 — 砍极端持仓 → Drawdown 直接减半
+    {"name": "[RD]trunc=0.03+TOP1000", "decay": 0, "truncation": 0.03, "neutralization": "INDUSTRY",    "universe": "TOP1000", "nanHandling": "OFF", "testPeriod": "P5Y0M0D"},
+    {"name": "[RD]trunc=0.02+SUBIND",  "decay": 0, "truncation": 0.02, "neutralization": "SUBINDUSTRY", "universe": "TOP1000", "nanHandling": "OFF", "testPeriod": "P5Y0M0D"},
+    # 策略2: 重衰减 — 平滑PnL曲线 → 降低DD spikes
+    {"name": "[RD]decay=8+trunc=0.04", "decay": 8, "truncation": 0.04, "neutralization": "INDUSTRY",    "universe": "TOP1000", "nanHandling": "OFF", "testPeriod": "P5Y0M0D"},
+    {"name": "[RD]decay=10+trunc=0.03","decay": 10,"truncation": 0.03, "neutralization": "SUBINDUSTRY", "universe": "TOP1000", "nanHandling": "OFF", "testPeriod": "P5Y0M0D"},
+    # 策略3: 小宇宙 — TOP500流动性最好 → DD天然更小
+    {"name": "[RD]TOP500+trunc=0.03",  "decay": 4, "truncation": 0.03, "neutralization": "INDUSTRY",    "universe": "TOP500",  "nanHandling": "OFF", "testPeriod": "P5Y0M0D"},
+    {"name": "[RD]TOP500+decay=8",     "decay": 8, "truncation": 0.04, "neutralization": "SUBINDUSTRY", "universe": "TOP500",  "nanHandling": "OFF", "testPeriod": "P5Y0M0D"},
+    # 策略4: backfill + 紧截断 — 更多覆盖=更分散=更低DD
+    {"name": "[RD]bf+trunc=0.03",      "decay": 4, "truncation": 0.03, "neutralization": "INDUSTRY",    "universe": "TOP1000", "nanHandling": "ON",  "testPeriod": "P5Y0M0D"},
+    {"name": "[RD]bf+TOP500+decay=6",  "decay": 6, "truncation": 0.03, "neutralization": "SUBINDUSTRY", "universe": "TOP500",  "nanHandling": "ON",  "testPeriod": "P5Y0M0D"},
+    # 策略5: 3年测试期 — 更短回测可能DD更小
+    {"name": "[RD]3Y+trunc=0.03",      "decay": 4, "truncation": 0.03, "neutralization": "INDUSTRY",    "universe": "TOP1000", "nanHandling": "OFF", "testPeriod": "P3Y0M0D"},
+    {"name": "[RD]3Y+TOP500+bf",       "decay": 6, "truncation": 0.03, "neutralization": "SUBINDUSTRY", "universe": "TOP500",  "nanHandling": "ON",  "testPeriod": "P3Y0M0D"},
+]
+
 _ALPHA_TEMPLATES = [
     # ════════════════════════════════════════════════════════════════
     # 全新模板库 v3 —— 极致蓝海版
@@ -774,6 +611,78 @@ _ALPHA_TEMPLATES = [
 
     # ── S25. 加速度 × 非线性 ──
     "group_neutralize(signed_power(ts_delta(ts_delta({F}, 5), 5), 0.5), subindustry)",
+
+    # ════════════════════════════════════════════════════════════════
+    # v4 新增: NaN 处理模板 (源自 WQ Brain 论坛最佳实践)
+    # 策略: 提升 coverage、降低 turnover 波动、处理基本面/事件数据缺失
+    # ════════════════════════════════════════════════════════════════
+
+    # ── S26. ts_backfill 补缺 ── 对低频基本面数据特别有效
+    "group_rank(ts_backfill({F}, 5), subindustry)",
+    "group_neutralize(ts_zscore(ts_backfill({F}, 10), {W}), subindustry)",
+    "group_rank(ts_delta(ts_backfill({F}, 5), {W}), subindustry)",
+    "group_neutralize(rank(ts_backfill({F1}, 10)) - rank(ts_backfill({F2}, 10)), subindustry)",
+
+    # ── S27. is_nan + if_else 条件填充 ── 智能替代，保留信号逻辑
+    "group_neutralize(if_else(is_nan({F1}), ts_zscore({F2}, 20), rank({F1})), subindustry)",
+    "group_rank(if_else(is_nan({F1}), group_mean({F2}, subindustry), {F1}), subindustry)",
+    "trade_when(1 - is_nan({F1}), group_rank({F1}, subindustry), 0)",
+    "group_neutralize(if_else(is_nan({F1}), 0, rank({F1}) - rank({F2})), subindustry)",
+
+    # ── S28. to_nan 清理 + 反转填充 ── 去除噪声零值 / 填充缺失
+    "group_rank(to_nan(rank({F}), 0), subindustry)",
+    "group_neutralize(ts_zscore(to_nan({F}, 0, reverse=true), {W}), subindustry)",
+
+    # ── S29. NaN 覆盖率信号 ── 数据质量本身就是 alpha
+    "group_rank(1 - ts_count_nans({F}, {W}) / {W}, subindustry)",
+    "group_neutralize(ts_count_nans({F1}, {W}) - ts_count_nans({F2}, {W}), subindustry)",
+    "trade_when(ts_count_nans({F}, 60) / 60 < 0.3, group_rank({F}, subindustry), 0)",
+
+    # ════════════════════════════════════════════════════════════════
+    # v4 新增: Pasteurize 模板 (Pasteurization=OFF 场景)
+    # 策略: Universe 内排名 vs 全市场排名 的差值 → 相对优势 alpha
+    # 使用时需设置 Pasteurization="Off"
+    # ════════════════════════════════════════════════════════════════
+
+    # ── S30. 跨 Universe 排名差 ── 核心模式
+    "group_rank(pasteurize({F}), subindustry) - group_rank({F}, subindustry)",
+    "group_rank(pasteurize({F1}), sector) - group_rank({F1}, sector)",
+    "group_neutralize(rank(pasteurize({F})) - rank({F}), subindustry)",
+
+    # ── S31. Pasteurize 安全除法 ── 防止 INF 权重集中
+    "group_rank(pasteurize({F1} / ({F2} + 1e-6)), subindustry)",
+    "group_neutralize(pasteurize(ts_delta({F1}, {W}) / (ts_std_dev({F1}, {W}) + 1e-6)), subindustry)",
+    "group_rank(pasteurize(signed_power(rank({F1}) - rank({F2}), 2)), subindustry)",
+
+    # ── S32. Pasteurize + NaN 组合 ── 双重保护
+    "group_neutralize(pasteurize(ts_backfill({F}, 5)), subindustry)",
+    "group_rank(pasteurize(if_else(is_nan({F1}), 0, rank({F1}))), subindustry)",
+    "group_neutralize(ts_zscore(pasteurize(ts_backfill({F}, 10)), {W}), subindustry)",
+
+    # ════════════════════════════════════════════════════════════════
+    # v5 新增: 高 Ret/DD 专用模板
+    # 基于服务器 Top Ret/DD 因子分析：
+    #   Top1-4: ts_corr(基本面, implied_vol) → Ret/DD=3.6~4.4
+    #   Top5: ts_zscore(implied_vol_360) → Ret/DD=3.43
+    # 核心洞察: 基本面×波动率交叉 + 重衰减 = 最优 Ret/DD
+    # ════════════════════════════════════════════════════════════════
+
+    # ── S33. 基本面×波动率相关性 ── 服务器验证的最佳 Ret/DD 策略
+    "-1 * group_rank(ts_corr({F1}, {F2}, {W}), subindustry)",
+    "group_neutralize(-1 * ts_corr({F1}, {F2}, {W}), subindustry)",
+    "group_rank(ts_corr(ts_delta({F1}, 5), ts_delta({F2}, 5), {W}), subindustry)",
+    "ts_decay_linear(group_rank(ts_corr({F1}, {F2}, {W}), subindustry), 5)",
+
+    # ── S34. 重衰减平滑 ── 降低 DD spikes（decay=5~10）
+    "ts_decay_linear(group_neutralize(rank({F1}) - rank({F2}), subindustry), 10)",
+    "ts_decay_exp_window(group_rank({F1}, subindustry), {W}, 3)",
+    "ts_decay_linear(group_rank(ts_zscore({F1}, {W}), subindustry), 8)",
+    "ts_decay_linear(-1 * group_rank(ts_corr({F1}, {F2}, {W}), subindustry), 5)",
+
+    # ── S35. 截面动量分歧 ── 低 Drawdown 特性
+    "group_rank(rank({F1}) - ts_mean(rank({F1}), {W}), subindustry)",
+    "group_neutralize(ts_zscore(rank({F1}) - rank({F2}), {W}), subindustry)",
+    "group_rank(ts_regression({F1}, {F2}, {W}, 2), subindustry)",
 ]
 
 # ★★★ 骨架工厂扩容：从 40 个手工骨架 → 2200+ 个有金融意义的骨架 ★★★
@@ -881,6 +790,30 @@ _D0_ALPHA_TEMPLATES = [
 
     # ── D0-S19. zscore of rank spread ──
     "group_rank(ts_zscore(group_rank(ts_delay({FUND_F},1), subindustry) - group_rank(ts_delay({BLUE_F},1), subindustry), {W}), sector)",
+
+    # ════════════════════════════════════════════════════════════════
+    # v4 新增: D0 NaN 处理模板 (基本面/分析师数据高频缺失场景)
+    # D0 数据延迟1天，基本面季度更新 → NaN 特别多 → backfill 极其重要
+    # ════════════════════════════════════════════════════════════════
+
+    # ── D0-S20. ts_backfill 补缺 ── D0 基本面必备
+    "group_rank(ts_backfill(ts_delay({FUND_F},1), 5), subindustry)",
+    "group_neutralize(ts_zscore(ts_backfill(ts_delay({FUND_F},1), 10), {W}), subindustry)",
+    "group_rank(ts_delta(ts_backfill(ts_delay({FUND_F},1), 5), {W}), subindustry)",
+    "group_neutralize(rank(ts_backfill(ts_delay({FUND_F},1), 10)) - rank(ts_backfill(ts_delay({BLUE_F},1), 10)), subindustry)",
+
+    # ── D0-S21. is_nan + if_else 条件填充 (D0版) ──
+    "group_neutralize(if_else(is_nan(ts_delay({FUND_F},1)), ts_zscore(ts_delay({BLUE_F},1), 20), rank(ts_delay({FUND_F},1))), subindustry)",
+    "group_rank(if_else(is_nan(ts_delay({FUND_F},1)), group_mean(ts_delay({BLUE_F},1), subindustry), ts_delay({FUND_F},1)), subindustry)",
+    "trade_when(1 - is_nan(ts_delay({FUND_F},1)), group_rank(ts_delay({FUND_F},1), subindustry), 0)",
+
+    # ── D0-S22. NaN 覆盖率信号 (D0版) ── 报表披露频率差异
+    "group_rank(1 - ts_count_nans(ts_delay({FUND_F},1), {W}) / {W}, subindustry)",
+    "group_neutralize(ts_count_nans(ts_delay({FUND_F},1), 60) - ts_count_nans(ts_delay({ANALYST_F},1), 60), subindustry)",
+
+    # ── D0-S23. Pasteurize 安全除法 (D0版) ── 防止 INF
+    "group_rank(pasteurize(ts_delay({FUND_F},1) / (ts_delay({BLUE_F},1) + 1e-6)), subindustry)",
+    "group_neutralize(pasteurize(ts_backfill(ts_delay({FUND_F},1), 5)), subindustry)",
 ]
 
 # D0 禁用的日频字段（提交前必须净化）
@@ -978,6 +911,368 @@ _FUNDAMENTAL_FIELDS = [
 ]
 _TEMPLATE_WINDOWS = [5, 8, 10, 15, 20, 30, 60]
 
+
+# ════════════════════════════════════════════════════════════════
+# Sniper Mode: 研究驱动的精准模板 (实例1 专用)
+# 策略: 基于 WQ 论坛/论文分析，指哪打哪
+# 以后新增研究模板直接加到这里
+# ════════════════════════════════════════════════════════════════
+
+_SENTIMENT1_FIELDS = [
+    # 核心情绪分数 (高换手, 需 decay)
+    "snt1_cored1_score",
+    # 分析师推荐 — ALL 17 fields verified in cache
+    "snt1_d1_buyrecpercent", "snt1_d1_sellrecpercent", "snt1_d1_netrecpercent",
+    "snt1_d1_analystcoverage",
+    # 盈利惊喜/修正
+    "snt1_d1_earningssurprise", "snt1_d1_earningsrevision",
+    "snt1_d1_netearningsrevision", "snt1_d1_earningstorpedo",
+    # 目标价
+    "snt1_d1_uptargetpercent", "snt1_d1_downtargetpercent", "snt1_d1_nettargetpercent",
+    # 排名/聚焦
+    "snt1_d1_stockrank", "snt1_d1_dynamicfocusrank", "snt1_d1_fundamentalfocusrank",
+    # EPS/分散度
+    "snt1_d1_longtermepsgrowthest", "snt1_d1_dtstsespe",
+    # ── Model77 VERIFIED fields from cache (prefix mdl77_2deepvaluefactor_*) ──
+    "mdl77_2deepvaluefactor_ebitdaev", "mdl77_2deepvaluefactor_pb",
+    "mdl77_2deepvaluefactor_divyield", "mdl77_2deepvaluefactor_cashp",
+    "mdl77_2deepvaluefactor_pfcf", "mdl77_2dv_currroe",
+    "mdl77_2400_chgqtrepssurp", "mdl77_2400_impvol",
+]
+
+# 交叉字段：情绪信号与基本面/量价结合
+_SNIPER_CROSS_FIELDS = [
+    "sales", "ebitda", "net_income", "returns", "volume", "close",
+    "cap", "operating_income", "assets", "equity",
+    "implied_vol", "implied_vol_360",
+]
+
+_SNIPER_WINDOWS = [5, 10, 20, 40, 63]  # 帖子建议: 不超过 63 天
+_SNIPER_DECAYS = [3, 5, 8, 10, 15, 20]  # ts_decay_linear 衰减长度
+_SNIPER_DELTAS = [1, 3, 5, 10, 20]       # ts_delta 回溯天数
+_SNIPER_GROUPS = ["subindustry", "industry", "sector"]  # group 分组维度
+
+_SNIPER_TEMPLATES = [
+    # ── ST1. 情绪动量 (帖子核心 idea 1) ──
+    # 正面情绪做多, 负面做空 + decay 平滑
+    "ts_decay_linear(group_rank({SNT}, {GRP}), {D})",
+    "ts_decay_linear(group_neutralize(rank({SNT}), {GRP}), {D})",
+    "group_rank(ts_decay_linear(rank({SNT}), {D}), {GRP})",
+    "group_rank(ts_mean({SNT}, {W}), {GRP})",
+
+    # ── ST2. 盈利惊喜动量 (帖子核心 idea 2) ──
+    "group_rank(ts_decay_linear({SNT}, {D}), {GRP})",
+    "ts_decay_linear(group_rank(ts_delta({SNT}, {DELTA}), {GRP}), {D})",
+    "group_neutralize(ts_zscore({SNT}, {W}), {GRP})",
+
+    # ── ST3. 分析师共识 + 覆盖度 (帖子核心 idea 3) ──
+    "group_rank({SNT} * rank(snt1_d1_analystcoverage), {GRP})",
+    "ts_decay_linear(group_rank({SNT} * sign(snt1_d1_analystcoverage - 5), {GRP}), {D})",
+
+    # ── ST4. 情绪×基本面交叉 (高 Ret/DD 策略) ──
+    "group_rank(ts_corr({SNT}, {CROSS}, {W}), {GRP})",
+    "-1 * group_rank(ts_corr({SNT}, {CROSS}, {W}), {GRP})",
+    "group_neutralize(ts_corr(ts_delta({SNT}, {DELTA}), ts_delta({CROSS}, {DELTA}), {W}), {GRP})",
+    "ts_decay_linear(group_rank(ts_corr({SNT}, {CROSS}, {W}), {GRP}), {D})",
+
+    # ── ST5. 情绪均值回归 ──
+    "-1 * group_rank(ts_zscore({SNT}, {W}), {GRP})",
+    "group_neutralize(-1 * ts_zscore(rank({SNT}), {W}), {GRP})",
+
+    # ── ST6. 情绪变化率 ──
+    "group_rank(ts_delta({SNT}, {DELTA}), {GRP})",
+    "group_neutralize(ts_delta(rank({SNT}), {DELTA}), {GRP})",
+    "ts_decay_linear(group_rank(ts_delta({SNT}, {DELTA}) - ts_delta({SNT}, {W}), {GRP}), {D})",
+
+    # ── ST7. 目标价方向 ──
+    "group_rank(snt1_d1_uptargetpercent - snt1_d1_downtargetpercent, {GRP})",
+    "ts_decay_linear(group_rank(snt1_d1_nettargetpercent, {GRP}), {D})",
+
+    # ── ST8. 盈利修正动量 (SUE-like) ──
+    "group_rank({SNT} / (snt1_d1_dtstsespe + 0.01), {GRP})",
+    "ts_decay_linear(group_rank({SNT} / (snt1_d1_dtstsespe + 0.01), {GRP}), {D})",
+
+    # ── ST9. 多信号复合 ──
+    "group_rank(0.5 * rank({SNT}) + 0.5 * rank({SNT2}), {GRP})",
+    "ts_decay_linear(group_rank(rank({SNT}) + rank({SNT2}), {GRP}), {D})",
+    "group_neutralize(rank({SNT}) - rank({SNT2}), {GRP})",
+
+    # ── ST10. 盈利鱼雷 (Torpedo = 极端负面, 反向做) ──
+    "-1 * group_rank(snt1_d1_earningstorpedo, {GRP})",
+    "ts_decay_linear(-1 * group_rank(snt1_d1_earningstorpedo, {GRP}), {D})",
+
+    # ── ST11. 情绪×波动率 (服务器 Top Ret/DD 策略) ──
+    "-1 * group_rank(ts_corr({SNT}, implied_vol, {W}), {GRP})",
+    "ts_decay_linear(-1 * group_rank(ts_corr({SNT}, implied_vol, {W}), {GRP}), {D})",
+    "group_neutralize(ts_corr(ts_delta({SNT}, {DELTA}), ts_delta(implied_vol, {DELTA}), {W}), {GRP})",
+
+    # ── ST12. ts_backfill + NaN 处理 (覆盖率提升) ──
+    # snt1 覆盖只有 ~2000, ts_backfill 前向填充能提升覆盖率和稳定性
+    "ts_decay_linear(group_rank(ts_backfill({SNT}, {W}), {GRP}), {D})",
+    "group_rank(ts_mean(ts_backfill({SNT}, {W}), {W}), {GRP})",
+    "group_neutralize(ts_zscore(ts_backfill({SNT}, {W}), {W}), {GRP})",
+    "group_rank(ts_delta(ts_backfill({SNT}, {W}), {DELTA}), {GRP})",
+    "ts_decay_linear(group_rank(ts_corr(ts_backfill({SNT}, {W}), {CROSS}, {W}), {GRP}), {D})",
+    "-1 * group_rank(ts_zscore(ts_backfill({SNT}, {W}), {W}), {GRP})",
+    "group_rank(ts_backfill({SNT}, {W}) * rank(snt1_d1_dtstsespe), {GRP})",
+    "group_rank(ts_backfill({SNT}, {W}) / (ts_backfill(snt1_d1_dtstsespe, {W}) + 0.01), {GRP})",
+]
+
+
+# ════════════════════════════════════════════════════════════════
+# Earnings4 Sniper: 基于 WQ earnings4 数据集文档的精准模板
+# 策略核心: 盈利波动率分解 → implied vs realized, with vs without earnings
+# VECTOR 字段需要 vec_avg() 降维; step 字段适合 ts_delta 捕捉事件
+# ════════════════════════════════════════════════════════════════
+
+# ── Earnings4 VECTOR 字段 (需要 vec_avg 包裹) ──
+_ERN4_VECTOR_FIELDS = [
+    # 核心: 每次盈利事件的股价变动
+    "ern4_ernmv1", "ern4_ernmv2", "ern4_ernmv3", "ern4_ernmv4",
+    "ern4_ernmv5", "ern4_ernmv6",
+    # 聚合统计
+    "ern4_absavgernmv", "ern4_ernmvstdev",
+    # 恒定期限隐含波动率
+    "ern4_10div", "ern4_30div", "ern4_60div", "ern4_90div",
+    # 去盈利效应IV
+    "ern4_30dexerniv",
+    # 月度 ATM IV
+    "ern4_m1atmiv", "ern4_m2atmiv", "ern4_m3atmiv",
+    # 已实现波动率
+    "ern4_10dclshv", "ern4_20dclshv", "ern4_90dclshv", "ern4_120dclshv",
+    "ern4_1000dclshv",
+    # 已实现波动率 xern (去盈利)
+    "ern4_500dclshvxern", "ern4_1000dclshvxern",
+    # 开盘区间波动率
+    "ern4_1000dorhvxern",
+    # 预测家族 (低换手高边际)
+    "ern4_fcsterneffct", "ern4_erneffct1",
+    "ern4_fairvol90d", "ern4_fairxieevol90d", "ern4_fairmth2xieevol90d",
+    "ern4_impernmv90d",
+    # 期权微观结构
+    "ern4_avg20doptvolu",
+    # 波动率曲面形状
+    "ern4_slope",
+    # 时间信号
+    "ern4_m1dtex", "ern4_ernmnth", "ern4_nexterntod",
+    # 预测 straddle
+    "ern4_m1fcaststrapx", "ern4_m2fcaststrapx",
+]
+
+# ── Earnings4 模板 (所有 VECTOR 字段已预包裹 vec_avg) ──
+_EARNINGS4_TEMPLATES = [
+    # ═══ E1. 盈利事件后漂移 (Post-Earnings Drift) ═══
+    # ernmv1 是最干净的 post-earnings drift 信号
+    "group_neutralize(ts_decay_linear(vec_avg({ERN}), {D}), industry)",
+    "group_rank(ts_decay_linear(vec_avg({ERN}), {D}), {GRP})",
+    "ts_decay_linear(group_rank(vec_avg({ERN}), {GRP}), {D})",
+
+    # ═══ E2. IV 盈利效应差 (The Gap = Earnings Premium) ═══
+    # 30div - 30dexerniv = 隐含盈利效应 (核心 Alpha)
+    "group_neutralize(vec_avg(ern4_30div) - vec_avg(ern4_30dexerniv), industry)",
+    "group_rank(vec_avg(ern4_30div) - vec_avg(ern4_30dexerniv), {GRP})",
+    "ts_decay_linear(group_rank(vec_avg(ern4_30div) - vec_avg(ern4_30dexerniv), {GRP}), {D})",
+    "-1 * group_rank(ts_delta(vec_avg(ern4_30div) - vec_avg(ern4_30dexerniv), {DELTA}), {GRP})",
+    # 盈利效应占总IV的比例
+    "group_rank((vec_avg(ern4_30div) - vec_avg(ern4_30dexerniv)) / (vec_avg(ern4_30div) + 0.001), {GRP})",
+
+    # ═══ E3. 已实现 vs 去盈利已实现 (HV Gap) ═══
+    # HV - HVxern = 历史上盈利日贡献了多少波动率
+    "group_rank(vec_avg(ern4_1000dclshv) - vec_avg(ern4_1000dclshvxern), {GRP})",
+    "group_neutralize(vec_avg(ern4_1000dclshv) - vec_avg(ern4_1000dclshvxern), industry)",
+
+    # ═══ E4. 预测 vs 实现 (Forecast Family) ═══
+    # 低换手高边际: fcsterneffct 更新慢, 信号持久
+    "group_rank(ts_backfill(vec_avg(ern4_fcsterneffct), 5), {GRP})",
+    "ts_decay_linear(group_rank(ts_backfill(vec_avg(ern4_fcsterneffct), 5), {GRP}), {D})",
+    # fcsterneffct vs erneffct1: 市场预期 vs 上次实际
+    "group_rank(ts_backfill(vec_avg(ern4_fcsterneffct), 5) - ts_backfill(vec_avg(ern4_erneffct1), 5), {GRP})",
+    "group_neutralize(ts_backfill(vec_avg(ern4_fcsterneffct), 5) - ts_backfill(vec_avg(ern4_erneffct1), 5), industry)",
+
+    # ═══ E5. 公允价值 vs 实际隐含 (Fair Vol Gap) ═══
+    # fairvol90d - 90div = 模型认为的溢价/折价
+    "group_rank(vec_avg(ern4_fairvol90d) - vec_avg(ern4_90div), {GRP})",
+    "ts_decay_linear(group_rank(vec_avg(ern4_fairvol90d) - vec_avg(ern4_90div), {GRP}), {D})",
+    # fairxieevol90d vs 实际 = 去掉市场盈利定价后的偏差
+    "group_rank(vec_avg(ern4_fairxieevol90d) - vec_avg(ern4_90div), {GRP})",
+    "group_neutralize(vec_avg(ern4_fairxieevol90d) - vec_avg(ern4_90div), industry)",
+
+    # ═══ E6. 隐含盈利波动 (Implied Earnings Move) ═══
+    # impernmv90d: 市场隐含的下次盈利变动幅度
+    "group_rank(vec_avg(ern4_impernmv90d), {GRP})",
+    "-1 * group_rank(vec_avg(ern4_impernmv90d), {GRP})",
+    "group_neutralize(vec_avg(ern4_impernmv90d) - vec_avg(ern4_absavgernmv), industry)",
+    # 隐含 vs 历史平均: 市场高估/低估盈利波动
+    "group_rank(vec_avg(ern4_impernmv90d) - vec_avg(ern4_absavgernmv), {GRP})",
+
+    # ═══ E7. ernmv1 正则化 (用 absavgernmv 或 stdev 作分母) ═══
+    "group_rank(ts_backfill(vec_avg(ern4_ernmv1), 5) / (vec_avg(ern4_absavgernmv) + 0.001), {GRP})",
+    "group_neutralize(ts_backfill(vec_avg(ern4_ernmv1), 5) / (vec_avg(ern4_ernmvstdev) + 0.001), industry)",
+
+    # ═══ E8. ernmv1 事件检测 (ts_delta on step field) ═══
+    # ts_delta 在 step field 上 = 检测"刚发生了盈利事件"
+    "group_rank(ts_delta(ts_backfill(vec_avg(ern4_ernmv1), 5), {DELTA}), {GRP})",
+    "ts_decay_linear(group_rank(ts_delta(ts_backfill(vec_avg(ern4_ernmv1), 5), 1), {GRP}), {D})",
+
+    # ═══ E9. 波动率曲面斜率 (Slope) + 配对 ═══
+    # slope 需要和另一个信号配对使用
+    "group_rank(vec_avg(ern4_slope) * sign(ts_backfill(vec_avg(ern4_ernmv1), 5)), {GRP})",
+    "group_neutralize(vec_avg(ern4_slope), industry)",
+    "ts_decay_linear(group_rank(vec_avg(ern4_slope), {GRP}), {D})",
+
+    # ═══ E10. 期限结构 (隐含 vs 已实现 spread) ═══
+    # IV高于HV = 市场过度定价; IV低于HV = 市场低估
+    "group_rank(vec_avg(ern4_30div) - vec_avg(ern4_20dclshv), {GRP})",
+    "-1 * group_rank(vec_avg(ern4_30div) - vec_avg(ern4_20dclshv), {GRP})",
+    "group_neutralize(vec_avg(ern4_90div) - vec_avg(ern4_90dclshv), industry)",
+
+    # ═══ E11. 期权成交量信号 ═══
+    "group_rank(ts_delta(vec_avg(ern4_avg20doptvolu), {DELTA}), {GRP})",
+    "ts_decay_linear(group_rank(vec_avg(ern4_avg20doptvolu), {GRP}), {D})",
+
+    # ═══ E12. 盈利日期定位 (Calendar Timing) ═══
+    # ernmnth 小 = 盈利快到了 → 波动率溢价上升
+    "-1 * group_rank(vec_avg(ern4_ernmnth), {GRP})",
+    "group_rank(vec_avg(ern4_m1dtex) * vec_avg(ern4_slope), {GRP})",
+
+    # ═══ E13. Straddle Forecast vs Actual ═══
+    "group_rank(vec_avg(ern4_m1fcaststrapx), {GRP})",
+    "group_neutralize(ts_delta(vec_avg(ern4_m1fcaststrapx), {DELTA}), industry)",
+
+    # ═══ E14. 多信号复合 (ernmv + forecast + slope) ═══
+    "group_rank(0.5 * rank(ts_backfill(vec_avg(ern4_ernmv1), 5)) + 0.5 * rank(ts_backfill(vec_avg(ern4_fcsterneffct), 5)), {GRP})",
+    "group_rank(rank(vec_avg(ern4_slope)) - rank(vec_avg(ern4_impernmv90d)), {GRP})",
+
+    # ═══ E15. 通用 vec_avg 单字段衰减 ═══
+    "ts_decay_linear(group_rank(vec_avg({ERN}), {GRP}), {D})",
+    "group_neutralize(ts_zscore(vec_avg({ERN}), {W}), industry)",
+    "-1 * group_rank(ts_zscore(vec_avg({ERN}), {W}), {GRP})",
+    "group_rank(ts_delta(vec_avg({ERN}), {DELTA}), {GRP})",
+
+    # ═══ E16. vec_avg + backfill 稀疏字段 ═══
+    "ts_decay_linear(group_rank(ts_backfill(vec_avg({ERN}), 5), {GRP}), {D})",
+    "group_neutralize(ts_backfill(vec_avg({ERN}), 5), industry)",
+    "group_rank(ts_delta(ts_backfill(vec_avg({ERN}), 5), {DELTA}), {GRP})",
+
+    # ═══ E17. earnings4 × 基本面交叉 ═══
+    "group_rank(ts_corr(vec_avg({ERN}), {CROSS}, {W}), {GRP})",
+    "-1 * group_rank(ts_corr(vec_avg({ERN}), {CROSS}, {W}), {GRP})",
+    "group_neutralize(ts_corr(vec_avg(ern4_ernmv1), {CROSS}, {W}), industry)",
+]
+
+_EARNINGS4_WINDOWS = [5, 10, 20, 40, 63]
+_EARNINGS4_DECAYS = [3, 5, 8, 10, 15, 20]
+_EARNINGS4_DELTAS = [1, 3, 5, 10, 20]
+_EARNINGS4_GROUPS = ["subindustry", "industry", "sector"]
+_EARNINGS4_CROSS_FIELDS = [
+    "sales", "ebitda", "net_income", "returns", "volume", "close",
+    "cap", "operating_income", "assets", "equity",
+]
+
+
+def generate_earnings4_leg(n: int, evaluated: set, d0_safe: bool = False) -> list:
+    """
+    Earnings4 专属因子生成器:
+    从 _EARNINGS4_TEMPLATES × _ERN4_VECTOR_FIELDS × 参数空间 中
+    组合出精准的波动率分解因子候选。
+
+    占位符:
+      {ERN}   → 随机一个 earnings4 VECTOR 字段
+      {CROSS} → 交叉字段: 基本面/量价
+      {W}     → 时序窗口
+      {D}     → 衰减长度
+      {DELTA} → delta回溯
+      {GRP}   → 分组维度
+
+    搜索空间 ≈ 50+ templates × 35+ fields × 5 × 6 × 5 × 3 ≈ 大量
+    """
+    import random as _r
+    cross_pool = _EARNINGS4_CROSS_FIELDS
+    if d0_safe:
+        cross_pool = [f for f in _EARNINGS4_CROSS_FIELDS
+                      if f not in _D0_FORBIDDEN_FIELDS]
+    candidates = []
+    attempts = 0
+    max_attempts = n * 20
+
+    while len(candidates) < n and attempts < max_attempts:
+        attempts += 1
+        tmpl = _r.choice(_EARNINGS4_TEMPLATES)
+        ern_field = _r.choice(_ERN4_VECTOR_FIELDS)
+        cross_field = _r.choice(cross_pool)
+        window = _r.choice(_EARNINGS4_WINDOWS)
+        decay = _r.choice(_EARNINGS4_DECAYS)
+        delta = _r.choice(_EARNINGS4_DELTAS)
+        group = _r.choice(_EARNINGS4_GROUPS)
+
+        expr = tmpl.replace("{ERN}", ern_field)
+        expr = expr.replace("{CROSS}", cross_field)
+        expr = expr.replace("{W}", str(window))
+        expr = expr.replace("{D}", str(decay))
+        expr = expr.replace("{DELTA}", str(delta))
+        expr = expr.replace("{GRP}", group)
+
+        if expr not in evaluated:
+            candidates.append(expr)
+            evaluated.add(expr)
+
+    return candidates
+
+
+def generate_sniper_leg(n: int, evaluated: set, d0_safe: bool = False) -> list:
+    """
+    Sniper 模式专用因子生成器: 从 _SNIPER_TEMPLATES × 全参数空间 中
+    组合出精准因子候选。
+
+
+    占位符 (全部随机化):
+      {SNT}   → 随机一个 sentiment1 字段 (17个)
+      {SNT2}  → 第二个 sentiment1 字段 (16个, 不同于 SNT)
+      {CROSS} → 交叉字段: 基本面/量价/波动率 (12个)
+      {W}     → 时序窗口: 5/10/20/40/63 (5个)
+      {D}     → 衰减长度: 3/5/8/10/15/20 (6个)
+      {DELTA} → delta回溯: 1/3/5/10/20 (5个)
+      {GRP}   → 分组维度: subindustry/industry/sector (3个)
+
+    搜索空间 ≈ 32 × 17 × 12 × 5 × 6 × 5 × 3 ≈ 2,937,600
+
+    Args:
+      d0_safe: True 时排除 D0 禁止字段 (returns/close/volume 等)
+    """
+    import random as _r
+    cross_pool = _SNIPER_CROSS_FIELDS
+    if d0_safe:
+        cross_pool = [f for f in _SNIPER_CROSS_FIELDS
+                      if f not in _D0_FORBIDDEN_FIELDS]
+    candidates = []
+    attempts = 0
+    max_attempts = n * 20  # 空间巨大，碰撞率极低
+
+    while len(candidates) < n and attempts < max_attempts:
+        attempts += 1
+        tmpl = _r.choice(_SNIPER_TEMPLATES)
+        snt_field = _r.choice(_SENTIMENT1_FIELDS)
+        snt2_field = _r.choice([f for f in _SENTIMENT1_FIELDS if f != snt_field])
+        cross_field = _r.choice(cross_pool)
+        window = _r.choice(_SNIPER_WINDOWS)
+        decay = _r.choice(_SNIPER_DECAYS)
+        delta = _r.choice(_SNIPER_DELTAS)
+        group = _r.choice(_SNIPER_GROUPS)
+
+        expr = tmpl.replace("{SNT2}", snt2_field)
+        expr = expr.replace("{SNT}", snt_field)
+        expr = expr.replace("{CROSS}", cross_field)
+        expr = expr.replace("{W}", str(window))
+        expr = expr.replace("{D}", str(decay))
+        expr = expr.replace("{DELTA}", str(delta))
+        expr = expr.replace("{GRP}", group)
+
+        if expr not in evaluated:
+            candidates.append(expr)
+            evaluated.add(expr)
+
+    return candidates
+
 
 # =========================================================
 # 🚫 禁用结构黑名单（自动记录 SELF_CORRELATION 失败的因子骨架）
@@ -1021,106 +1316,6 @@ def _add_forbidden_structure(expr: str):
         logging.debug(f"写入禁用骨架失败: {e}")
 
 
-# =========================================================
-# 🔪 字段耗尽黑名单（Field Exhaustion Kill List）
-# 挖到好因子后，提取其主字段加入永久黑名单，强制探索其他蓝海字段
-# 解决"贪婪锁定"问题：发现一个好字段后反复利用，忽略其他蓝海
-# =========================================================
-_EXHAUSTED_FIELDS_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "exhausted_fields.json"
-)
-
-def _extract_primary_fields(expr: str) -> set:
-    """从因子表达式中提取所有使用的数据字段名。
-    排除算子名、数字、分组标识符等，只保留真正的数据字段。"""
-    import re as _r
-    # 提取所有看起来像标识符的 token
-    tokens = set(_r.findall(r'\b([a-z][a-z0-9_]{2,})\b', expr.lower()))
-    # 排除已知的算子/关键词/分组标识符
-    _OPERATORS = {
-        'ts_mean', 'ts_rank', 'ts_zscore', 'ts_delta', 'ts_std_dev',
-        'ts_decay_linear', 'ts_decay_exp_window', 'ts_sum', 'ts_delay',
-        'ts_av_diff', 'ts_corr', 'ts_covariance', 'ts_regression',
-        'ts_arg_max', 'ts_arg_min', 'ts_product', 'ts_quantile',
-        'ts_count_nans', 'ts_ir', 'ts_skewness', 'ts_kurtosis',
-        'ts_moment', 'ts_theilsen', 'ts_herfindahl', 'ts_entropy',
-        'ts_step', 'rank', 'group_rank', 'group_neutralize',
-        'group_zscore', 'group_quantile', 'winsorize', 'trade_when',
-        'divide', 'subtract', 'log', 'abs', 'signed_power',
-        'jump_decay', 'hump', 'kth_element', 'days_from_last_change',
-        'last_diff_value', 'if_else', 'is_nan',
-        'subindustry', 'industry', 'sector',  # 分组标识符
-    }
-    # 排除纯标价格字段（这些是公共的，不需要 kill）
-    _COMMON_FIELDS = {
-        'close', 'open', 'high', 'low', 'volume', 'vwap', 'returns',
-        'cap', 'adv20', 'adv60', 'adv120', 'turnover',
-    }
-    fields = tokens - _OPERATORS - _COMMON_FIELDS
-    # 再排除纯数字 token 和太短的
-    fields = {f for f in fields if not f.isdigit() and len(f) > 2}
-    return fields
-
-
-def _load_exhausted_fields() -> dict:
-    """加载已耗尽字段集合。
-    返回: dict {field_id: {"killed_at": timestamp, "alpha_expr": ..., "sharpe": ...}}
-    """
-    if not os.path.exists(_EXHAUSTED_FIELDS_PATH):
-        return {}
-    try:
-        with open(_EXHAUSTED_FIELDS_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def _save_exhausted_fields(exhausted: dict):
-    """持久化已耗尽字段集合。"""
-    try:
-        with open(_EXHAUSTED_FIELDS_PATH, 'w', encoding='utf-8') as f:
-            json.dump(exhausted, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        logging.debug(f"保存耗尽字段失败: {e}")
-
-
-def _get_exhausted_field_set() -> set:
-    """快速获取所有已耗尽字段 ID 的集合。"""
-    return set(_load_exhausted_fields().keys())
-
-
-def _kill_fields_from_alpha(expr: str, sharpe: float = 0, fitness: float = 0):
-    """从成功的 alpha 中提取主字段并加入耗尽黑名单。
-    只 kill 非公共字段（排除 close/volume 等通用字段）。"""
-    fields = _extract_primary_fields(expr)
-    if not fields:
-        return
-    exhausted = _load_exhausted_fields()
-    newly_killed = []
-    for f in fields:
-        if f not in exhausted:
-            exhausted[f] = {
-                "killed_at": time.strftime('%Y-%m-%d %H:%M'),
-                "alpha_expr": expr[:120],
-                "sharpe": round(sharpe, 3),
-                "fitness": round(fitness, 3),
-            }
-            newly_killed.append(f)
-    if newly_killed:
-        _save_exhausted_fields(exhausted)
-        logging.warning(
-            f"🔪 字段耗尽! 已杀死 {len(newly_killed)} 个字段: {newly_killed} | "
-            f"总耗尽={len(exhausted)} | 来源: {expr[:60]}"
-        )
-
-
-def _filter_exhausted_from_list(field_list: list, exhausted_set: set = None) -> list:
-    """从字段列表中移除已耗尽的字段。"""
-    if exhausted_set is None:
-        exhausted_set = _get_exhausted_field_set()
-    if not exhausted_set:
-        return field_list
-    return [f for f in field_list if f not in exhausted_set]
 
 
 # =========================================================
@@ -1333,17 +1528,7 @@ def generate_systematic_sweep(wq_fields, wq_fields_by_category,
     all_fields = wq_fields if wq_fields else _FUNDAMENTAL_FIELDS
     if not fund_fields:
         fund_fields = [f for f in _FUNDAMENTAL_FIELDS if f in set(all_fields)] or _FUNDAMENTAL_FIELDS
-    # ★ 字段耗尽过滤：跳过已产出好因子的字段
-    _exhausted = _get_exhausted_field_set()
-    if _exhausted:
-        all_fields = _filter_exhausted_from_list(all_fields, _exhausted) or all_fields
-        fund_fields = _filter_exhausted_from_list(fund_fields, _exhausted) or fund_fields
-        # 也过滤类别内的字段
-        if wq_fields_by_category:
-            wq_fields_by_category = {
-                cat: _filter_exhausted_from_list(flds, _exhausted) or flds
-                for cat, flds in wq_fields_by_category.items()
-            }
+
 
     # ★ 类别轮询：从 state 恢复当前类别和每类别的进度
     cat_list = sorted(wq_fields_by_category.keys()) if wq_fields_by_category else []
@@ -1532,266 +1717,6 @@ def generate_decay_sweep_variants(high_sharpe_results, base_settings_d0,
     return variants
 
 
-# 🤖 Ollama 角色拓展：从“写作机器”升级为“战略顾问”
-# 当前只有 generate_ai_alphas() 一个角色（生成4个因子/代）
-# 新增充3个角色：
-#   [2] ai_strategist  — 每代结束后，分析胜败因子，给下一代推荐战略
-#   [3] ai_smart_mutate — 用 AI 对具体因子进行“手术级”精准改良
-#   [4] ai_failure_analyst — 分析失败因子，生成修复版本
-# =========================================================
-
-
-def ai_strategist(ollama_manager, winners: list, losers: list,
-                  generation: int) -> dict:
-    """
-    角色 [2] — 战略居间人（每代结束后调用）
-
-    分析本代胜超者和失败者，奏出：
-    1. 下一代应该看哪个方向
-    2. 建议的具体数据字段
-    3. 应该避免哪些结构
-    返回 dict: {"direction": str, "fields": list, "avoid": str}
-    """
-    if ollama_manager is None or not winners:
-        return {}
-
-    winners_text = "\n".join(f"  ✅ {w[:120]}" for w in winners[:5])
-    losers_text  = "\n".join(f"  ❌ {l[:120]}" for l in losers[:5])
-
-    prompt = f"""你是一位 WorldQuant Brain 量化研究居间人。
-我们刚完成第 {generation} 代进化实验。
-
-=== 本代高 Sharpe 胜出因子 ===
-{winners_text}
-
-=== 本代低 Sharpe / 失败因子 ===
-{losers_text}
-
-请分析胜败模式，给出下一代的三条具体建议：
-1. 应该振大哪个研究方向？（一句话）
-2. 建议添加哪几个具体的 FASTEXPR 数据字段？（列出 3-5 个字段名）
-3. 应该避免哪些结构或特征？（一句话）
-
-只输出 JSON，格式：
-{{"direction": "下一代建议方向", "fields": ["字段A", "字段B", ...], "avoid": "应避免结构"}}
-
-JSON:"""
-
-    try:
-        raw = ollama_manager.generate(
-            prompt,
-            system_prompt="你是量化研究居间人。只输出 JSON。",
-            temperature=0.5,
-            max_tokens=300
-        )
-        if not raw:
-            return {}
-
-        import re
-        m = re.search(r'\{.*?\}', raw, re.DOTALL)
-        if m:
-            result = json.loads(m.group())
-            logging.info(f"💡 AI战略居间: 方向={result.get('direction','')} "
-                         f"| 推荐字段={result.get('fields',[])}")
-            return result
-    except Exception as e:
-        logging.debug(f"ai_strategist 异常: {e}")
-    return {}
-
-
-def ai_smart_mutate(ollama_manager, expr: str, hint: str = "") -> str:
-    """
-    角色 [3] — AI 精准改良工程师
-
-    对一个具体的因子进行“手术级”改良而不是随机变异；
-    可以传入战略居间的建议（hint）来引导改良方向。
-    返回改良后的因子表达式字符串。
-    """
-    if ollama_manager is None:
-        return expr
-
-    prompt = f"""你是 WorldQuant Brain FASTEXPR 专家。
-
-待改良因子：
-  {expr}
-
-{f'改良建议：{hint}' if hint else ''}
-
-请对这个因子进行一个小但有意义的改良：
-- 可以替换一个数据字段为更相关的字段
-- 可以调整 lookback 窗口参数
-- 可以增加一层 ts_zscore 或 group_rank 进行诺尔化
-- 保持因子核心逻辑不变
-
-只输出改良后的因子表达式字符串，不要任何解释。
-
-改良后的因子:"""
-
-    try:
-        raw = ollama_manager.generate(
-            prompt,
-            system_prompt="只输出因子表达式，不要解释。",
-            temperature=0.4,  # 低温度 = 迎採改良而非大创新
-            max_tokens=200
-        )
-        if raw and len(raw.strip()) > 5:
-            improved = raw.strip().split('\n')[0].strip()
-            # 基本健康检查：括号平衡
-            if improved.count('(') == improved.count(')'):
-                logging.info(f"🔧 AI改良: {expr[:60]}... → {improved[:60]}...")
-                return improved
-    except Exception as e:
-        logging.debug(f"ai_smart_mutate 异常: {e}")
-    return expr  # fallback 返回原始表达式
-
-
-def ai_failure_analyst(ollama_manager, failed_alphas: list, n_fixes: int = 3) -> list:
-    """
-    角色 [4] — AI 失败诊断师
-
-    对少量具体失败的因子，让 AI 分析可能的失败原因
-    并生成修复/改写版本加入稭子池。
-    """
-    if ollama_manager is None or not failed_alphas:
-        return []
-
-    sample = failed_alphas[:3]  # 每次最多分析3个（控制 token 消耗）
-    sample_text = "\n".join(f"  {i+1}. {s[:150]}" for i, s in enumerate(sample))
-
-    prompt = f"""你是 WorldQuant Brain 因子诊断少将。
-
-以下因子在回测中表现差（低 Sharpe 或失败）：
-{sample_text}
-
-请分析常见失败原因（snall window、self-correlation、signal-too-weak等），
-然后生成 {n_fixes} 个改写版本，修复这些问题。
-
-只输出 JSON 数组，{n_fixes} 个修复后的因子表达式，不要解释。
-["fix1", "fix2", ...]
-
-JSON:"""
-
-    try:
-        raw = ollama_manager.generate(
-            prompt,
-            system_prompt="只输出 JSON 数组。",
-            temperature=0.6,
-            max_tokens=400
-        )
-        candidates = _parse_ai_alpha_response(raw)
-        if candidates:
-            logging.info(f"🔧 AI失败诊断师生成 {len(candidates)} 个修复因子")
-        return candidates[:n_fixes]
-    except Exception as e:
-        logging.debug(f"ai_failure_analyst 异常: {e}")
-    return []
-
-
-def generate_ai_alphas(ollama_manager, knowledge_pool: list, n: int = 4,
-                       theme: str = None, evaluated_alphas: set = None, db_path: str = None) -> list:
-    """
-    主题驱动的 AI 原创因子生成。
-
-    每次调用随机选择一个量化研究主题，指引 AI 在该特定经济学领域生成因子。
-    不同主题生成的因子在结构上完全不同，从根本上解决 SELF_CORRELATION 问题。
-
-    参数:
-        ollama_manager: OllamaManager 实例
-        knowledge_pool:  当前遗传精英池（作为"禁止抄袭"的反例）
-        n:              目标生成数量
-        evaluated_alphas: 已测试因子集合（用于去重检验）
-        db_path:        SQLite 路径（用于 CorrelationTracker 过滤）
-
-    返回: 新颖的因子表达式列表
-    """
-    if ollama_manager is None:
-        return []
-
-    if theme is None:
-        theme_dict = random.choice(_RESEARCH_THEMES)
-    elif isinstance(theme, str):
-        theme_dict = {'name': theme, 'hypothesis': f'基于 {theme} 逻辑进行因子挖掘。', 'hint': '请发挥创造力，使用任何相关字段。'}
-    else:
-        theme_dict = theme
-
-    logging.info(f"🎯 本代 AI 探索主题: {theme_dict['name']}")
-
-    # 从知识库中抽几条示例，仅作"避开相似"的参考
-    examples = random.sample(knowledge_pool, min(3, len(knowledge_pool)))
-    avoid_text = "\n".join(f"  - {e[:120]}" for e in examples)
-
-    prompt = f"""你是一位顶级量化研究员，专精 WorldQuant Brain 平台的 FASTEXPR 语言。
-今天的研究课题是：{theme_dict['name']}
-
-===【研究假设】===
-{theme_dict['hypothesis']}
-
-===【推荐数据字段和思路】===
-{theme_dict['hint']}
-
-=== FASTEXPR 完整语法速查 ===
-{_WQ_OPERATOR_CHEATSHEET}
-
-===【已有因子（禁止雷同，必须在结构上完全创新）】===
-{avoid_text}
-
-===【设计要求】===
-1. 严格基于今天的研究课题，不要偏离主题
-2. 因子逻辑必须与已有因子完全不同（不同的数据字段组合 + 不同的算子结构）
-3. 括号必须完全平衡
-4. 时间序列算子必须带整数 lookback 参数：ts_rank(x, 20) ✓，ts_rank(x) ✗
-5. 最外层必须用 group_neutralize(..., subindustry) 或 group_rank(..., subindustry) 中性化
-6. 字段只能用语法速查中列出的标准字段名，不要自创字段名
-
-===【输出格式】===
-只输出 JSON 数组，{n} 个因子，不要任何解释文字、不要 markdown。
-格式：["expr1", "expr2", ...]
-
-JSON 数组:"""
-
-    try:
-        logging.info(f"🤖 调用 Ollama ({ollama_manager.model}) 以主题「{theme['name']}」生成 {n} 个新因子...")
-        raw = ollama_manager.generate(
-            prompt,
-            system_prompt="你是量化因子设计专家。只输出 JSON 数组格式，不输出任何解释或 markdown。",
-            temperature=0.82,   # 略高温度确保多样性
-            max_tokens=700
-        )
-        if not raw:
-            logging.warning("🤖 Ollama 返回空响应")
-            return []
-
-        candidates = _parse_ai_alpha_response(raw)
-        logging.info(f"🤖 Ollama 初步生成 {len(candidates)} 个因子")
-
-        # ---- 用 CorrelationTracker 过滤高相关候选（减少 SELF_CORRELATION）----
-        if db_path and candidates:
-            try:
-                from generation_two.core.mining.correlation_tracker import CorrelationTracker
-                tracker = CorrelationTracker(db_path=db_path)
-                # 以 (template, region) 格式传入
-                candidate_pairs = [(c, "USA") for c in candidates]
-                filtered = tracker.get_low_correlation_templates(
-                    candidate_pairs,
-                    max_correlation=0.5,  # 超过 50% 相关的直接丢弃
-                    limit=n + 2
-                )
-                if filtered:
-                    candidates = [t for t, r, corr in filtered]
-                    logging.info(f"🔗 CorrelationTracker 过滤后剩余 {len(candidates)} 个低相关因子")
-            except Exception as e:
-                logging.debug(f"CorrelationTracker 过滤跳过: {e}")
-
-        # 去掉已评估过的
-        if evaluated_alphas:
-            candidates = [c for c in candidates if c not in evaluated_alphas]
-
-        return candidates[:n]
-
-    except Exception as e:
-        logging.warning(f"🤖 Ollama 生成因子异常: {e}")
-        return []
-
 # =========================================================
 # 🔥 探索引擎（Exploration Engine）— 反重复温度采样
 # 用过的降温（减少被选概率），没用过的升温（增加被选概率）
@@ -1900,13 +1825,8 @@ def generate_template_alphas(n: int, wq_fields: list, evaluated_alphas: set = No
     all_fields = wq_fields if wq_fields else _FUNDAMENTAL_FIELDS
     # 基本面字段优先用于双字段模板的 F2（分母/配对字段）
     fund_fields = [f for f in _FUNDAMENTAL_FIELDS if f in all_fields] or _FUNDAMENTAL_FIELDS
-    # ★ 字段耗尽过滤：移除已产出好因子的字段，强制探索新领域
-    _exhausted = _get_exhausted_field_set()
-    if _exhausted:
-        all_fields = _filter_exhausted_from_list(all_fields, _exhausted) or all_fields
-        fund_fields = _filter_exhausted_from_list(fund_fields, _exhausted) or fund_fields
-    # 蓝海字段 ID 列表（用于 30% 强制采样）— 同样过滤已耗尽字段
-    _blue_ids = [b['id'] for b in blue_ocean_fields if b['id'] not in _exhausted] if blue_ocean_fields else []
+    # 蓝海字段 ID 列表（用于 30% 强制采样）
+    _blue_ids = [b['id'] for b in blue_ocean_fields] if blue_ocean_fields else []
 
     # 准备数据集类别列表——蓝海冷门类别优先排列
     _COLD_CATEGORIES = ['model', 'sentiment', 'socialmedia', 'macro', 'news', 'option', 'analyst']
@@ -2001,8 +1921,7 @@ def generate_template_alphas(n: int, wq_fields: list, evaluated_alphas: set = No
 # 已删除 D1精英净化来源（机械修改后仍是套小模拟、容易返回 429/self-corr）
 # =========================================================
 def generate_d0_leg(n: int, wq_fields: list, wq_fields_by_category: dict,
-                    knowledge_pool: list, evaluated_alphas: set,
-                    ollama_manager=None) -> list:
+                    knowledge_pool: list, evaluated_alphas: set) -> list:
     """生成 D0（Delay=0）合规的因子批次 v2"""
     results = []
 
@@ -2090,8 +2009,8 @@ def generate_d0_leg(n: int, wq_fields: list, wq_fields_by_category: dict,
                 # 直接复用（原模型）
                 if _cached_expr not in evaluated_alphas and _cached_expr not in results:
                     results.append(_cached_expr)
-                # 变异体 1： ai_smart_mutate
-                _mut1 = ai_smart_mutate(ollama_manager, _cached_expr) if ollama_manager else _cached_expr
+                # 变异体 1： smart_mutate (字段替换/参数微调)
+                _mut1 = smart_mutate(_cached_expr)
                 if _mut1 and _mut1 != _cached_expr and _mut1 not in evaluated_alphas and _mut1 not in results:
                     results.append(inject_neutralization(_mut1))
             except Exception:
@@ -2185,7 +2104,7 @@ def generate_d0_leg(n: int, wq_fields: list, wq_fields_by_category: dict,
             continue
 
     # --- 来源 3：AI D0 专属生成（目标 25%，补充创意因子）---
-    if ollama_manager and len(results) < n:
+    if None and len(results) < n:
         need = n - len(results)
         try:
             # 随机选择一个 D0 研究主题来驱动 AI 生成方向
@@ -2234,7 +2153,7 @@ def generate_d0_leg(n: int, wq_fields: list, wq_fields_by_category: dict,
                 + f"Also available: open, cap, ts_delay(close,1), ts_delay(volume,1), ts_delay(returns,1)\n\n"
                 f"Output JSON array of {need} expressions:"
             )
-            raw = ollama_manager.generate(
+            raw = None.generate(
                 d0_prompt,
                 system_prompt=d0_system,
                 temperature=0.75,
@@ -2341,6 +2260,165 @@ def check_final_submission_status(sess, alpha_id, template):
         except Exception:
             pass
 
+# =========================================================
+# ⑩ GM 信号增强流水线（参考三度蝉联GM架构）
+#    裸信号 → 阈值初筛 → 相关性剪枝 → 1阶增强 → rank/sign test → robust
+# =========================================================
+
+def gm_threshold_filter(results, sharpe_min=0.6, fitness_min=0.4):
+    """GM 步骤 2.1：按指标阈值筛选裸信号
+    
+    筛选条件：
+    - Sharpe >= sharpe_min (默认0.6，初步有信号)
+    - Fitness >= fitness_min (默认0.4，有一定稳健性)
+    - longCount + shortCount > 20 (剔除厂因子/横线因子)
+    """
+    passed = []
+    for r in results:
+        if not r.success or r.sharpe is None or r.fitness is None:
+            continue
+        # 取绝对值（负 Sharpe 的因子后面会反转）
+        s = abs(r.sharpe)
+        f = abs(r.fitness)
+        if s < sharpe_min or f < fitness_min:
+            continue
+        # 剔除厂/横线因子：持仓数太少说明因子几乎没有信号
+        lc = getattr(r, 'longCount', None) or 0
+        sc = getattr(r, 'shortCount', None) or 0
+        if lc + sc < 20:
+            continue
+        passed.append(r)
+    return passed
+
+
+def gm_correlation_pruning(candidates, max_corr_initial=0.85):
+    """GM 步骤 2.3：多通道相关性剪枝
+    
+    对候选因子按 Sharpe/Fitness/Margin 三通道排序。
+    每个通道独立做贪心去相关（基于骨架 Jaccard 相似度）。
+    最终取并集。
+    
+    相关性阈值衰减：前5个=0.85, 5-10=0.80, 之后=0.75
+    """
+    if not candidates:
+        return []
+    
+    channels = ['sharpe', 'fitness']  # margin 可能为 None
+    final_pool = {}  # expr -> result
+    
+    for ch in channels:
+        sorted_cands = sorted(candidates, 
+                              key=lambda x: abs(getattr(x, ch, 0) or 0), 
+                              reverse=True)
+        selected_skeletons = []
+        selected_results = []
+        
+        for c in sorted_cands:
+            c_skel = _extract_skeleton(c.template)
+            # 衰减阈值
+            n = len(selected_results)
+            if n < 5:
+                threshold = max_corr_initial
+            elif n < 10:
+                threshold = max_corr_initial - 0.05
+            else:
+                threshold = max_corr_initial - 0.10
+            
+            # 检查与已选骨架的相似度
+            too_similar = False
+            for existing_skel in selected_skeletons:
+                sim = _jaccard_similarity(c_skel, existing_skel)
+                if sim >= threshold:
+                    too_similar = True
+                    break
+            
+            if not too_similar:
+                selected_skeletons.append(c_skel)
+                selected_results.append(c)
+                final_pool[c.template] = c
+    
+    return list(final_pool.values())
+
+
+def gm_first_order_enhance(naked_signal: str) -> list:
+    """GM 步骤 2.4 第一阶：简单包裹增强
+    
+    对一个已通过初筛的裸信号，生成简单变体：
+    - rank() 包裹
+    - ts_decay_linear() 平滑 (降 turnover)
+    - 不同中性化方式 (subindustry/industry/sector)
+    - 符号翻转 (捕获反向)
+    
+    保证所有变体 ≤ 150 字符
+    """
+    variants = set()
+    variants.add(naked_signal)
+    
+    # rank 包裹
+    r = f"rank({naked_signal})"
+    if len(r) <= 150:
+        variants.add(r)
+    
+    # decay 平滑（降低 turnover）
+    for d in [5, 10]:
+        v = f"ts_decay_linear({naked_signal}, {d})"
+        if len(v) <= 150:
+            variants.add(v)
+    
+    # 符号翻转
+    inv = f"-1 * ({naked_signal})"
+    if len(inv) <= 150:
+        variants.add(inv)
+    
+    # 不同中性化
+    for grp in ['subindustry', 'industry', 'sector']:
+        # 跳过已经有中性化的
+        if 'group_neutralize' in naked_signal:
+            break
+        v = f"group_neutralize({naked_signal}, {grp})"
+        if len(v) <= 150:
+            variants.add(v)
+    
+    return list(variants)
+
+
+def gm_rank_sign_test(results_map: dict, threshold_ratio=0.5):
+    """GM 步骤 3.4：rank/sign 稳健性测试
+    
+    对每个通过初筛的候选，检查 rank(alpha) 和 sign(alpha) 变体。
+    如果变体 Sharpe < 原版 50%，标记为不稳健。
+    
+    Args:
+        results_map: {expression: SimulationResult} 映射
+        threshold_ratio: 变体 Sharpe 至少要达到原版的这个比例
+        
+    Returns:
+        list of (expression, result, is_robust) tuples
+    """
+    robust_candidates = []
+    for expr, res in results_map.items():
+        if res.sharpe is None:
+            continue
+        original_sharpe = abs(res.sharpe)
+        # rank/sign test 在增强回测阶段执行
+        # 这里先标记所有候选为待测试
+        robust_candidates.append((expr, res, True))  # True = pending test
+    return robust_candidates
+
+
+def _jaccard_similarity(skel_a: str, skel_b: str) -> float:
+    """计算两个骨架的 Jaccard 相似度"""
+    if not skel_a or not skel_b:
+        return 0.0
+    tokens_a = set(skel_a.replace('(', ' ').replace(')', ' ').replace(',', ' ').split())
+    tokens_b = set(skel_b.replace('(', ' ').replace(')', ' ').replace(',', ' ').split())
+    if not tokens_a or not tokens_b:
+        return 0.0
+    intersection = tokens_a & tokens_b
+    union = tokens_a | tokens_b
+    return len(intersection) / len(union) if union else 0.0
+
+
 def inject_neutralization(base_alpha: str) -> str:
     """Intelligently wraps formula in neutralization to avoid LOW_SUB_UNIVERSE_SHARPE.
     Also fixes divide(group_rank()) unit incompatibility warning."""
@@ -2350,19 +2428,65 @@ def inject_neutralization(base_alpha: str) -> str:
         return base_alpha
     return f"group_neutralize({base_alpha}, subindustry)"
 
-def main(mode: str = "d0"):
+def main(mode: str = "d0", credential_file: str = None):
     """
     mode: 挖掘模式
-      - 'd0'   : 只挖 D0 因子（默认，团队重点）
-      - 'd1'   : 只挖 D1 因子
-      - 'both'  : D0 + D1 双引擎（原来的行为）
+      - 'd0'     : 只挖 D0 因子（默认，团队重点）
+      - 'd1'     : 只挖 D1 因子
+      - 'both'   : D0 + D1 双引擎（原来的行为）
+      - 'sniper' : 🎯 精准研究模式（实例1 专用：只跑论文/论坛精选模板，D0+D1 双延迟）
     """
-    assert mode in ("d0", "d1", "both"), f"Invalid mode: {mode}, must be 'd0', 'd1', or 'both'"
+    assert mode in ("d0", "d1", "both", "sniper"), f"Invalid mode: {mode}, must be 'd0', 'd1', 'both', or 'sniper'"
     logging.info(f"🎮 挖掘模式: {mode.upper()}")
 
-    # ── 初始化认证 ──────────────────────────────────────────
+    # ── 初始化认证（支持多账号：--credential 指定不同文件）──────────
+    # 支持两种认证方式:
+    #   1. 账号密码: credential.txt 第1行=email, 第2行=password
+    #   2. Cookie/JWT: credential.txt 第1行=email, 第2行=COOKIE:<jwt_token>
     cm = CredentialManager(base_path=os.path.dirname(os.path.abspath(__file__)))
-    if not cm.authenticate(auto_load=True, auto_prompt=False):
+    _is_cookie_auth = False  # 标记是否使用 cookie 认证
+    _cookie_cred_path = None  # cookie 凭据文件路径（用于热重载）
+    if credential_file:
+        from pathlib import Path
+        _cred_path = Path(credential_file)
+        if not _cred_path.is_absolute():
+            _cred_path = Path(os.path.dirname(os.path.abspath(__file__))) / _cred_path
+        logging.info(f"📌 使用指定账号文件: {_cred_path}")
+
+        # 检查是否为 COOKIE 认证模式
+        try:
+            with open(_cred_path, 'r', encoding='utf-8') as _cf:
+                _cred_lines = [l.strip() for l in _cf.readlines() if l.strip()]
+            if len(_cred_lines) >= 2 and _cred_lines[1].startswith("COOKIE:"):
+                # Cookie/JWT 认证模式
+                _jwt_token = _cred_lines[1][7:]  # 去掉 "COOKIE:" 前缀
+                _cookie_email = _cred_lines[0]
+                _cookie_cred_path = _cred_path
+                _is_cookie_auth = True
+                logging.info(f"🍪 Cookie 认证模式: {_cookie_email}")
+                import requests as _req
+                _cookie_sess = _req.Session()
+                _cookie_sess.headers['Authorization'] = f'Bearer {_jwt_token}'
+                # 验证 token
+                _verify_resp = _cookie_sess.get('https://api.worldquantbrain.com/users/self', timeout=15)
+                if _verify_resp.status_code == 200:
+                    _user_info = _verify_resp.json()
+                    logging.info(f"✅ Cookie 认证成功: {_user_info.get('email')} | Level={_user_info.get('geniusLevel')}")
+                    cm.authenticated = True
+                    cm.session = _cookie_sess
+                else:
+                    logging.error(f"❌ Cookie 认证失败: {_verify_resp.status_code} {_verify_resp.text[:200]}")
+                    logging.error("请更新 cookie: ./update_cookie.sh <new_jwt_token>")
+                    return
+            else:
+                # 标准密码认证
+                if not cm.load_from_file(_cred_path) or not cm.validate_credentials():
+                    logging.error(f"❌ 指定的 credential 文件认证失败: {_cred_path}")
+                    return
+        except Exception as _auth_err:
+            logging.error(f"❌ 认证文件读取失败: {_auth_err}")
+            return
+    elif not cm.authenticate(auto_load=True, auto_prompt=False):
         logging.error("❌ Authentication failed - cannot proceed without valid credentials")
         logging.error("Failed to authenticate.")
         return
@@ -2373,7 +2497,6 @@ def main(mode: str = "d0"):
     # ── 初始化三大可选模块（任一失败均不影响主流程）──
     validator = _build_validator()
     # 强制关闭 AI 模块以追求极致速度和并发量（根据用户要求）
-    ollama_manager = None 
     storage = _build_storage()
 
     # ── 初始化模拟器 ─────────────────────────────────────────
@@ -2386,11 +2509,11 @@ def main(mode: str = "d0"):
     region_configs = {}
     region_configs["USA"] = type('RegionConfig', (), {
         'region': "USA",
-        'universe': "TOP1000" if mode == "d0" else "TOP3000",
+        'universe': "TOP1000" if mode in ("d0", "sniper") else "TOP3000",
         'delay': 0 if mode == "d0" else 1
     })()
 
-    tester = SimulatorTester(session=sess, region_configs=region_configs)
+    tester = SimulatorTester(session=sess, region_configs=region_configs, credential_file=credential_file)
     # 线程数控制在6，避免连接池被打爆
 
     settings = SimulationSettings(
@@ -2593,13 +2716,6 @@ def main(mode: str = "d0"):
         _blue_ocean_cache, max_users=30, max_alphas=50, min_coverage=0.30
     )
     if _blue_ocean_pool:
-        # ★ 从蓝海池中移除已耗尽字段
-        _exhausted_init = _get_exhausted_field_set()
-        if _exhausted_init:
-            _before = len(_blue_ocean_pool)
-            _blue_ocean_pool = [b for b in _blue_ocean_pool if b['id'] not in _exhausted_init]
-            if _before != len(_blue_ocean_pool):
-                logging.info(f"🔪 蓝海池耗尽过滤: {_before} → {len(_blue_ocean_pool)} (已杀死 {_before - len(_blue_ocean_pool)} 个)")
         # 按类别统计蓝海分布
         _bo_cats = {}
         for bo in _blue_ocean_pool:
@@ -2608,7 +2724,6 @@ def main(mode: str = "d0"):
             f"🌊 蓝海类别分布: " +
             " | ".join(f"{k}({v}个)" for k, v in sorted(_bo_cats.items(), key=lambda x: -x[1]))
         )
-        logging.info(f"🔪 已耗尽字段总数: {len(_exhausted_init)} | 剩余蓝海: {len(_blue_ocean_pool)}")
 
     
     # ── 从 operatorRAW.json 动态加载全量算子池 ──────────────────────
@@ -2768,154 +2883,6 @@ def main(mode: str = "d0"):
     # ── 初始化 Near-Miss 重试队列 ─────────────────────────────────
     near_miss_queue = []
 
-    _prefetch_lock = threading.Lock()
-    _prefetch_ai_pool = []      # 后台预生成的因子缓冲池
-    _prefetch_strategy_fields = [] # 后台生成的战略字段缓冲
-    _prefetch_thread = None     # 后台线程引用
-    _intel_d1_pool = []         # 情报爬虫转化的 D1 模板缓冲
-    _intel_d0_pool = []         # 情报爬虫转化的 D0 模板缓冲
-
-    _AI_STRATEGY_THEMES = [
-        "趋势跟随 (Trend Following)",
-        "均值回归 (Mean Reversion)",
-        "统计套利 (Statistical Arbitrage)",
-        "量价背离 (Price-Volume Divergence)",
-        "基本面动量 (Fundamental Momentum)",
-        "多因子组合 (Multi-factor Combination)",
-    ]
-
-    def _background_prefetch(high_performers_snap, losers_snap, pool_snap, gen_num):
-        """后台预生成线程：执行所有的 AI 任务（战略、诊断、变异、原创生成）
-        利用 API 轮询等待时间，实现 AI 与模拟真正并行。"""
-        try:
-            strategy = {}
-            if ollama_manager and high_performers_snap:
-                strategy = ai_strategist(ollama_manager, high_performers_snap, losers_snap, gen_num)
-                if strategy.get("fields"):
-                    with _prefetch_lock:
-                        _prefetch_strategy_fields.clear()
-                        _prefetch_strategy_fields.extend([f for f in strategy["fields"] if isinstance(f, str)])
-                    logging.info(f"🧭 [后台AI] 战略字段已缓冲: {_prefetch_strategy_fields[:5]}")
-            
-            if ollama_manager and losers_snap:
-                fixed = ai_failure_analyst(ollama_manager, losers_snap, n_fixes=5)
-                if fixed:
-                    with _prefetch_lock:
-                        _prefetch_ai_pool.extend(fixed)
-                    logging.info(f"🔧 [后台AI] 诊断生成缓冲: {len(fixed)} 条修复因子")
-            
-            if ollama_manager and high_performers_snap:
-                direction_hint = strategy.get("direction", "")
-                improved_list = []
-                for elite in high_performers_snap[:4]:
-                    improved = ai_smart_mutate(ollama_manager, elite, hint=direction_hint)
-                    if improved != elite:
-                        improved_list.append(improved)
-                if improved_list:
-                    with _prefetch_lock:
-                        _prefetch_ai_pool.extend(improved_list)
-                    logging.info(f"✨ [后台AI] 精准改良缓冲: {len(improved_list)} 条变异因子")
-            
-            # 主题探索原创生成
-            if ollama_manager:
-                theme = random.choice(_AI_STRATEGY_THEMES)
-                db_path_for_tracker = storage.db_path if storage else None
-                new_alphas = generate_ai_alphas(
-                    ollama_manager, pool_snap[:15], n=15, theme=theme,
-                    evaluated_alphas=evaluated_alphas,
-                    db_path=db_path_for_tracker
-                )
-                if new_alphas:
-                    with _prefetch_lock:
-                        _prefetch_ai_pool.extend(new_alphas)
-                    logging.info(f"🤖 [后台AI] 原创预生成缓冲: {len(new_alphas)} 条主题因子 ({theme})")
-
-            # ── 每日情报爬虫（利用模拟等待时间，每天只跑一次）──────────
-            try:
-                from generation_two.intelligence.factor_spider import run_daily_spider, get_expression_templates
-                from generation_two.intelligence.intel_to_template import text_to_templates
-
-                new_intel = run_daily_spider(session=sess, force=False)
-                if new_intel:
-                    logging.info(f"📡 [情报爬虫] 今日新增 {len(new_intel)} 条灵感，启动 Qwen 转化...")
-                    converted = text_to_templates(
-                        ollama_manager, new_intel, n_per_idea=2, include_d0=True
-                    )
-                    d1_t = converted.get("d1_templates", [])
-                    d0_t = converted.get("d0_templates", [])
-                    with _prefetch_lock:
-                        _intel_d1_pool.extend(d1_t)
-                        _intel_d0_pool.extend(d0_t)
-                    logging.info(
-                        f"📡 [情报爬虫] Qwen转化完成: D1模板+{len(d1_t)} D0模板+{len(d0_t)}"
-                    )
-
-                # 直接从 WQ 排名 alpha 获取的表达式模板（无需 Qwen）
-                expr_templates = get_expression_templates()
-                if expr_templates:
-                    import random as _rnd
-                    sample = _rnd.sample(expr_templates, min(10, len(expr_templates)))
-                    # 按 D0/D1 分类注入正确的池（修复：之前全部扔进 D1 池）
-                    d0_expr = [sanitize_for_d0(t) for t in sample if _classify_d0_or_d1(t) == 'd0']
-                    d1_expr = [inject_neutralization(t) for t in sample if _classify_d0_or_d1(t) == 'd1']
-                    with _prefetch_lock:
-                        _intel_d0_pool.extend(d0_expr)
-                        _prefetch_ai_pool.extend(d1_expr)
-                    logging.info(
-                        f"📡 [情报爬虫] WQ ranked 表达式分类注入: D0={len(d0_expr)} D1={len(d1_expr)}"
-                    )
-
-                # ── WQ Brain 中文论坛爬虫（Playwright，每日一次）────────
-                try:
-                    from generation_two.intelligence.wq_forum_spider import (
-                        run_forum_spider, get_forum_templates
-                    )
-                    # 读取凭据
-                    import json as _json
-                    _cred_path = Path(__file__).parent / "credential.txt"
-                    if _cred_path.exists():
-                        _raw = _cred_path.read_text(encoding="utf-8").strip()
-                        try:
-                            _cred = _json.loads(_raw)
-                            _wq_user, _wq_pass = _cred[0], _cred[1]
-                        except Exception:
-                            _lines = _raw.split("\n")
-                            _wq_user, _wq_pass = _lines[0].strip(), _lines[1].strip()
-
-                        logging.info("📡 [情报爬虫] 启动 WQ 中文论坛无头浏览器...")
-                        forum_result = run_forum_spider(_wq_user, _wq_pass)
-                        forum_templates = get_forum_templates()
-
-                        if forum_templates:
-                            # 按 D0/D1 分类注入（含 close/returns/volume 等裸露价格字段 -> D0）
-                            d0_forum = [fix_divide_group_rank(sanitize_for_d0(t))
-                                       for t in forum_templates
-                                       if _classify_d0_or_d1(t) == 'd0']
-                            d1_forum = [fix_divide_group_rank(inject_neutralization(t))
-                                       for t in forum_templates
-                                       if _classify_d0_or_d1(t) == 'd1']
-
-                            forum_sample_d0 = _rnd.sample(d0_forum, min(4, len(d0_forum)))
-                            forum_sample_d1 = _rnd.sample(d1_forum, min(4, len(d1_forum)))
-
-                            with _prefetch_lock:
-                                # D0 论坛模板 → D0池
-                                _intel_d0_pool.extend(forum_sample_d0)
-                                # D1 论坛模板 → D1池
-                                _intel_d1_pool.extend(forum_sample_d1)
-                            logging.info(
-                                f"🌐 [中文论坛] 注入 D0={len(forum_sample_d0)} D1={len(forum_sample_d1)} 条论坛FASTEXPR"
-                                f" (论坛总计 {forum_result['total']} 篇帖子)"
-                            )
-                except Exception as _fe:
-                    logging.debug(f"[WQ论坛爬虫] 跳过: {_fe}")
-
-            except Exception as _ie:
-                logging.debug(f"[情报爬虫] 跳过: {_ie}")
-
-        except Exception as e:
-            logging.warning(f"🤖 [后台AI任务] 异常（不影响主流程）: {e}")
-
     prev_high_performers = []
     prev_losers = []
     
@@ -2932,7 +2899,7 @@ def main(mode: str = "d0"):
     logging.info(f"🧬 初始种子池自动分流: D1遗传池={len(knowledge_pool)}个 | D0特种池={len(d0_knowledge_pool)}个")
 
     # ── 从 WQ API 拉取你的 D0 历史精英因子（已验证的高分 delay=0 alpha）─────
-    if mode in ("d0", "both"):
+    if mode in ("d0", "both", "sniper"):
         try:
             _wq_d0_elites = []
             for _stage in ["RANKED", "RESEARCH"]:
@@ -2972,7 +2939,7 @@ def main(mode: str = "d0"):
     )
 
     while True:
-
+      try:
         logging.info(f"========= GENERATION {generation} =========")
         alphas_to_test = []
 
@@ -2981,81 +2948,53 @@ def main(mode: str = "d0"):
         if _cooled_set:
             logging.info(f"🧊 当前冷却中骨架: {len(_cooled_set)} 个 | 精英池骨架种类: {len(set(_extract_skeleton(s) for s in knowledge_pool))}")
 
-        # ── 优先消耗上一代后台预生成的 AI 因子及战略（如有）─────
-        with _prefetch_lock:
-            if _prefetch_strategy_fields:
-                wq_fields[:] = _prefetch_strategy_fields + [f for f in wq_fields if f not in _prefetch_strategy_fields]
-                logging.info(f"🧭 [主线程] 应用后台缓冲战略字段: {_prefetch_strategy_fields[:5]}")
-                _prefetch_strategy_fields.clear()
-
-            if _prefetch_ai_pool:
-                prefetched = [inject_neutralization(a) for a in _prefetch_ai_pool
-                              if a not in evaluated_alphas]
-                alphas_to_test.extend(prefetched)
-                logging.info(f"  🤖 [预加载] 消耗后台预生成缓冲: {len(prefetched)} 个 AI 因子")
-                _prefetch_ai_pool.clear()
-
-            # 消耗情报爬虫转化的 D1 模板（每代最多 3 个，避免占用太多配额）
-            if _intel_d1_pool:
-                intel_d1 = [inject_neutralization(t) for t in _intel_d1_pool[:3]
-                            if t not in evaluated_alphas]
-                alphas_to_test.extend(intel_d1)
-                _intel_d1_pool[:] = _intel_d1_pool[3:]
-                if intel_d1:
-                    logging.info(f"  📡 [情报注入] D1模板 {len(intel_d1)} 个 | 池剩余 {len(_intel_d1_pool)}")
-
-            # D0 情报模板暂存，交给 d0_candidates 使用（在 generate_d0_leg 之前 append）
-            intel_d0_this_gen = []
-            if _intel_d0_pool:
-                intel_d0_this_gen = [t for t in _intel_d0_pool[:2] if t not in evaluated_alphas]
-                _intel_d0_pool[:] = _intel_d0_pool[2:]
-                if intel_d0_this_gen:
-                    logging.info(f"  📡 [情报注入] D0模板 {len(intel_d0_this_gen)} 个 | 池剩余 {len(_intel_d0_pool)}")
-
         pool_snapshot = knowledge_pool[:21]
 
         # ━━━ 三条腿因子生成 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        # 腿一：D0 因子（mode=d0 时 ~20个，mode=both 时 ~8个）
+
+        # ── Sniper 模式: 专用生成路径 ──
         d0_candidates = []
-        if mode in ("d0", "both"):
-            d0_count = 20  # 稳定并发：避免连接池爆炸，20个D0/代
-            d0_candidates = generate_d0_leg(
-                d0_count, wq_fields, wq_fields_by_category,
-                d0_knowledge_pool or knowledge_pool, evaluated_d0_alphas, ollama_manager
-            )
-            # 把本代 D0 候选加入 D0 去重集，下代不重复
-            evaluated_d0_alphas.update(d0_candidates)
-            # 追加今日情报爬虫的 D0 模板（已由 Qwen 转化，含 {FUND_F} 等占位符需填充）
-            if intel_d0_this_gen:
-                for raw_t in intel_d0_this_gen:
-                    # 简单填充：随机选一个 fundamental 字段替换占位符
-                    fund_fields = wq_fields_by_category.get("fundamental", wq_fields[:10])
-                    t = raw_t.replace("{FUND_F}", random.choice(fund_fields) if fund_fields else "sales")
-                    analyst_fields = wq_fields_by_category.get("analyst", [])
-                    t = t.replace("{ANALYST_F}", random.choice(analyst_fields) if analyst_fields else "anl4_adjusted_netincome_ft")
-                    blue_fields = wq_fields_by_category.get("option", []) or wq_fields_by_category.get("sentiment", [])
-                    t = t.replace("{BLUE_F}", random.choice(blue_fields) if blue_fields else "implied_volatility_call_30")
-                    t = t.replace("{FIELD}", random.choice(fund_fields) if fund_fields else "sales")
-                    if t.count("(") == t.count(")") and t not in evaluated_alphas:
-                        d0_candidates.append(t)
-
-        # ━━━━━━━━ 奥卡姆剃刀：纯模板遍历蓝海字段 ━━━━━━━━
-        # 不再有裂变腿/杂交腿，只有模板×蓝海字段的组合
-
-        # 腿一：蓝海模板遍历（主力，30个）
         d1_template = []
-        if mode in ("d1", "both"):
-            d1_template = generate_template_alphas(
-                30, wq_fields, evaluated_alphas, wq_fields_by_category,
-                blue_ocean_fields=_blue_ocean_pool
-            )
-            d1_template = [inject_neutralization(a) for a in d1_template]
-
-        # 腿二：简单字段替换变异补充（5个）— 对模板做纯字段替换，不加层
         d1_mutated = []
-        if mode in ("d1", "both") and d1_template:
-            for t in random.sample(d1_template, min(5, len(d1_template))):
-                d1_mutated.append(inject_neutralization(smart_mutate(t)))
+        if mode == "sniper":
+            # 🎯 Sniper: 精选研究模板, D1 only (D0 not available for these accounts)
+            # NOTE: ern4 dataset NOT available → pure sniper only
+            sniper_d1 = generate_sniper_leg(20, evaluated_alphas)
+            combined_d1 = [inject_neutralization(a) for a in sniper_d1]
+            d0_candidates = []  # D0 not available, skip
+            d1_template = combined_d1
+            logging.info(
+                f"  🎯 SNIPER: D0=0(skip) D1={len(d1_template)} | "
+                f"模板库={len(_SNIPER_TEMPLATES)} "
+                f"字段池={len(_SENTIMENT1_FIELDS)}+{len(_SNIPER_CROSS_FIELDS)}"
+            )
+        else:
+            # ── 普通模式: D0 + D1 随机生成 ──
+            # 腿一：D0 因子（mode=d0 时 ~20个，mode=both 时 ~8个）
+            if mode in ("d0", "both"):
+                d0_count = 20  # 稳定并发：避免连接池爆炸，20个D0/代
+                d0_candidates = generate_d0_leg(
+                    d0_count, wq_fields, wq_fields_by_category,
+                    d0_knowledge_pool or knowledge_pool, evaluated_d0_alphas
+                )
+                # 把本代 D0 候选加入 D0 去重集，下代不重复
+                evaluated_d0_alphas.update(d0_candidates)
+
+            # ━━━━━━━━ 奥卡姆剃刀：纯模板遍历蓝海字段 ━━━━━━━━
+            # 不再有裂变腿/杂交腿，只有模板×蓝海字段的组合
+
+            # 腿一：蓝海模板遍历（主力，30个）
+            if mode in ("d1", "both"):
+                d1_template = generate_template_alphas(
+                    30, wq_fields, evaluated_alphas, wq_fields_by_category,
+                    blue_ocean_fields=_blue_ocean_pool
+                )
+                d1_template = [inject_neutralization(a) for a in d1_template]
+
+            # 腿二：简单字段替换变异补充（5个）— 对模板做纯字段替换，不加层
+            if mode in ("d1", "both") and d1_template:
+                for t in random.sample(d1_template, min(5, len(d1_template))):
+                    d1_mutated.append(inject_neutralization(smart_mutate(t)))
 
         logging.info(
             f"  📊 D0腿={len(d0_candidates)} | 模板遍历={len(d1_template)} | 变异补充={len(d1_mutated)} | 模式={mode.upper()}\n"
@@ -3116,23 +3055,28 @@ def main(mode: str = "d0"):
                 unique_alphas, knowledge_pool + d0_knowledge_pool, threshold=0.80
             )
                 
-        # Memory protection: keep only recent 50k entries (LRU-style)
-        if len(evaluated_alphas) > 100000:
-            # Keep the most recent 50k instead of full clear to avoid re-submitting
+        # Memory protection: trim evaluated set to prevent diversity collapse
+        _trim_threshold = 5000 if mode == "sniper" else 100000
+        if len(evaluated_alphas) > _trim_threshold:
             _eval_list = list(evaluated_alphas)
             evaluated_alphas.clear()
-            evaluated_alphas.update(_eval_list[-50000:])
-            logging.info(f"Trimmed evaluated_alphas: 100k -> {len(evaluated_alphas)}")
+            evaluated_alphas.update(_eval_list[-2000:])
+            logging.info(f"Trimmed evaluated_alphas: {len(_eval_list)} -> {len(evaluated_alphas)}")
                 
         if not unique_alphas:
-            logging.info("Diversity collapsed. Introducing fresh blood...")
-            # 多样性崩溃时也尝试用 AI 补充
-            ai_emergency = generate_ai_alphas(ollama_manager, pool_snapshot, n=5)
-            if ai_emergency:
-                unique_alphas = [inject_neutralization(a) for a in ai_emergency]
+            if mode == "sniper":
+                # 🎯 Sniper fallback: 清空去重集后重新生成
+                logging.info("Sniper diversity collapsed. Clearing dedup cache and regenerating...")
+                evaluated_alphas.clear()  # 彻底清空，允许重新提交
+                unique_alphas = generate_sniper_leg(20, evaluated_alphas)
             else:
-                engine = AlphaEvolutionEngine()
-                unique_alphas = [engine.mutate(knowledge_pool[0]) for _ in range(5)]
+                logging.info("Diversity collapsed. Introducing fresh blood...")
+                if knowledge_pool:
+                    engine = AlphaEvolutionEngine()
+                    unique_alphas = [engine.mutate(knowledge_pool[0]) for _ in range(5)]
+                else:
+                    logging.warning("Knowledge pool empty! Generating from scratch...")
+                    unique_alphas = generate_sniper_leg(5, evaluated_alphas)
             
         # 从模拟器中取出上一代 429 失败被暂存的因子
         retries = getattr(tester, 'get_retry_queue', lambda: [])() if hasattr(tester, 'get_retry_queue') else []
@@ -3143,7 +3087,7 @@ def main(mode: str = "d0"):
             
         # Hard limit：匹配 WQ 实际并发能力（~3 个同时模拟）
         d0_limit = 15 if mode in ("d0", "both") else 0
-        d1_limit = 15 if mode in ("d1", "both") else 0
+        d1_limit = 20 if mode == "sniper" else (15 if mode in ("d1", "both") else 0)
 
         # [C5 fix] D0 候选也需要经过 Validator + dedup 过滤
         if d0_candidates:
@@ -3167,22 +3111,13 @@ def main(mode: str = "d0"):
         try:
             logging.info(f"  🎯 提交 D0={len(d0_candidates)}(优先) + D1={len(unique_alphas)} 个，模式={mode.upper()}...")
             # ★ D0 先提交，抢占模拟器资源
-            futures_d0 = tester.simulate_batch(d0_candidates, "USA", d0_settings) if (d0_candidates and mode in ("d0", "both")) else []
-            futures_d1 = tester.simulate_batch(unique_alphas, "USA", settings) if (unique_alphas and mode in ("d1", "both")) else []
+            futures_d0 = tester.simulate_batch(d0_candidates, "USA", d0_settings) if (d0_candidates and mode in ("d0", "both", "sniper")) else []
+            futures_d1 = tester.simulate_batch(unique_alphas, "USA", settings) if (unique_alphas and mode in ("d1", "both", "sniper")) else []
             all_futures = futures_d0 + futures_d1  # D0 在前，优先处理结果
 
             # 记录哪些 futures 属于 D0 批次
             _d0_template_set = set(d0_candidates)
 
-            # ✨ 模拟提交后立刻启动后台 AI 预生成线程
-            if ollama_manager and (_prefetch_thread is None or not _prefetch_thread.is_alive()):
-                _prefetch_thread = threading.Thread(
-                    target=_background_prefetch,
-                    args=(prev_high_performers, prev_losers, pool_snapshot, generation),
-                    daemon=True
-                )
-                _prefetch_thread.start()
-                logging.info("🤖 [后台AI任务] Ollama 开始在后台诊断、总结、生成下一代因子...")
 
             results = tester.wait_for_results(all_futures, timeout=600)
         except Exception as e:
@@ -3217,36 +3152,37 @@ def main(mode: str = "d0"):
 
                 # 判断来源标签
                 is_d0 = res.template in _d0_template_set
-                source = "D0-Template" if is_d0 else ("AI-Ollama" if res.template in locals().get("ai_alphas_neutralized", []) else "Genetic-D1")
+                source = "D0-Template" if is_d0 else ("Template-D1")
                 _log_discovery(res.template, res.sharpe, res.fitness, res.alpha_id, source=source)
 
                 # ★★★ 骨架冷却：每个好因子都记录骨架命中（低门槛）★★★
                 _record_skeleton_hit(res.template, generation, res.sharpe)
 
-                # ★★★ 字段耗尽：只有真正优秀的因子才杀字段（高门槛防误杀）★★★
-                # 门槛: Sharpe>1.5 & Fitness>1.25 & Turnover<30% & Returns>15%
-                _should_kill = (
-                    abs(res.sharpe) > 1.5
-                    and abs(res.fitness) > 1.25
-                    and res.turnover is not None and 0 < res.turnover < 0.30
-                    and res.returns is not None and abs(res.returns) > 0.15
-                )
-                if _should_kill:
-                    _kill_fields_from_alpha(res.template, res.sharpe, res.fitness)
-                    # 动态更新蓝海池：移除刚被杀死的字段
-                    _newly_exhausted = _get_exhausted_field_set()
-                    _blue_ocean_pool[:] = [b for b in _blue_ocean_pool if b['id'] not in _newly_exhausted]
-                else:
-                    logging.info(
-                        f"  ⏳ 字段暂不杀死 (未达门槛): S={res.sharpe:.3f} F={res.fitness:.3f} "
-                        f"T={res.turnover:.2f} R={res.returns:.3f}"
-                    )
+                # ★★★ 候选池：存入 SQLite 供人工审核 ★★★
+                if storage and hasattr(storage, 'add_candidate'):
+                    try:
+                        _skel = _extract_skeleton(res.template)
+                        storage.add_candidate(
+                            expression=res.template,
+                            skeleton=_skel,
+                            source=source,
+                            sharpe=res.sharpe,
+                            fitness=res.fitness,
+                            turnover=getattr(res, 'turnover', 0) or 0,
+                            returns=getattr(res, 'returns', 0) or 0,
+                            correlation=float(getattr(res, 'correlation', 0) or 0),
+                            alpha_id=res.alpha_id or '',
+                            delay=0 if is_d0 else 1,
+                        )
+                    except Exception:
+                        pass
 
                 logging.warning(
                     f"📋 待手动提交: Alpha ID={res.alpha_id} | "
                     f"Sharpe={res.sharpe:.3f} | Fitness={res.fitness:.3f} | "
                     f"来源={source} | 表达式={res.template[:80]}"
                 )
+
 
             # 让 Validator 从每次模拟失败中学习（如果有错误信息）
             if not res.success and res.error_message and validator:
@@ -3260,6 +3196,57 @@ def main(mode: str = "d0"):
             stored_count = storage.store_batch(results)
             logging.info(f"💾 本代 {stored_count}/{len(results)} 条结果已存入数据库")
         
+        # ━━━ GM 信号增强流水线 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # Step 1: 阈值初筛 (Sharpe>=0.6, Fitness>=0.4)
+        _gm_candidates = gm_threshold_filter(results, sharpe_min=0.6, fitness_min=0.4)
+        # 排除已经直接达标的（Sharpe>1.25 已在上面处理）
+        _gm_candidates = [c for c in _gm_candidates 
+                          if abs(c.sharpe) < 1.25 or abs(c.fitness) < 1.0]
+        
+        if _gm_candidates:
+            logging.info(f"🔬 [GM增强] 阈值初筛通过: {len(_gm_candidates)} 个有信号的裸因子")
+            
+            # Step 2: 相关性剪枝（控制增强量，避免浪费 API 配额）
+            _gm_pruned = gm_correlation_pruning(_gm_candidates, max_corr_initial=0.85)
+            _gm_pruned = _gm_pruned[:6]  # 每代最多增强 6 个
+            logging.info(f"🔬 [GM增强] 相关性剪枝后: {len(_gm_pruned)} 个独立信号")
+            
+            # Step 3: 一阶增强（生成变体）
+            _enhance_pool = []
+            for _gc in _gm_pruned:
+                variants = gm_first_order_enhance(_gc.template)
+                # 过滤已评估的
+                fresh = [v for v in variants if v not in evaluated_alphas]
+                _enhance_pool.extend(fresh)
+            
+            if _enhance_pool:
+                _enhance_pool = list(set(_enhance_pool))[:18]  # 每代最多 18 个增强变体
+                logging.info(f"🔬 [GM增强] 生成 {len(_enhance_pool)} 个一阶增强变体，开始回测...")
+                
+                # 回测增强变体
+                _enh_futures = tester.simulate_batch(_enhance_pool, "USA", settings)
+                try:
+                    _enh_results = tester.wait_for_results(_enh_futures, timeout=400)
+                    _enh_hits = 0
+                    for _er in _enh_results:
+                        if (_er.success and _er.sharpe is not None and _er.fitness is not None
+                                and abs(_er.sharpe) > 1.25 and abs(_er.fitness) > 1.0):
+                            if _er.sharpe < 0:
+                                _er.template = f"-1 * ({_er.template})"
+                                _er.sharpe = abs(_er.sharpe)
+                                _er.fitness = abs(_er.fitness)
+                            high_performers.append(_er.template)
+                            _log_discovery(_er.template, _er.sharpe, _er.fitness,
+                                           _er.alpha_id, source="GM-Enhance")
+                            _enh_hits += 1
+                    if storage:
+                        storage.store_batch(_enh_results)
+                    if _enh_hits:
+                        logging.warning(f"🎯 [GM增强] 成功！{_enh_hits} 个增强变体达标")
+                except Exception as _ee:
+                    logging.debug(f"[GM增强] 回测异常: {_ee}")
+        
+
         # Phase 3: Decay Sweep for high-Sharpe factors
         _high_sharpe_for_sweep = [
             r for r in results
@@ -3383,75 +3370,118 @@ def main(mode: str = "d0"):
             _run_near_miss_layer(layer_b, NEAR_MISS_VARIANTS_FITNESS, "D1-Fitness优化",
                                  target_sharpe=1.25, target_fitness=1.0, target_pool=high_performers)
 
-        # ── D0 Layer-C：Sharpe 1.5~2.0 优化（目标推过 2.0）─────────────
-        d0_layer_c = [
-            res for res in results
-            if res.success and res.template
-            and res.sharpe is not None and res.fitness is not None
-            and res.template in _d0_template_set
-            and D0_NEAR_MISS_SHARPE_MIN <= abs(res.sharpe) < D0_NEAR_MISS_SHARPE_MAX
-            and abs(res.fitness) >= D0_NEAR_MISS_FITNESS_REQ
-        ][:D0_MAX_NEAR_MISS_SHARPE]
+        # ── D0 Layer-C/D：仅 D0/both 模式启用（sniper/d1 模式无 D0 权限）───
+        if mode in ("d0", "both"):
+            d0_layer_c = [
+                res for res in results
+                if res.success and res.template
+                and res.sharpe is not None and res.fitness is not None
+                and res.template in _d0_template_set
+                and D0_NEAR_MISS_SHARPE_MIN <= abs(res.sharpe) < D0_NEAR_MISS_SHARPE_MAX
+                and abs(res.fitness) >= D0_NEAR_MISS_FITNESS_REQ
+            ][:D0_MAX_NEAR_MISS_SHARPE]
 
-        # ── D0 Layer-D：Fitness 1.0~1.3 优化（目标推过 1.3）────────────
-        d0_layer_d = [
-            res for res in results
-            if res.success and res.template
-            and res.sharpe is not None and res.fitness is not None
-            and res.template in _d0_template_set
-            and D0_NEAR_MISS_FIT_MIN <= abs(res.fitness) < D0_NEAR_MISS_FIT_MAX
-            and abs(res.sharpe) >= D0_NEAR_MISS_SHARPE_REQ
-            and not (D0_NEAR_MISS_SHARPE_MIN <= abs(res.sharpe) < D0_NEAR_MISS_SHARPE_MAX
-                     and abs(res.fitness) >= D0_NEAR_MISS_FITNESS_REQ)
-        ][:D0_MAX_NEAR_MISS_FIT]
+            d0_layer_d = [
+                res for res in results
+                if res.success and res.template
+                and res.sharpe is not None and res.fitness is not None
+                and res.template in _d0_template_set
+                and D0_NEAR_MISS_FIT_MIN <= abs(res.fitness) < D0_NEAR_MISS_FIT_MAX
+                and abs(res.sharpe) >= D0_NEAR_MISS_SHARPE_REQ
+                and not (D0_NEAR_MISS_SHARPE_MIN <= abs(res.sharpe) < D0_NEAR_MISS_SHARPE_MAX
+                         and abs(res.fitness) >= D0_NEAR_MISS_FITNESS_REQ)
+            ][:D0_MAX_NEAR_MISS_FIT]
 
-        if d0_layer_c or d0_layer_d:
-            logging.info(
-                f"🔄 D0 Near-Miss: Layer-C(Sharpe→2.0)={len(d0_layer_c)} Layer-D(Fitness→1.3)={len(d0_layer_d)}"
-            )
-            _run_near_miss_layer(d0_layer_c, D0_NEAR_MISS_VARIANTS_SHARPE, "D0-Sharpe优化",
-                                 target_sharpe=2.0, target_fitness=1.3, target_pool=d0_high_performers)
-            _run_near_miss_layer(d0_layer_d, D0_NEAR_MISS_VARIANTS_FITNESS, "D0-Fitness优化",
-                                 target_sharpe=2.0, target_fitness=1.3, target_pool=d0_high_performers)
-
-        # ── VRP Layer-E：波动率风险溢价专属持续优化（用户指定精英）─────────
-        # 触发条件：任何含 implied_volatility_call_120 的因子 Sharpe >= 1.3
-        vrp_layer_e = [
-            res for res in results
-            if res.success and res.template
-            and res.sharpe is not None
-            and abs(res.sharpe) >= VRP_NEAR_MISS_SHARPE_MIN
-            and "implied_volatility_call_120" in (res.template or "")
-        ][:VRP_MAX_NEAR_MISS]
-        # 每代随机选3个VRP候选做轮替注入
-        _vrp_inject = [e for e in random.sample(VRP_EXPR_POOL, min(3, len(VRP_EXPR_POOL)))
-                       if e not in evaluated_alphas]
-        if vrp_layer_e or _vrp_inject:
-            logging.info(f"🎯 VRP Layer-E: near-miss命中={len(vrp_layer_e)} + 轮替注入={len(_vrp_inject)}")
-            # 对命中的 near-miss 结果做参数扫描（已经是并行的）
-            if vrp_layer_e:
-                _run_near_miss_layer(vrp_layer_e, VRP_NEAR_MISS_VARIANTS, "VRP-专属优化",
-                                     target_sharpe=2.0, target_fitness=1.3, target_pool=d0_high_performers)
-            # 轮替注入：batch 并行提交（替代串行 simulate_alpha）
-            if _vrp_inject:
-                _vrp_settings = SimulationSettings(
-                    region="USA", universe="TOP1000", delay=0, decay=0,
-                    neutralization="INDUSTRY", truncation=0.1,
-                    nanHandling="ON", testPeriod="P5Y0M0D"
+            if d0_layer_c or d0_layer_d:
+                logging.info(
+                    f"🔄 D0 Near-Miss: Layer-C(Sharpe→2.0)={len(d0_layer_c)} Layer-D(Fitness→1.3)={len(d0_layer_d)}"
                 )
-                _vrp_futures = tester.simulate_batch(_vrp_inject, "USA", _vrp_settings)
-                try:
-                    _vrp_results = tester.wait_for_results(_vrp_futures, timeout=300)
-                    for _vrp_expr, _vrp_r in zip(_vrp_inject, _vrp_results):
-                        evaluated_alphas.add(_vrp_expr)
-                        if _vrp_r.success and _vrp_r.sharpe:
-                            logging.info(f"🎯 VRP注入: Sharpe={_vrp_r.sharpe:.3f} Fitness={_vrp_r.fitness:.3f} | {_vrp_expr[:70]}")
-                            if abs(_vrp_r.sharpe) >= VRP_NEAR_MISS_SHARPE_MIN:
-                                d0_high_performers.append(_vrp_expr)
-                                _log_discovery(_vrp_expr, _vrp_r.sharpe, _vrp_r.fitness,
-                                               _vrp_r.alpha_id, source="VRP-轮替注入")
-                except Exception as _ve:
-                    logging.debug(f"VRP batch注入异常: {_ve}")
+                _run_near_miss_layer(d0_layer_c, D0_NEAR_MISS_VARIANTS_SHARPE, "D0-Sharpe优化",
+                                     target_sharpe=2.0, target_fitness=1.3, target_pool=d0_high_performers)
+                _run_near_miss_layer(d0_layer_d, D0_NEAR_MISS_VARIANTS_FITNESS, "D0-Fitness优化",
+                                     target_sharpe=2.0, target_fitness=1.3, target_pool=d0_high_performers)
+
+        # ── VRP Layer-E：仅 D0/both 模式启用（VRP 是 delay=0 策略）─────────
+        if mode in ("d0", "both"):
+            vrp_layer_e = [
+                res for res in results
+                if res.success and res.template
+                and res.sharpe is not None
+                and abs(res.sharpe) >= VRP_NEAR_MISS_SHARPE_MIN
+                and "implied_volatility_call_120" in (res.template or "")
+            ][:VRP_MAX_NEAR_MISS]
+            _vrp_inject = [e for e in random.sample(VRP_EXPR_POOL, min(3, len(VRP_EXPR_POOL)))
+                           if e not in evaluated_alphas]
+            if vrp_layer_e or _vrp_inject:
+                logging.info(f"🎯 VRP Layer-E: near-miss命中={len(vrp_layer_e)} + 轮替注入={len(_vrp_inject)}")
+                if vrp_layer_e:
+                    _run_near_miss_layer(vrp_layer_e, VRP_NEAR_MISS_VARIANTS, "VRP-专属优化",
+                                         target_sharpe=2.0, target_fitness=1.3, target_pool=d0_high_performers)
+                if _vrp_inject:
+                    _vrp_settings = SimulationSettings(
+                        region="USA", universe="TOP1000", delay=0, decay=0,
+                        neutralization="INDUSTRY", truncation=0.1,
+                        nanHandling="ON", testPeriod="P5Y0M0D"
+                    )
+                    _vrp_futures = tester.simulate_batch(_vrp_inject, "USA", _vrp_settings)
+                    try:
+                        _vrp_results = tester.wait_for_results(_vrp_futures, timeout=300)
+                        for _vrp_expr, _vrp_r in zip(_vrp_inject, _vrp_results):
+                            evaluated_alphas.add(_vrp_expr)
+                            if _vrp_r.success and _vrp_r.sharpe:
+                                logging.info(f"🎯 VRP注入: Sharpe={_vrp_r.sharpe:.3f} Fitness={_vrp_r.fitness:.3f} | {_vrp_expr[:70]}")
+                                if abs(_vrp_r.sharpe) >= VRP_NEAR_MISS_SHARPE_MIN:
+                                    d0_high_performers.append(_vrp_expr)
+                                    _log_discovery(_vrp_expr, _vrp_r.sharpe, _vrp_r.fitness,
+                                                   _vrp_r.alpha_id, source="VRP-轮替注入")
+                    except Exception as _ve:
+                        logging.debug(f"VRP batch注入异常: {_ve}")
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        # ── Layer-F: Ret/DD 优化层 — 直接提升 IQC OS 分数 ──────────
+        # 针对 Sharpe 尚可 (1.0~1.5) 但 Returns/Drawdown 比低的因子
+        # 用紧截断+重衰减+小宇宙降 Drawdown → 提升 Ret/DD ratio
+        layer_f_candidates = [
+            res for res in results
+            if res.success and res.template
+            and res.sharpe is not None and res.fitness is not None
+            and RETDD_LAYER_F_SHARPE_MIN <= abs(res.sharpe) < RETDD_LAYER_F_SHARPE_MAX
+            and abs(res.fitness) >= RETDD_LAYER_F_FITNESS_MIN
+            and res.template not in _d0_template_set  # D1 only for now
+        ][:MAX_RETDD_LAYER_F_PER_GEN]
+
+        # Also capture D0 high-sharpe but low Ret/DD (only in D0/both modes)
+        d0_layer_f = []
+        if mode in ("d0", "both"):
+            d0_layer_f = [
+                res for res in results
+                if res.success and res.template
+                and res.sharpe is not None and res.fitness is not None
+                and res.template in _d0_template_set
+                and abs(res.sharpe) >= 1.5
+                and abs(res.fitness) >= 1.0
+                # Check if returns/drawdown ratio is poor
+                and hasattr(res, 'returns') and hasattr(res, 'max_drawdown')
+                and res.returns is not None and res.max_drawdown is not None
+                and res.max_drawdown > 0
+                and (res.returns / res.max_drawdown) < 2.0  # Only target low Ret/DD
+            ][:3]
+
+        if layer_f_candidates or d0_layer_f:
+            logging.info(
+                f"📈 Ret/DD Layer-F: D1={len(layer_f_candidates)} D0={len(d0_layer_f)} "
+                f"(targeting OS Score improvement)"
+            )
+            if layer_f_candidates:
+                _run_near_miss_layer(
+                    layer_f_candidates, RETDD_NEAR_MISS_VARIANTS, "D1-RetDD优化",
+                    target_sharpe=1.25, target_fitness=1.0, target_pool=high_performers
+                )
+            if d0_layer_f:
+                _run_near_miss_layer(
+                    d0_layer_f, RETDD_NEAR_MISS_VARIANTS, "D0-RetDD优化",
+                    target_sharpe=2.0, target_fitness=1.3, target_pool=d0_high_performers
+                )
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
@@ -3463,7 +3493,6 @@ def main(mode: str = "d0"):
         # 更新上一代数据供下次后台线程使用
         prev_high_performers = high_performers
         prev_losers = losers
-        # 同步的 AI 诊断和策略任务已全部移入后台线程 _background_prefetch
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
         # Self-Optimization / Genetic Feedback mechanism
@@ -3485,47 +3514,19 @@ def main(mode: str = "d0"):
             d0_knowledge_pool = list(dict.fromkeys(d0_knowledge_pool))[:10]
             logging.info(f"🟢 D0精英池更新: {len(d0_high_performers)} 条新精英 | 池总量={len(d0_knowledge_pool)}")
 
-            # 🔬 D0 成功模式放大器：用 Qwen 分析高分 D0 因子并生成同族变体
-            if ollama_manager:
-                for _elite in d0_high_performers[:2]:  # 最多放大 2 个
-                    try:
-                        # 采样真实字段供 Qwen 使用
-                        _amp_fields = random.sample(
-                            list(wq_fields_by_category.get('fundamental', wq_fields[:20])),
-                            min(8, len(wq_fields_by_category.get('fundamental', wq_fields[:20])))
-                        )
-                        _amp_prompt = (
-                            f"This Delay-0 alpha achieved high Sharpe: {_elite}\n"
-                            f"Analyze WHY this pattern works, then generate 4 VARIATIONS that:\n"
-                            "1. Keep the same structural pattern but swap the data fields\n"
-                            "2. Try different time windows (5, 10, 20, 60)\n"
-                            "3. Add an extra signal layer (e.g. trade_when condition)\n"
-                            f"AVAILABLE FIELDS: {', '.join(_amp_fields)}\n"
-                            "D0 RULES: Never use raw close/volume/returns. Use ts_delay(close,1) instead.\n"
-                            "Output ONLY a JSON array of 4 expression strings:"
-                        )
-                        _amp_raw = ollama_manager.generate(
-                            _amp_prompt,
-                            system_prompt="Output ONLY a JSON array of FASTEXPR strings. No explanation.",
-                            temperature=0.7, max_tokens=600
-                        )
-                        if _amp_raw:
-                            _amp_parsed = _parse_ai_alpha_response(_amp_raw)
-                            _amp_valid = []
-                            for _v in _amp_parsed:
-                                _v = re.sub(r'^["\s]*expression["\s]*:\s*["\s]*', '', _v).strip().rstrip('"')
-                                _v = sanitize_for_d0(_v)
-                                if (_v not in evaluated_alphas and _v not in d0_knowledge_pool
-                                        and _v.count('(') == _v.count(')') and len(_v) > 15):
-                                    _amp_valid.append(_v)
-                            if _amp_valid:
-                                with _prefetch_lock:
-                                    _intel_d0_pool.extend(_amp_valid)
-                                logging.info(
-                                    f"🔬 [D0放大器] 从精英 '{_elite[:50]}...' 生成 {len(_amp_valid)} 个同族变体"
-                                )
-                    except Exception as _ae:
-                        logging.debug(f"[D0放大器] 跳过: {_ae}")
+        # 📊 候选池摘要（每代汇报一次）
+        if storage and hasattr(storage, 'get_candidate_summary'):
+            try:
+                _cp_summary = storage.get_candidate_summary()
+                _pending = _cp_summary.get('pending', {}).get('count', 0)
+                _approved = _cp_summary.get('approved', {}).get('count', 0)
+                _submitted = _cp_summary.get('submitted', {}).get('count', 0)
+                if _pending or _approved:
+                    logging.info(
+                        f"📊 [候选池] 待审核={_pending} | 已批准={_approved} | 已提交={_submitted}"
+                    )
+            except Exception:
+                pass
 
         logging.info(
             f"Generation {generation} completed. "
@@ -3535,12 +3536,22 @@ def main(mode: str = "d0"):
         # 无空窗期：立即开始下一代（WQ Brain 并发仿真本身就是节流器）
         time.sleep(1)
         generation += 1
+      except KeyboardInterrupt:
+        logging.info("Shutting down gracefully...")
+        break
+      except Exception as _gen_err:
+        logging.error(f"⚠️ GENERATION {generation} CRASHED (auto-recovering): {_gen_err}", exc_info=True)
+        time.sleep(30)
+        generation += 1
+        continue
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="WorldQuant Continuous Evolution Engine")
-    parser.add_argument("--mode", choices=["d0", "d1", "both"], default="both",
-                        help="挖掘模式: d0=只挖D0, d1=只挖D1, both=双引擎(默认)")
+    parser.add_argument("--mode", choices=["d0", "d1", "both", "sniper"], default="both",
+                        help="挖掘模式: d0=只挖D0, d1=只挖D1, both=双引擎(默认), sniper=精准研究(实例1专用)")
+    parser.add_argument("--credential", type=str, default=None,
+                        help="指定 credential 文件路径（不同实例用不同账号，如 credential_2.txt）")
     args = parser.parse_args()
-    main(mode=args.mode)
+    main(mode=args.mode, credential_file=args.credential)

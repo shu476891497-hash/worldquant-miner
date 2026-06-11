@@ -78,7 +78,7 @@ class SimulatorTester:
     Separated from template generation for modularity.
     """
     
-    def __init__(self, session: requests.Session, region_configs: Dict, template_generator=None):
+    def __init__(self, session: requests.Session, region_configs: Dict, template_generator=None, credential_file: str = None):
         """
         Initialize simulator tester
         
@@ -86,10 +86,12 @@ class SimulatorTester:
             session: Authenticated requests session
             region_configs: Region configuration dictionary
             template_generator: Optional reference to template generator for re-authentication
+            credential_file: Path to the credential file for this instance (for re-login)
         """
         self.sess = session
         self.region_configs = region_configs
         self.template_generator = template_generator  # For re-authentication if needed
+        self.credential_file = credential_file  # Instance-specific credential file for re-login
         self.executor = ThreadPoolExecutor(max_workers=4)  # 多实例安全：3实例×4线程=12总并发
         self.active_simulations = {}  # {alpha_id: Future}
         self._relogin_count = 0  # Track re-login attempts
@@ -97,66 +99,94 @@ class SimulatorTester:
     def _try_relogin(self) -> bool:
         """
         Attempt to re-authenticate when session expires (401).
-        Uses credential.txt for password-based re-login.
+        Uses ONLY the instance-specific credential file.
+        
+        🔒 SECURITY: Never falls back to auth.json or default credential.txt
+        to prevent silent account switching in multi-instance deployments.
         Returns True if re-login succeeded.
         """
         self._relogin_count += 1
-        logger.info(f"🔄 Re-login attempt #{self._relogin_count}")
+        logger.info(f"🔄 Re-login attempt #{self._relogin_count} (credential_file={self.credential_file})")
         
         try:
-            # Method 1: Use CredentialManager to re-authenticate
-            from .credential_manager import CredentialManager
             from pathlib import Path
+            from requests.auth import HTTPBasicAuth
             
             base_path = Path(__file__).parent.parent
-            cm = CredentialManager(base_path=str(base_path))
             
-            if cm.authenticate(auto_load=True, auto_prompt=False):
-                new_session = cm.get_session()
-                if new_session:
-                    # Update the session used by this simulator
-                    self.sess = new_session
+            # ONLY use instance-specific credential file (CRITICAL for multi-account)
+            if not self.credential_file:
+                logger.error("❌ No credential_file set — cannot re-login without instance-specific credentials")
+                return False
+            
+            cred_path = Path(self.credential_file)
+            if not cred_path.is_absolute():
+                cred_path = base_path / cred_path
+            if not cred_path.exists():
+                logger.error(f"❌ Instance credential file not found: {cred_path}")
+                return False
+            
+            with open(cred_path, 'r') as f:
+                lines = f.read().strip().split('\n')
+            if len(lines) < 2:
+                logger.error(f"❌ Credential file has insufficient lines: {cred_path}")
+                return False
+            
+            username = lines[0].strip()
+            password_or_cookie = lines[1].strip()
+
+            if password_or_cookie.startswith("COOKIE:"):
+                # Cookie/JWT re-auth: hot-reload token from file
+                jwt_token = password_or_cookie[7:]
+                self.sess.headers['Authorization'] = f'Bearer {jwt_token}'
+                # Clear any old basic auth
+                self.sess.auth = None
+                resp = self.sess.get(
+                    'https://api.worldquantbrain.com/users/self',
+                    timeout=10
+                )
+                if resp.status_code == 200:
+                    actual_email = resp.json().get('email', '?')
+                    logger.info(f"✅ Cookie re-login successful (expected={username}, actual={actual_email})")
+                    if actual_email.lower() != username.lower():
+                        logger.error(f"❌ ACCOUNT MISMATCH! Expected {username} but got {actual_email}. Aborting re-login.")
+                        return False
+                    return True
+                else:
+                    logger.error(f"❌ Cookie re-login failed: {resp.status_code} — please update cookie")
+                    return False
+            else:
+                # Standard password auth
+                auth = HTTPBasicAuth(username, password_or_cookie)
+                resp = self.sess.post(
+                    'https://api.worldquantbrain.com/authentication',
+                    auth=auth, timeout=10
+                )
+                if resp.status_code == 201:
+                    self.sess.auth = auth
+                    # Verify we actually logged in as the right account
+                    verify_resp = self.sess.get('https://api.worldquantbrain.com/users/self', auth=auth, timeout=10)
+                    actual_email = '?'
+                    if verify_resp.status_code == 200:
+                        actual_email = verify_resp.json().get('email', '?')
+                    logger.info(f"✅ Re-login successful: expected={username}, actual={actual_email}")
+                    if actual_email != '?' and actual_email.lower() != username.lower():
+                        logger.error(f"❌ ACCOUNT MISMATCH! Expected {username} but got {actual_email}. Aborting.")
+                        return False
                     # Also update template_generator's session if available
                     if self.template_generator and hasattr(self.template_generator, 'sess'):
-                        self.template_generator.sess = new_session
-                    logger.info(f"✅ Re-login successful via CredentialManager")
+                        self.template_generator.sess = self.sess
                     return True
-            
-            # Method 2: Direct BasicAuth re-login as fallback
-            credential_paths = [
-                base_path / 'credential.txt',
-                base_path / 'credentials.txt',
-                base_path.parent / 'credential.txt',
-            ]
-            
-            for cred_path in credential_paths:
-                if cred_path.exists():
-                    with open(cred_path, 'r') as f:
-                        lines = f.read().strip().split('\n')
-                    if len(lines) >= 2:
-                        username, password = lines[0].strip(), lines[1].strip()
-                        from requests.auth import HTTPBasicAuth
-                        auth = HTTPBasicAuth(username, password)
-                        resp = self.sess.post(
-                            'https://api.worldquantbrain.com/authentication',
-                            auth=auth, timeout=10
-                        )
-                        if resp.status_code == 201:
-                            self.sess.auth = auth
-                            logger.info(f"✅ Re-login successful via BasicAuth ({username})")
-                            return True
-                        elif resp.status_code == 401:
-                            body = resp.json() if resp.content else {}
-                            if body.get('inquiry'):
-                                logger.error(f"❌ Biometrics required (inquiry={body['inquiry']}), cannot auto-relogin")
-                            else:
-                                logger.error(f"❌ BasicAuth 401: {resp.text[:200]}")
-                        else:
-                            logger.error(f"❌ BasicAuth failed: {resp.status_code}")
-                    break
-            
-            logger.error("❌ All re-login methods failed")
-            return False
+                elif resp.status_code == 401:
+                    body = resp.json() if resp.content else {}
+                    if body.get('inquiry'):
+                        logger.error(f"❌ Biometrics required for {username}")
+                    else:
+                        logger.error(f"❌ Instance credential auth failed: 401 {resp.text[:200]}")
+                    return False
+                else:
+                    logger.error(f"❌ Instance credential auth failed: {resp.status_code}")
+                    return False
             
         except Exception as e:
             logger.error(f"❌ Re-login exception: {e}")
@@ -277,6 +307,33 @@ class SimulatorTester:
                 else:
                     logger.error(f"❌ Re-login failed, cannot recover session")
                 return None
+            elif response.status_code == 429:
+                # CONCURRENT_SIMULATION_LIMIT_EXCEEDED - retry with exponential backoff
+                import time as _time
+                for retry_i in range(3):
+                    backoff = 10 * (2 ** retry_i)  # 10s, 20s, 40s
+                    logger.warning(f"⏳ 429 rate limit hit, backing off {backoff}s (retry {retry_i+1}/3)...")
+                    _time.sleep(backoff)
+                    if self.template_generator and hasattr(self.template_generator, 'make_api_request'):
+                        response = self.template_generator.make_api_request(
+                            'POST',
+                            'https://api.worldquantbrain.com/simulations',
+                            json=simulation_data
+                        )
+                    else:
+                        response = self.sess.post(
+                            'https://api.worldquantbrain.com/simulations',
+                            json=simulation_data
+                        )
+                    if response.status_code == 201:
+                        progress_url = response.headers.get('Location')
+                        if progress_url:
+                            logger.info(f"Submitted simulation after 429 retry: {progress_url}")
+                            return progress_url
+                    elif response.status_code != 429:
+                        break  # Different error, stop retrying
+                logger.error(f"Failed to submit simulation after 429 retries: {response.status_code} - {response.text[:200]}")
+                return None
             else:
                 logger.error(f"Failed to submit simulation: {response.status_code} - {response.text}")
                 return None
@@ -365,14 +422,24 @@ class SimulatorTester:
                 # Calculate elapsed time once
                 elapsed = time.time() - start_time
                 
-                # Handle empty or missing status - treat as PENDING if just submitted
+                # ── Fix: WQ API sometimes returns {'progress': 0.35} without 'status' ──
+                # Detect progress-only responses and map to proper status
                 if status == 'UNKNOWN' or not status:
-                    # If we just started monitoring (elapsed < 10s), treat as PENDING
-                    if elapsed < 10:
+                    if 'progress' in data:
+                        # API is reporting progress → simulation is running
+                        progress_val = data.get('progress', 0)
+                        if progress_val >= 1.0:
+                            status = 'COMPLETE'
+                        else:
+                            status = 'RUNNING'
+                        logger.debug(f"Mapped progress={progress_val} to status={status}")
+                    elif 'alpha' in data:
+                        # Has alpha ID → completed
+                        status = 'COMPLETE'
+                    elif elapsed < 10:
                         status = 'PENDING'
-                        logger.debug(f"Status missing/unknown in API response, treating as PENDING (elapsed: {elapsed:.1f}s)")
+                        logger.debug(f"Status missing, treating as PENDING (elapsed: {elapsed:.1f}s)")
                     else:
-                        # Log the actual response for debugging
                         logger.warning(f"Unknown status in API response: {data}")
                 
                 # Calculate progress based on status and elapsed time
