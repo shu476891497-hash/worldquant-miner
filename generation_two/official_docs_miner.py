@@ -47,6 +47,7 @@ LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
 API_BASE = "https://api.worldquantbrain.com"
+SUBMITTED_DATAFIELDS_PATH = BASE_DIR / "constants" / "submitted_datafields.json"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,6 +58,44 @@ logging.basicConfig(
     ]
 )
 log = logging.getLogger("official_miner")
+
+
+def _load_submitted_datafield_cache() -> Dict:
+    """Load user-submitted field/expression cache used to avoid re-mining spent ideas."""
+    if not SUBMITTED_DATAFIELDS_PATH.exists():
+        return {}
+    try:
+        with open(SUBMITTED_DATAFIELDS_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception as exc:
+        log.warning(f"Failed to load submitted datafield cache: {exc}")
+        return {}
+
+
+def _template_hits_submitted_cache(template, cache: Dict) -> bool:
+    """Return True when a template contains an already-submitted fragment or banned field."""
+    raw_expression = template.expression or ""
+    expression = raw_expression.replace(" ", "")
+    for item in cache.get("banned_exact_expressions", []):
+        banned = item.get("expression") if isinstance(item, dict) else item
+        normalized = str(banned or "").replace(" ", "")
+        if normalized and normalized == expression:
+            return True
+    for item in cache.get("banned_fields", []):
+        field = item.get("field") if isinstance(item, dict) else item
+        normalized = str(field or "").replace(" ", "")
+        if normalized and normalized in expression:
+            return True
+    for item in cache.get("submitted_expressions", []):
+        if not isinstance(item, dict):
+            continue
+        fragments = item.get("expression_fragments") or []
+        for fragment in fragments:
+            normalized = str(fragment).replace(" ", "")
+            if normalized and normalized in expression:
+                return True
+    return False
 
 
 # ──────────────────────────── DATA CLASSES ─────────────────────────
@@ -245,7 +284,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="long_term_investment",
-        expression="ts_regression(ts_sum(ts_backfill(fnd6_newqv1300_ivltq, 60), 252), ts_step(1), 756, 0, 2)",
+        expression="group_rank(ts_delta(ts_backfill(fnd6_newqv1300_ivltq, 60), 252), subindustry)",
         hypothesis="持续增加长期投资的公司 → 未来更高利润",
         hint="给同时有收入增长的公司加更大权重",
         dataset_category="fundamental",
@@ -414,7 +453,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="ern4_forecast_vs_realized",
-        expression="ts_backfill(ern4_fcsterneffct, 5) - ts_backfill(ern4_erneffct1, 5)",
+        expression="ts_backfill(vec_avg(ern4_fcsterneffct), 5) - ts_backfill(vec_avg(ern4_erneffct1), 5)",
         hypothesis="预测效应 - 实现效应 = 市场预期偏差",
         hint="预测家族是低turnover高margin的宝地",
         dataset_category="earnings",
@@ -424,7 +463,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="ern4_implied_move",
-        expression="ts_backfill(ern4_impernmv90d, 5)",
+        expression="ts_backfill(vec_avg(ern4_impernmv90d), 5)",
         hypothesis="市场隐含的下次盈利移动百分比",
         hint="信号在forecast vs implied的差距中",
         dataset_category="earnings",
@@ -434,7 +473,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="ern4_ernmv1_drift",
-        expression="ts_backfill(ern4_ernmv1, 60)",
+        expression="ts_backfill(vec_avg(ern4_ernmv1), 60)",
         hypothesis="最近盈利移动大小→盈利后漂移(PEAD)代理",
         hint="ernmv1是全数据集使用最多的字段; ts_delta检测新事件",
         dataset_category="earnings",
@@ -516,9 +555,9 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fn_opincome_assets_ir",
-        expression="group_rank(ts_ir(operating_income / (assets + 0.000001), 120), subindustry)",
+        expression="group_rank(ts_mean(operating_income / (assets + 0.000001), 120) / (ts_std_dev(operating_income / (assets + 0.000001), 120) + 0.000001), subindustry)",
         hypothesis="经营收入/资产的信息比率高 → 稳定改善 → 买入",
-        hint="ts_ir = mean/std = 信号稳定性指标",
+        hint="mean/std information ratio proxy; avoids inaccessible ts_ir operator",
         dataset_category="fundamental",
         level="custom",
         neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
@@ -536,7 +575,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fn_equity_assets_trend",
-        expression="group_rank(ts_regression(equity / (assets + 0.000001), ts_step(1), 252, 0, 2), subindustry)",
+        expression="group_rank(ts_delta(equity / (assets + 0.000001), 252), subindustry)",
         hypothesis="权益/资产比率长期上升趋势 → 财务结构改善 → 买入",
         hint="ts_regression rettype=2 返回斜率",
         dataset_category="fundamental",
@@ -629,7 +668,7 @@ def get_official_templates() -> List[AlphaTemplate]:
     # rettype=2: slope (趋势斜率)
     templates.append(AlphaTemplate(
         name="fn_sales_trend_slope",
-        expression="group_rank(ts_regression(sales_ps, ts_step(1), 252, 0, 2), subindustry)",
+        expression="group_rank(ts_delta(sales_ps, 252), subindustry)",
         hypothesis="每股销售长期趋势斜率为正 → 收入稳步增长 → 买入",
         hint="ts_regression rettype=2返回斜率, ts_step(1)是时间序列",
         dataset_category="fundamental",
@@ -639,7 +678,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fn_ebitda_trend_slope",
-        expression="group_rank(ts_regression(ebitda, ts_step(1), 252, 0, 2), subindustry)",
+        expression="group_rank(ts_delta(ebitda, 252), subindustry)",
         hypothesis="EBITDA趋势斜率为正 → 盈利能力持续提升 → 买入",
         hint="长窗口(252天)捕捉年度趋势",
         dataset_category="fundamental",
@@ -649,7 +688,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fn_eps_trend_slope",
-        expression="group_rank(ts_regression(eps, ts_step(1), 120, 0, 2), subindustry)",
+        expression="group_rank(ts_delta(eps, 120), subindustry)",
         hypothesis="EPS半年趋势为正 → 盈利改善 → 买入",
         hint="120天窗口更敏感, 适合捕捉季报变化",
         dataset_category="fundamental",
@@ -660,7 +699,7 @@ def get_official_templates() -> List[AlphaTemplate]:
     # rettype=0: residual (偏离趋势的异常值)
     templates.append(AlphaTemplate(
         name="fn_sales_resid_reversal",
-        expression="-1 * group_rank(ts_regression(sales_ps, ts_step(1), 252, 0, 0), subindustry)",
+        expression="-1 * group_rank(ts_zscore(sales_ps, 252), subindustry)",
         hypothesis="残差为正=高于趋势→均值回归做空; 残差为负→反弹做多",
         hint="rettype=0返回残差, 捕捉偏离长期趋势的异常",
         dataset_category="fundamental",
@@ -671,7 +710,7 @@ def get_official_templates() -> List[AlphaTemplate]:
     # rettype=1: R² (拟合度 → 趋势可靠性)
     templates.append(AlphaTemplate(
         name="fn_operating_income_r2",
-        expression="group_rank(ts_regression(operating_income, ts_step(1), 252, 0, 1), subindustry)",
+        expression="group_rank(ts_mean(operating_income, 252) / (ts_std_dev(operating_income, 252) + 0.000001), subindustry)",
         hypothesis="经营收入趋势R²高→走势可预测→市场定价准确→动量有效",
         hint="rettype=1返回R², 高R²意味着线性趋势强",
         dataset_category="fundamental",
@@ -682,7 +721,7 @@ def get_official_templates() -> List[AlphaTemplate]:
     # 双因子回归: 用一个因子解释另一个
     templates.append(AlphaTemplate(
         name="fn_eps_vs_sales_beta",
-        expression="group_rank(ts_regression(eps, sales_ps, 252, 0, 2), subindustry)",
+        expression="group_rank(ts_zscore(eps / (sales_ps + 0.000001), 252), subindustry)",
         hypothesis="EPS对每股销售的beta高→利润率杠杆大→高弹性",
         hint="两个基本面字段做回归, 衡量利润率弹性",
         dataset_category="fundamental",
@@ -705,9 +744,9 @@ def get_official_templates() -> List[AlphaTemplate]:
     templates.append(AlphaTemplate(
         name="fn_equity_resid_signal",
         expression=(
-            "resid = ts_regression(equity, ts_step(1), 252, 0, 0);\n"
-            "slope = ts_regression(equity, ts_step(1), 252, 0, 2);\n"
-            "trade_when(slope > 0, -group_rank(resid, subindustry), nan)"
+            "trend = ts_delta(equity, 252);\n"
+            "z = ts_zscore(equity, 252);\n"
+            "trade_when(trend > 0, -group_rank(z, subindustry), nan)"
         ),
         hypothesis="权益趋势向上时, 负残差=暂时低于趋势→买入反弹",
         hint="组合slope+residual, 条件信号降低turnover",
@@ -921,7 +960,7 @@ def get_official_templates() -> List[AlphaTemplate]:
     # --- EPS Quality (文档核心策略) ---
     templates.append(AlphaTemplate(
         name="fnd7_eps_quality",
-        expression="group_rank(ts_regression(fnd7_ointfund_qxspeo, fnd7_ointhstfund_hqxspeo, 252, 0, 2), subindustry)",
+        expression="-group_rank(abs(fnd7_ointfund_qxspeo - fnd7_ointhstfund_hqxspeo), subindustry)",
         hypothesis="diluted EPS与footnote EPS回归斜率→高→报告一致→高质量",
         hint="文档Alpha Idea: footnote reinforces primary → higher earnings quality",
         dataset_category="fundamental",
@@ -942,7 +981,7 @@ def get_official_templates() -> List[AlphaTemplate]:
     # --- Income Quality ---
     templates.append(AlphaTemplate(
         name="fnd7_income_before_extraordinary",
-        expression="group_rank(ts_regression(fnd7_ointfund_qbi, ts_step(1), 252, 0, 2), subindustry)",
+        expression="group_rank(ts_delta(fnd7_ointfund_qbi, 252), subindustry)",
         hypothesis="税前经常性收入趋势上升→核心盈利改善→买入",
         hint="qbi = income before extraordinary items, 排除非经常性",
         dataset_category="fundamental",
@@ -953,7 +992,7 @@ def get_official_templates() -> List[AlphaTemplate]:
     # --- Cash Flow ---
     templates.append(AlphaTemplate(
         name="fnd7_operating_cashflow_trend",
-        expression="group_rank(ts_regression(fnd7_ointfund_qfcnif, ts_step(1), 252, 0, 2), subindustry)",
+        expression="group_rank(ts_delta(fnd7_ointfund_qfcnao, 252), subindustry)",
         hypothesis="融资活动现金流趋势→反映资本结构变化",
         hint="fnd7提供详细cash flow statement items",
         dataset_category="fundamental",
@@ -985,7 +1024,7 @@ def get_official_templates() -> List[AlphaTemplate]:
     # --- Retained Earnings ---
     templates.append(AlphaTemplate(
         name="fnd7_retained_earnings_growth",
-        expression="group_rank(ts_regression(fnd7_ointfund_qer, ts_step(1), 252, 0, 2), subindustry)",
+        expression="group_rank(ts_delta(fnd7_ointfund_qer, 252), subindustry)",
         hypothesis="留存收益趋势上升→内生增长→买入",
         hint="qer = retained earnings, 公司自我积累能力",
         dataset_category="fundamental",
@@ -1007,12 +1046,989 @@ def get_official_templates() -> List[AlphaTemplate]:
     # --- EPS 12-month Trend ---
     templates.append(AlphaTemplate(
         name="fnd7_eps_12m_trend",
-        expression="group_rank(ts_regression(fnd7_ointfund_21speo, ts_step(1), 252, 0, 2), subindustry)",
+        expression="group_rank(ts_delta(fnd7_ointfund_21speo, 252), subindustry)",
         hypothesis="12个月移动EPS趋势上升→持续盈利改善→买入",
         hint="21speo = EPS from operations, trailing 12 months",
         dataset_category="fundamental",
         level="custom",
         neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
+    ))
+
+    # Deep Fundamental Pack: FND2/FND6/FND7 fields verified in local USA_1_TOP3000 cache.
+    # FND1/FND3 are intentionally not added until their fields are present in cache.
+
+    # --- FND2: detailed disclosures, financing, tax quality ---
+    templates.append(AlphaTemplate(
+        name="fnd2_tax_cash_gap",
+        expression="-group_rank(ts_zscore((fn_income_taxes_paid_a - fn_income_tax_expense_a) / (assets + 0.000001), 252), subindustry)",
+        hypothesis="Cash taxes materially above booked tax expense can pressure future free cash flow.",
+        hint="FND2 disclosure field; normalize by assets and rank within subindustry.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_deferred_tax_quality",
+        expression="-group_rank(ts_delta(fn_def_income_tax_expense_a / (fn_income_tax_expense_a + 0.000001), 252), subindustry)",
+        hypothesis="Rising deferred tax share can indicate lower cash earnings quality.",
+        hint="Uses annual deferred tax expense versus total tax expense.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_net_debt_issuance_pressure",
+        expression="-group_rank(ts_mean((fn_proceeds_from_issuance_of_debt_q - fn_repayments_of_debt_q) / (fn_debt_instrument_carrying_amount_q + 0.000001), 120), sector)",
+        hypothesis="Net debt issuance relative to debt stock flags external financing dependence.",
+        hint="Sector neutralization keeps capital-structure norms comparable.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_debt_repayment_strength",
+        expression="group_rank(ts_rank(fn_repayments_of_debt_q / (fn_debt_instrument_carrying_amount_q + 0.000001), 252), subindustry)",
+        hypothesis="Consistent debt repayment indicates balance-sheet repair and lower refinancing risk.",
+        hint="Long time-series rank fits low-frequency disclosure cadence.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_sbc_dilution_drag",
+        expression="-group_rank(ts_delta(fn_allocated_share_based_compensation_expense_q / (fn_comprehensive_income_net_of_tax_q + 0.000001), 120), subindustry)",
+        hypothesis="Rising share-based compensation versus comprehensive income dilutes real shareholder return.",
+        hint="Quarterly FND2 compensation disclosure; negative sign penalizes acceleration.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=5, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_deferred_tax_asset_risk",
+        expression="-group_rank(ts_zscore(fn_def_tax_assets_liab_net_q / (assets + 0.000001), 252), subindustry)",
+        hypothesis="Large deferred tax asset balances can be fragile if future profitability weakens.",
+        hint="Asset-normalized balance-sheet disclosure with subindustry ranking.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_expected_dividend_support",
+        expression="group_rank(ts_rank(fnd2_a_sbcpnargmtwfsptepddvdrt, 252), sector)",
+        hypothesis="Higher expected dividend rate supports income-quality and shareholder-return demand.",
+        hint="Uses FND2 estimated dividend-rate disclosure; sector rank avoids yield-sector bias.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_restructuring_overhang",
+        expression="-group_rank(ts_mean(fnd2_a_restructuringcharges / (assets + 0.000001), 252), subindustry)",
+        hypothesis="Persistent restructuring charges suggest operational stress and future margin drag.",
+        hint="Lower coverage but low crowding; keep decay high to reduce turnover.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_inventory_mix_shift",
+        expression="-group_rank(ts_delta(fnd2_a_inventoryfinishedgoods / (fnd2_a_inventoryrawmaterials + 0.000001), 120), subindustry)",
+        hypothesis="Finished-goods buildup versus raw materials can flag demand weakness.",
+        hint="Inventory composition signal; negative sign treats buildup as risk.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_receivable_reserve_risk",
+        expression="-group_rank(ts_zscore(fn_allowance_for_doubtful_accounts_receivable_a / (fn_ppne_gross_a + 0.000001), 252), subindustry)",
+        hypothesis="High doubtful-account allowance can indicate deteriorating customer quality.",
+        hint="Uses FND2 receivable reserve disclosure normalized by asset scale.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    # --- FND6: industry/special-item fields with low crowding in cache ---
+    templates.append(AlphaTemplate(
+        name="fnd6_core_pension_quality",
+        expression="group_rank(ts_rank(fnd6_newqeventv110_pnciaq, 252), subindustry)",
+        hypothesis="Favorable after-tax pension adjustment versus pretax drag can improve reported quality.",
+        hint="Low-crowding FND6 pension event fields.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_restructuring_cost_reversal",
+        expression="-group_rank(ts_zscore(fnd6_newqeventv110_rcaq, 252), subindustry)",
+        hypothesis="Large restructuring costs are often followed by near-term uncertainty and margin pressure.",
+        hint="FND6 restructuring after-tax field has low user and alpha counts.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_export_sales_momentum",
+        expression="group_rank(ts_delta(fnd6_salexg / (fnd6_sales + 0.000001), 252), sector)",
+        hypothesis="Rising export-sales share can capture external demand surprise inside sectors.",
+        hint="Uses low-crowding export sales field normalized by net sales.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_dividend_stability",
+        expression="group_rank(ts_rank(ts_backfill(fnd6_divd, 20), 252), sector)",
+        hypothesis="Stable cash dividends proxy durable cash generation and shareholder discipline.",
+        hint="Daily dividend field is sparse; short backfill reduces missingness.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_goodwill_impairment_warning",
+        expression="-group_rank(ts_zscore(fnd6_newqeventv110_gdwlipq, 252), subindustry)",
+        hypothesis="Goodwill impairment events reveal overpaid acquisitions and weak capital allocation.",
+        hint="Combines pretax and EPS-effect impairment fields.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_inventory_finished_goods_alert",
+        expression="-group_rank(ts_delta(fnd6_newqeventv110_invfgq, 120), subindustry)",
+        hypothesis="Finished-goods inventory growing faster than raw materials can signal demand slowdown.",
+        hint="Low-crowding FND6 inventory detail.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_working_capital_stress",
+        expression="-group_rank(ts_delta(fnd6_cptnewqeventv110_rectq, 120), subindustry)",
+        hypothesis="Receivables rising faster than payables and sales can reveal cash conversion stress.",
+        hint="Receivables/payables event fields are less crowded than generic fundamentals.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_level3_liability_risk",
+        expression="-group_rank(ts_zscore(fnd6_newqeventv110_lul3q, 252), sector)",
+        hypothesis="High Level-3 liability share increases valuation uncertainty and downside risk.",
+        hint="Fair-value hierarchy signal; sector rank keeps financial exposure comparable.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_core_eps_option_spread",
+        expression="group_rank(ts_zscore(fnd6_newqv1300_spcep12 - fnd6_newqv1300_xoptdq, 252), subindustry)",
+        hypothesis="Core earnings strength beyond option-related EPS effects is higher-quality earnings.",
+        hint="Separates core 12-month earnings from option EPS dilution.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    # --- FND7: point-in-time cash-flow and balance-sheet structure ---
+    templates.append(AlphaTemplate(
+        name="fnd7_operating_cash_flow_improvement",
+        expression="group_rank(ts_delta(fnd7_ointfund_qfcnao / (fnd7_ointfund_qta + 0.000001), 252), subindustry)",
+        hypothesis="Operating cash flow improving relative to assets indicates stronger self-funded growth.",
+        hint="PIT FND7 operating cash flow normalized by total assets.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_financing_dependency",
+        expression="-group_rank(ts_mean(fnd7_ointfund_qfcnif / (fnd7_ointfund_qqec + 0.000001), 120), sector)",
+        hypothesis="High financing cash inflow relative to common equity signals external capital dependence.",
+        hint="Negative sign penalizes financing dependence; sector neutralization for capital structure.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_shortterm_debt_surge",
+        expression="-group_rank(ts_delta(fnd7_ointfund_qcld / (fnd7_ointfund_qqec + 0.000001), 120), subindustry)",
+        hypothesis="Current debt surges versus equity can reveal liquidity stress.",
+        hint="PIT current-debt field; use quarter-scale window.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_longterm_debt_pressure",
+        expression="-group_rank(ts_delta(fnd7_ointfund_qttld / (fnd7_ointfund_qqec + 0.000001), 252), sector)",
+        hypothesis="Long-term debt rising versus equity can dilute future ROE through interest burden.",
+        hint="Uses FND7 total long-term debt outstanding at quarter end.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_dividend_stability_pit",
+        expression="group_rank(ts_rank(ts_backfill(fnd7_ointfund_qvd, 20), 252), subindustry)",
+        hypothesis="PIT cash dividends paid at high historical rank proxy durable cash generation.",
+        hint="Point-in-time dividend cash-flow field with light backfill.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_cash_balance_strength",
+        expression="group_rank(ts_delta(fnd7_ointfund_qehc / (fnd7_ointfund_qtcl + 0.000001), 120), subindustry)",
+        hypothesis="Cash and short-term investments rising versus current liabilities improves liquidity margin.",
+        hint="Balances cash against current liabilities instead of absolute company size.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_investing_cashflow_discipline",
+        expression="group_rank(ts_delta((fnd7_ointfund_qfcnao + fnd7_ointfund_qfcnvi) / (fnd7_ointfund_qta + 0.000001), 252), subindustry)",
+        hypothesis="Operating cash flow covering investment cash use is a cleaner free-cash-flow proxy.",
+        hint="Combines PIT operating and investing cash-flow statements.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_aggressive_expansion_alert",
+        expression="-group_rank(ts_delta(fnd7_ointfund_qoa / (fnd7_ointfund_qqec + 0.000001), 252), subindustry)",
+        hypothesis="Other assets expanding versus equity can flag aggressive or opaque asset growth.",
+        hint="Close to the requested other-assets expansion template using actual FND7 PIT field.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_receivable_quality",
+        expression="-group_rank(ts_delta(fnd7_ointfund_qtcer / (fnd7_ointfund_qelas + 0.000001), 120), subindustry)",
+        hypothesis="Receivables rising versus sales can signal lower revenue quality.",
+        hint="PIT receivables and sales fields; negative sign penalizes buildup.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_payables_cash_conversion",
+        expression="group_rank(ts_delta(fnd7_ointfund_qhclapa / (fnd7_ointfund_qelas + 0.000001), 120), subindustry)",
+        hypothesis="Accounts-payable cash-flow improvement can support near-term cash conversion.",
+        hint="Uses cash-flow statement change in payables against PIT sales.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_buyback_support",
+        expression="group_rank(ts_rank(fnd7_ointfund_qcktsrp / (fnd7_ointfund_qqec + 0.000001), 252), sector)",
+        hypothesis="Common/preferred stock purchases relative to equity can indicate shareholder-return support.",
+        hint="Cash outflow for stock purchases; sector rank avoids capital-return sector bias.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_pit_vs_footnote_liability_gap",
+        expression="-group_rank(ts_zscore((fnd7_ointfund_qtl - fnd7_ointhstfund_hqtl) / (fnd7_ointfund_qta + 0.000001), 252), subindustry)",
+        hypothesis="A widening PIT-versus-footnote liability gap can flag reporting-quality risk.",
+        hint="FND7 footnote alignment idea extended from EPS to liabilities.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    # Deep Fundamental Pack II: more cache-verified, low-risk operator templates.
+
+    templates.append(AlphaTemplate(
+        name="fnd2_ppne_growth_drag",
+        expression="-group_rank(ts_delta(fn_ppne_gross_a / (assets + 0.000001), 252), subindustry)",
+        hypothesis="Rapid PP&E growth versus assets can signal heavy investment needs before returns arrive.",
+        hint="Asset-normalized PP&E expansion; simple delta avoids fragile low-frequency regression.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_quarterly_tax_burden",
+        expression="-group_rank(ts_zscore(fn_income_tax_expense_q / (abs(fn_comprehensive_income_net_of_tax_q) + 0.000001), 120), subindustry)",
+        hypothesis="High quarterly tax burden relative to comprehensive income can pressure retained earnings.",
+        hint="Uses quarterly FND2 tax and comprehensive-income disclosures.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=8, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_oci_balance_risk",
+        expression="-group_rank(ts_zscore(fn_accum_oth_income_loss_net_of_tax_q / (assets + 0.000001), 252), sector)",
+        hypothesis="Large accumulated OCI balances can hide mark-to-market risk in book equity.",
+        hint="Sector rank because OCI exposure differs structurally by industry.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_sbc_asset_drag",
+        expression="-group_rank(ts_rank(fn_allocated_share_based_compensation_expense_q / (assets + 0.000001), 252), subindustry)",
+        hypothesis="Persistent stock compensation relative to assets dilutes economic ownership.",
+        hint="Stable rank signal on FND2 SBC disclosure.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_cash_tax_momentum",
+        expression="-group_rank(ts_delta(fn_income_taxes_paid_a / (assets + 0.000001), 252), subindustry)",
+        hypothesis="Rising cash taxes relative to assets can reduce distributable cash flow.",
+        hint="Annual cash-tax paid field; negative sign penalizes acceleration.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd2_refinancing_balance",
+        expression="group_rank(ts_delta((fn_repayments_of_debt_q - fn_proceeds_from_issuance_of_debt_q) / (assets + 0.000001), 120), sector)",
+        hypothesis="Debt repayments exceeding new issuance indicate refinancing discipline.",
+        hint="Quarterly financing cash-flow spread normalized by assets.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=8, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_liability_fair_value_mix",
+        expression="-group_rank(ts_zscore(fnd6_newqeventv110_lol2q, 252), sector)",
+        hypothesis="Level-2 liabilities high versus Level-1 liabilities increase valuation uncertainty.",
+        hint="Fair-value hierarchy mix, using low-crowding FND6 fields.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_wip_inventory_buildup",
+        expression="-group_rank(ts_delta(fnd6_newqeventv110_invwipq, 120), subindustry)",
+        hypothesis="Work-in-process inventory buildup versus finished goods can flag production bottlenecks.",
+        hint="Industry-specific inventory composition signal.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_receivable_payable_balance",
+        expression="-group_rank(ts_zscore(fnd6_cptnewqeventv110_rectq, 252), subindustry)",
+        hypothesis="Receivables high versus payables can imply weaker cash conversion.",
+        hint="Event-version working-capital detail, less crowded than generic ratios.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=8, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_core_earnings_acceleration",
+        expression="group_rank(ts_delta(fnd6_newqv1300_spcep12, 252) / (ts_std_dev(fnd6_newqv1300_spcep12, 252) + 0.000001), subindustry)",
+        hypothesis="Core 12-month earnings acceleration with stable volatility indicates quality improvement.",
+        hint="Delta over volatility proxy, no regression dependency.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=8, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_dividend_rate_trend",
+        expression="group_rank(ts_delta(ts_backfill(fnd6_dvrated, 20), 252), sector)",
+        hypothesis="Rising indicated dividend rate supports shareholder-return momentum.",
+        hint="Backfill daily indicated dividend rate before long-window delta.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd6_debt_due_1y_pressure",
+        expression="-group_rank(ts_rank(fnd6_eventv110_dd1q / (fnd6_newqeventv110_lltq + 0.000001), 252), sector)",
+        hypothesis="Debt due within one year relative to long-term liabilities flags refinancing pressure.",
+        hint="Debt maturity stress template using low-crowding FND6 fields.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_cash_operating_margin",
+        expression="group_rank(ts_rank(fnd7_ointfund_qfcnao / (fnd7_ointfund_qelas + 0.000001), 252), subindustry)",
+        hypothesis="Operating cash flow margin high versus own history indicates durable cash earnings.",
+        hint="PIT operating cash flow over PIT sales.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_current_ratio_improvement",
+        expression="group_rank(ts_delta(fnd7_ointfund_qtca / (fnd7_ointfund_qtcl + 0.000001), 120), subindustry)",
+        hypothesis="Improving current ratio increases short-term solvency cushion.",
+        hint="PIT current assets/current liabilities, quarter-scale delta.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=8, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_cash_tax_drag",
+        expression="-group_rank(ts_rank(fnd7_ointfund_qdpxt / (abs(fnd7_ointfund_qip) + 0.000001), 252), subindustry)",
+        hypothesis="High cash taxes paid relative to pretax income reduce cash available to shareholders.",
+        hint="PIT cash-flow tax paid versus pretax income.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_rd_reinvestment_quality",
+        expression="group_rank(ts_delta(fnd7_ointfund_qdrx / (fnd7_ointfund_qelas + 0.000001), 252), subindustry)",
+        hypothesis="R&D intensity rising versus sales can indicate reinvestment in future growth.",
+        hint="Works best inside subindustry where R&D norms are comparable.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_acquisition_cash_drag",
+        expression="-group_rank(ts_mean(fnd7_ointfund_qcqa / (fnd7_ointfund_qta + 0.000001), 252), subindustry)",
+        hypothesis="Persistent acquisition cash outflow can indicate integration and capital-allocation risk.",
+        hint="PIT acquisition cash-flow item normalized by total assets.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_issuance_alert",
+        expression="-group_rank(ts_delta(fnd7_ointfund_qsitld / (fnd7_ointfund_qttld + 0.000001), 120), sector)",
+        hypothesis="Rising issuance of long-term debt relative to outstanding debt can flag leverage pressure.",
+        hint="PIT issuance/outstanding long-term debt ratio.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_issuance_supported",
+        expression="group_rank(ts_delta(fnd7_ointfund_qsitld / (fnd7_ointfund_qttld + 0.000001), 120) * ts_rank(fnd7_ointfund_qfcnao / (fnd7_ointfund_qta + 0.000001), 252), sector)",
+        hypothesis="Long-term debt issuance backed by strong operating cash flow can signal productive financing capacity.",
+        hint="Builds on RRrKVEp0: keep issuance signal, gate it by asset-scaled operating cash-flow quality.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_net_issuance_repair",
+        expression="group_rank(ts_delta((fnd7_ointfund_qsitld - fnd7_ointfund_qrtld) / (fnd7_ointfund_qttld + 0.000001), 120), sector)",
+        hypothesis="Net long-term debt issuance captures financing expansion after subtracting repayments.",
+        hint="Separates gross issuance from simultaneous deleveraging to reduce noisy balance-sheet churn.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_assets_momentum",
+        expression="hump(group_rank(ts_delta(fnd7_ointfund_qsitld / (fnd7_ointfund_qta + 0.000001), 120), sector), 0.01)",
+        hypothesis="Debt issuance scaled by total assets avoids overweighting firms with small existing debt bases.",
+        hint="Uses assets instead of long-term debt denominator and hump to reduce drawdown/turnover.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=8, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_cash_coverage_combo",
+        expression="group_rank(group_zscore(ts_delta(fnd7_ointfund_qsitld / (fnd7_ointfund_qttld + 0.000001), 120), sector) + group_zscore(fnd7_ointfund_qfcnao / (abs(fnd7_ointfund_qtnix) + abs(fnd7_ointfund_qcld) + 0.000001), sector), sector)",
+        hypothesis="Debt issuance is more investable when cash flow covers interest expense and current debt.",
+        hint="Aims to lift fitness and reduce drawdown by combining financing access with debt-service quality.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=8, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_sales_growth_finance",
+        expression="group_rank(ts_delta(fnd7_ointfund_qsitld / (fnd7_ointfund_qttld + 0.000001), 120) * ts_delta(fnd7_ointfund_qelas / (fnd7_ointfund_qta + 0.000001), 120), sector)",
+        hypothesis="Debt issuance paired with improving sales productivity can indicate growth financing rather than distress borrowing.",
+        hint="Combines RRrKVEp0 issuance slope with asset-normalized sales improvement.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=8, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_regression_trend",
+        expression="group_rank(ts_regression(fnd7_ointfund_qsitld / (fnd7_ointfund_qta + 0.000001), fnd7_ointfund_qelas / (fnd7_ointfund_qta + 0.000001), 252), sector)",
+        hypothesis="Debt issuance that historically tracks sales productivity can be productive financing.",
+        hint="Regression beta links asset-scaled debt issuance to asset-scaled sales over one year.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=8, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_issuance_positive_base",
+        expression="group_rank(ts_delta(fnd7_ointfund_qsitld / (fnd7_ointfund_qttld + 0.000001), 120), sector)",
+        hypothesis="RRrKVEp0 showed the positive debt-issuance direction is the live signal; tune it directly.",
+        hint="Positive version of the near-miss core with tighter truncation to reduce drawdown.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.04,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_issuance_positive_hump",
+        expression="hump(group_rank(ts_delta(fnd7_ointfund_qsitld / (fnd7_ointfund_qttld + 0.000001), 120), sector), 0.005)",
+        hypothesis="Hump smoothing may keep the strong issuance signal while reducing the near-miss drawdown.",
+        hint="Same RRrKVEp0 core, with very light hump to dampen rebalance shocks.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=8, truncation=0.04,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_issuance_positive_avdiff",
+        expression="group_rank(ts_av_diff(fnd7_ointfund_qsitld / (fnd7_ointfund_qttld + 0.000001), 252), sector)",
+        hypothesis="Debt issuance above its one-year average may capture the same financing regime with less endpoint noise.",
+        hint="Replaces ts_delta with ts_av_diff to reduce single-quarter jump sensitivity.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=8, truncation=0.04,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_issuance_positive_window60",
+        expression="group_rank(ts_delta(fnd7_ointfund_qsitld / (fnd7_ointfund_qttld + 0.000001), 60), sector)",
+        hypothesis="A shorter quarter-scale issuance acceleration may improve returns while preserving low turnover.",
+        hint="Same denominator as RRrKVEp0 but with a 60-day change window.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=8, truncation=0.04,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_issuance_positive_window252",
+        expression="group_rank(ts_delta(fnd7_ointfund_qsitld / (fnd7_ointfund_qttld + 0.000001), 252), sector)",
+        hypothesis="A full-year issuance change may reduce drawdown by favoring persistent financing access.",
+        hint="Same denominator as RRrKVEp0 but with a 252-day change window.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.04,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_long_debt_issuance_positive_assets",
+        expression="group_rank(ts_delta(fnd7_ointfund_qsitld / (fnd7_ointfund_qta + 0.000001), 120), sector)",
+        hypothesis="Scaling debt issuance by assets avoids denominator instability when existing long-term debt is small.",
+        hint="Tests whether the near-miss improves when total assets replace long-term debt as denominator.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=8, truncation=0.04,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_debt_repayment_strength",
+        expression="group_rank(ts_rank(fnd7_ointfund_qrtld / (fnd7_ointfund_qttld + 0.000001), 252), sector)",
+        hypothesis="Long-term debt repayment relative to debt stock supports balance-sheet repair.",
+        hint="PIT cash repayment of long-term debt over outstanding long-term debt.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_deferred_tax_income_quality",
+        expression="-group_rank(ts_zscore(fnd7_ointfund_qidxt / (abs(fnd7_ointfund_qip) + 0.000001), 252), subindustry)",
+        hypothesis="Deferred taxes high versus pretax income may indicate lower cash quality of earnings.",
+        hint="PIT deferred income tax ratio.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_accrual_quality_cash_gap",
+        expression="group_rank(winsorize(ts_zscore((fnd7_ointfund_qfcnao - fnd7_ointfund_qin) / (fnd7_ointfund_qta + 0.000001), 252), std=4), subindustry)",
+        hypothesis="Operating cash flow exceeding reported net income indicates higher earnings quality and lower accrual risk.",
+        hint="Uses PIT operating cash flow minus quarterly net income, normalized by assets and winsorized.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=8, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_free_cashflow_yield_quality",
+        expression="hump(group_rank(ts_rank((fnd7_ointfund_qfcnao + fnd7_ointfund_qfcnvi) / (fnd7_ointfund_qta + 0.000001), 252), subindustry), 0.01)",
+        hypothesis="Companies converting assets into free cash flow should have stronger forward returns than asset-heavy peers.",
+        hint="Operating plus investing cash flow approximates free cash flow; hump limits low-frequency turnover jumps.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=8, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_cashflow_sales_regression_beta",
+        expression="group_rank(ts_regression(fnd7_ointfund_qfcnao / (fnd7_ointfund_qta + 0.000001), fnd7_ointfund_qelas / (fnd7_ointfund_qta + 0.000001), 252), subindustry)",
+        hypothesis="A high cash-flow response to sales indicates sales are translating into real cash earnings.",
+        hint="ts_regression(y, x, d) estimates cash-flow sensitivity to asset-normalized sales.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_working_capital_release",
+        expression="group_rank(ts_av_diff((fnd7_ointfund_qhccer + fnd7_ointfund_qhclapa + fnd7_ointfund_qhcvni) / (fnd7_ointfund_qta + 0.000001), 252), subindustry)",
+        hypothesis="Working-capital release from receivables, payables, and inventory supports cash conversion.",
+        hint="Cash-flow statement working-capital items are scaled by assets and compared with their own history.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=8, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_receivable_inventory_risk",
+        expression="-group_rank(ts_delta((fnd7_ointfund_qtcer + abs(fnd7_ointfund_qhcvni)) / (fnd7_ointfund_qelas + 0.000001), 120), subindustry)",
+        hypothesis="Receivables and inventory pressure rising faster than sales often flags lower revenue quality.",
+        hint="Combines balance-sheet receivables with cash-flow inventory change against PIT sales.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=8, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_margin_cost_discipline",
+        expression="-group_rank(ts_delta((fnd7_ointfund_qsgoc + fnd7_ointfund_qagsx) / (fnd7_ointfund_qelas + 0.000001), 120), subindustry)",
+        hypothesis="COGS plus SG&A falling relative to sales captures improving operating discipline.",
+        hint="Industry-neutral cost intensity change is usually cleaner than raw income growth.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=8, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_shareholder_yield_cashback",
+        expression="group_rank(ts_rank((fnd7_ointfund_qvd + fnd7_ointfund_qcktsrp - fnd7_ointfund_qktss) / (fnd7_ointfund_qqec + 0.000001), 252), sector)",
+        hypothesis="Dividends plus buybacks net of equity issuance indicate shareholder-friendly capital allocation.",
+        hint="Balances cash dividends and repurchases against common/preferred stock issuance.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_debt_service_coverage",
+        expression="group_rank(ts_rank((fnd7_ointfund_qfcnao + fnd7_ointfund_qnptni) / (abs(fnd7_ointfund_qtnix) + abs(fnd7_ointfund_qcld) + 0.000001), 252), sector)",
+        hypothesis="Cash flow covering interest expense and current debt improves balance-sheet resilience.",
+        hint="Debt service coverage uses PIT cash flow, net interest paid, interest expense, and current debt.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SECTOR", decay=10, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_rd_cash_productivity",
+        expression="group_rank(ts_regression(fnd7_ointfund_qfcnao / (fnd7_ointfund_qta + 0.000001), fnd7_ointfund_qdrx / (fnd7_ointfund_qelas + 0.000001), 252), subindustry)",
+        hypothesis="R&D that co-moves with cash-flow improvement is more valuable than raw R&D spending.",
+        hint="Regression beta links R&D intensity to cash-flow generation within the firm's PIT history.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_balance_sheet_quality_combo",
+        expression="group_rank(group_zscore(fnd7_ointfund_qehc / (fnd7_ointfund_qta + 0.000001), subindustry) - group_zscore(fnd7_ointfund_qtl / (fnd7_ointfund_qta + 0.000001), subindustry), subindustry)",
+        hypothesis="Cash-rich, low-liability balance sheets provide a quality tilt inside each subindustry.",
+        hint="Cross-sectional group z-scores combine liquidity strength and leverage penalty.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=10, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_clean_eps_momentum",
+        expression="group_rank(ts_delta((fnd7_ointfund_21speo - fnd7_ointfund_21xspe) / (abs(fnd7_ointfund_21xspe) + 0.000001), 120), subindustry)",
+        hypothesis="Operations EPS improving versus EPS excluding extraordinary items captures cleaner core earnings momentum.",
+        hint="Uses trailing 12-month PIT EPS fields instead of noisier single-quarter EPS.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=8, truncation=0.06,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="fnd7_nonoperating_income_drag",
+        expression="-group_rank(ts_zscore(fnd7_ointfund_qipon / (abs(fnd7_ointfund_qip) + 0.000001), 252), subindustry)",
+        hypothesis="Pretax income relying on nonoperating income is lower quality than core operating profitability.",
+        hint="Penalizes unusually high PIT nonoperating income relative to pretax income.",
+        dataset_category="fundamental",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=8, truncation=0.06,
+    ))
+
+    # ═══════════════════════════════════════════════════════════════════
+    # IQC 2026 Tip #3: hump 操作符 + earnings4 数据集
+    # hump(x, hump=threshold): 限制信号变化频率和幅度
+    #   - 如果变化 < threshold，保持前值不变 → 降低换手
+    #   - 如果变化 > threshold，只允许变化 threshold 幅度 → 降低回撤
+    # ═══════════════════════════════════════════════════════════════════
+
+    # --- Tip #3 官方示例模板 (直接复现) ---
+    templates.append(AlphaTemplate(
+        name="ern4_hump_90div_zscore",
+        expression="hump(ts_zscore(ts_backfill(vec_avg(ern4_90div), 252), 5), hump=0.0005)",
+        hypothesis="Official Tip #3 template: 90-day IV z-score stabilized by hump to reduce turnover and drawdown.",
+        hint="Exact reproduction of IQC Tip #3 example. hump=0.0005 is the official recommendation.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="INDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    # --- Hump + IV 系列: 隐含波动率信号稳定化 ---
+    templates.append(AlphaTemplate(
+        name="ern4_hump_30div_zscore",
+        expression="hump(ts_zscore(ts_backfill(vec_avg(ern4_30div), 252), 5), hump=0.0005)",
+        hypothesis="30-day constant-maturity IV z-score with hump stabilization: low-turnover IV regime signal.",
+        hint="Shorter IV tenor captures faster regime changes; hump prevents whipsawing.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="INDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="ern4_hump_60div_zscore",
+        expression="hump(ts_zscore(ts_backfill(vec_avg(ern4_60div), 252), 5), hump=0.0005)",
+        hypothesis="60-day IV z-score with hump: medium-term volatility regime detection with stable portfolio turnover.",
+        hint="60-day tenor balances speed and stability; hump smooths quarterly IV spikes.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="INDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="ern4_hump_10div_rank",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_10div), 252), subindustry), hump=0.001)",
+        hypothesis="10-day very short-term IV cross-sectional rank, hump-stabilized to prevent excessive turnover from daily noise.",
+        hint="10div is noisier than 30/60/90div; hump is essential to prevent churn.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    # --- Hump + IV Gap (隐含盈利效应): 核心 alpha ---
+    templates.append(AlphaTemplate(
+        name="ern4_hump_iv_gap",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_30div), 252) - ts_backfill(vec_avg(ern4_30dexerniv), 252), subindustry), hump=0.001)",
+        hypothesis="Earnings IV premium (30div - 30dexerniv) is the core earnings4 alpha. hump stabilizes portfolio turnover.",
+        hint="The IV gap is the single most effective earnings4 construction. hump adds stability.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="ern4_hump_iv_gap_zscore",
+        expression="hump(ts_zscore(ts_backfill(vec_avg(ern4_30div), 252) - ts_backfill(vec_avg(ern4_30dexerniv), 252), 60), hump=0.0005)",
+        hypothesis="Z-scored IV gap detects when earnings premium is unusually high/low; hump prevents overtrading.",
+        hint="60-day z-score window captures quarterly patterns; hump=0.0005 matches official recommendation.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="INDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    # --- Hump + Forecast 系列: 低换手高边际 ---
+    templates.append(AlphaTemplate(
+        name="ern4_hump_fcsterneffct",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_fcsterneffct), 5), subindustry), hump=0.001)",
+        hypothesis="Forecast earnings effect is already slow-changing; hump further reduces turnover for near-zero churn.",
+        hint="Forecast family (fcsterneffct) updates rarely; hump pushes turnover below 5%.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="ern4_hump_forecast_gap",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_fcsterneffct), 5) - ts_backfill(vec_avg(ern4_erneffct1), 5), subindustry), hump=0.001)",
+        hypothesis="Gap between forecasted and realized earnings effect; hump eliminates noise from infrequent updates.",
+        hint="Forecast vs realized is a classic 'expectation surprise' signal; hump keeps turnover ultra-low.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    # --- Hump + Fair Vol 系列: 模型公允价值偏差 ---
+    templates.append(AlphaTemplate(
+        name="ern4_hump_fairvol_gap",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_fairvol90d), 252) - ts_backfill(vec_avg(ern4_90div), 252), subindustry), hump=0.001)",
+        hypothesis="Fair value vol model vs actual 90-day IV: positive gap = market underpricing volatility.",
+        hint="fairvol90d is model-based; gap to market IV is a mispricing signal. hump smooths.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="ern4_hump_fairxiee_gap",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_fairxieevol90d), 252) - ts_backfill(vec_avg(ern4_90div), 252), subindustry), hump=0.001)",
+        hypothesis="Fair vol excluding implied earnings effect vs actual IV: pure non-earnings mispricing signal.",
+        hint="fairxieevol90d removes earnings component; cleaner structural mispricing.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    # --- Hump + 盈利移动 (ernmv) 系列 ---
+    templates.append(AlphaTemplate(
+        name="ern4_hump_ernmv1_drift",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_ernmv1), 60), subindustry), hump=0.001)",
+        hypothesis="Post-earnings drift (PEAD) from last earnings move, stabilized by hump for lower churn.",
+        hint="ernmv1 is the most-used field in earnings4. hump prevents turnover spikes around announcement.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="ern4_hump_ernmv1_normalized",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_ernmv1), 5) / ts_backfill(vec_avg(ern4_absavgernmv), 252), subindustry), hump=0.001)",
+        hypothesis="ernmv1 normalized by avg absolute move: captures 'surprise magnitude' relative to history.",
+        hint="Division by absavgernmv normalizes for stock-specific earnings volatility.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    # --- Hump + Implied Earnings Move ---
+    templates.append(AlphaTemplate(
+        name="ern4_hump_implied_vs_avg",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_impernmv90d), 252) - ts_backfill(vec_avg(ern4_absavgernmv), 252), subindustry), hump=0.001)",
+        hypothesis="Implied move vs historical average: market overestimating/underestimating future earnings vol.",
+        hint="Positive gap = market expects bigger move than usual → potential mean reversion.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    # --- Hump + 期限结构: IV vs HV ---
+    templates.append(AlphaTemplate(
+        name="ern4_hump_iv_hv_spread",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_30div), 252) - ts_backfill(vec_avg(ern4_20dclshv), 252), subindustry), hump=0.001)",
+        hypothesis="IV > HV = market overpricing vol (sell vol); IV < HV = underpricing (buy vol). hump stabilizes.",
+        hint="Classic variance risk premium signal from earnings4; hump prevents whipsaw.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="ern4_hump_iv_hv_spread_neg",
+        expression="-hump(group_rank(ts_backfill(vec_avg(ern4_90div), 252) - ts_backfill(vec_avg(ern4_90dclshv), 252), subindustry), hump=0.001)",
+        hypothesis="Negative of IV-HV spread: short overpriced vol stocks. 90-day tenor for medium-term view.",
+        hint="Negative sign → buy stocks where vol is cheap relative to realized.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    # --- Hump + Slope + 波动率曲面 ---
+    templates.append(AlphaTemplate(
+        name="ern4_hump_slope",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_slope), 252), subindustry), hump=0.001)",
+        hypothesis="Volatility term structure slope reflects market's forward vol expectations. hump reduces noise.",
+        hint="slope is a derivative signal; hump is critical to avoid over-trading on daily fluctuations.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    # --- Hump + HV xern (去盈利实现波动率) ---
+    templates.append(AlphaTemplate(
+        name="ern4_hump_hv_earnings_share",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_1000dclshv), 252) - ts_backfill(vec_avg(ern4_1000dclshvxern), 252), subindustry), hump=0.001)",
+        hypothesis="Long-term HV minus HV-excluding-earnings: isolates historical earnings-day volatility contribution.",
+        hint="Fundamental data cannot provide this; only earnings4 has HV/HVxern decomposition.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    # --- Hump + ATM IV 月度展期 ---
+    templates.append(AlphaTemplate(
+        name="ern4_hump_atm_term_spread",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_m1atmiv), 252) - ts_backfill(vec_avg(ern4_m3atmiv), 252), subindustry), hump=0.001)",
+        hypothesis="ATM IV month1 minus month3: steep contango = near-term event risk. hump stabilizes signal.",
+        hint="m1atmiv-m3atmiv is the ATM calendar spread signal; positive = near-term fear.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    # --- Hump + Straddle Forecast ---
+    templates.append(AlphaTemplate(
+        name="ern4_hump_straddle_forecast",
+        expression="hump(group_rank(ts_backfill(vec_avg(ern4_m1fcaststrapx), 5), subindustry), hump=0.001)",
+        hypothesis="Month-1 forecast straddle price: high straddle = market expects large move. hump smooths updates.",
+        hint="m1fcaststrapx updates around events; hump prevents position churn.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
+    ))
+
+    templates.append(AlphaTemplate(
+        name="ern4_hump_option_volume_change",
+        expression="hump(group_rank(ts_delta(ts_backfill(vec_avg(ern4_avg20doptvolu), 252), 20), subindustry), hump=0.001)",
+        hypothesis="20-day average option volume changes can flag rising pre-earnings attention and event-risk demand.",
+        hint="Use vec_avg then backfill for the earnings4 event field; hump limits volume-spike churn.",
+        dataset_category="earnings",
+        level="custom",
+        neutralization="SUBINDUSTRY", decay=0, truncation=0.08,
     ))
 
     return templates
@@ -1059,6 +2075,17 @@ def apply_official_hint(tmpl: AlphaTemplate) -> List[ParamVariant]:
             delay=tmpl.delay,
             mutation_desc=desc,
         ))
+
+    flipped_expr = expr[1:] if expr.startswith("-") else f"-({expr})"
+    variants.append(ParamVariant(
+        expression=flipped_expr,
+        decay=tmpl.decay,
+        neutralization=tmpl.neutralization,
+        truncation=tmpl.truncation,
+        universe=tmpl.universe,
+        delay=tmpl.delay,
+        mutation_desc="polarity_flip",
+    ))
 
     # ── neutralization 变体 (按官方推荐矩阵) ──
     rec_neuts = NEUT_RECOMMENDATIONS.get(tmpl.dataset_category, ["INDUSTRY"])
@@ -1160,6 +2187,25 @@ def apply_official_hint(tmpl: AlphaTemplate) -> List[ParamVariant]:
     return unique
 
 
+def variant_priority(variant: ParamVariant) -> int:
+    desc = variant.mutation_desc
+    if desc == "原始":
+        return 0
+    if "polarity" in desc:
+        return 1
+    if any(key in desc for key in ("group_rank", "ts_decay", "ts_zscore", "rank包裹")):
+        return 2
+    if desc.startswith("neut="):
+        return 3
+    if desc.startswith("universe="):
+        return 4
+    if desc.startswith("delay="):
+        return 5
+    if desc.startswith("decay="):
+        return 6
+    return 7
+
+
 # ──────────────────────────── POWER POOL FILTER ──────────────────
 
 def is_power_pool_candidate(expr: str) -> bool:
@@ -1205,9 +2251,9 @@ class WQClient:
         secret = lines[1].strip()
 
         if secret.startswith("COOKIE:"):
-            # JWT Bearer 认证
+            # JWT Cookie 认证 (Bearer header causes 403 on /simulations)
             jwt = secret[7:]
-            self.sess.headers['Authorization'] = f'Bearer {jwt}'
+            self.sess.cookies.set("t", jwt, domain=".worldquantbrain.com")
             self.sess.auth = None
         else:
             # 密码认证
@@ -1415,7 +2461,9 @@ class OfficialDocsMiner:
         self.submission_delay = 15  # 秒, 每次提交间隔 (避免429)
 
     def run(self, rounds: int = 3, templates_per_round: int = 5,
-            variants_per_template: int = 3, level_filter: str = None):
+            variants_per_template: int = 3, level_filter: str = None,
+            category_filter: str = None,
+            template_prefix: str = None):
         """
         主运行循环
 
@@ -1424,6 +2472,8 @@ class OfficialDocsMiner:
             templates_per_round: 每轮处理的模板数
             variants_per_template: 每个模板提交的变体数 (从所有变体中选最优)
             level_filter: 可选过滤: beginner/bronze/silver/custom
+            category_filter: 可选过滤: fundamental/option/model/...
+            template_prefix: 可选过滤: template name prefix, e.g. fnd7_
         """
         log.info(f"""
 ╔══════════════════════════════════════════════════════════╗
@@ -1442,6 +2492,25 @@ class OfficialDocsMiner:
         if level_filter:
             active_templates = [t for t in active_templates if t.level == level_filter]
             log.info(f"🔍 筛选 level={level_filter}: {len(active_templates)} 个模板")
+
+        if category_filter:
+            active_templates = [t for t in active_templates if t.dataset_category == category_filter]
+            log.info(f"🔍 筛选 category={category_filter}: {len(active_templates)} 个模板")
+
+        if template_prefix:
+            active_templates = [t for t in active_templates if t.name.startswith(template_prefix)]
+            log.info(f"🔍 筛选 template_prefix={template_prefix}: {len(active_templates)} 个模板")
+
+        submitted_cache = _load_submitted_datafield_cache()
+        if submitted_cache:
+            before_cache_filter = len(active_templates)
+            active_templates = [
+                t for t in active_templates
+                if not _template_hits_submitted_cache(t, submitted_cache)
+            ]
+            skipped = before_cache_filter - len(active_templates)
+            if skipped:
+                log.info(f"🧊 Submitted datafield cache skipped {skipped} already-submitted templates")
 
         log.info(f"📋 模板统计:")
         for cat in set(t.dataset_category for t in active_templates):
@@ -1475,7 +2544,7 @@ class OfficialDocsMiner:
                 for v in all_variants:
                     key = f"d={v.decay},n={v.neutralization},u={v.universe}"
                     already = any(
-                        r.name == tmpl.name and key in r.variant_desc
+                        r.name == tmpl.name and key in r.variant_desc and not r.error
                         for r in self.tracker.results
                     )
                     if not already:
@@ -1485,11 +2554,13 @@ class OfficialDocsMiner:
                     log.info(f"   ⏭️ 所有变体已测试过, 跳过")
                     continue
 
+                random.shuffle(untested)
+                untested.sort(key=variant_priority)
                 selected = untested[:variants_per_template]
                 log.info(f"   选择 {len(selected)} 个未测试变体")
 
-                # ── 批量提交: 每次最多 3 个并发 ──
-                BATCH_SIZE = 3  # API 并发上限
+                # Keep inst4 conservative: account-level concurrency can be lower than API docs.
+                BATCH_SIZE = max(1, self.max_concurrent)
                 for batch_start in range(0, len(selected), BATCH_SIZE):
                     batch_variants = selected[batch_start:batch_start + BATCH_SIZE]
                     log.info(f"\n   📦 批次 {batch_start//BATCH_SIZE + 1}: 提交 {len(batch_variants)} 个并发模拟")
@@ -1510,8 +2581,8 @@ class OfficialDocsMiner:
                                 variant_desc=f"d={variant.decay},n={variant.neutralization},u={variant.universe},{variant.mutation_desc}",
                                 error="submit_failed",
                             ))
-                        # 短间隔避免瞬间并发触发 429
-                        time.sleep(2)
+                        # Stagger submissions; simulations still overlap when max_concurrent > 1.
+                        time.sleep(self.submission_delay)
 
                     if not pending:
                         continue
@@ -1683,8 +2754,23 @@ def main():
         help='每模板提交变体数 (default: 3)'
     )
     parser.add_argument(
+        '--max-concurrent', type=int, default=1,
+        help='每批并发模拟数 (default: 1)'
+    )
+    parser.add_argument(
         '--level', '-l', choices=['beginner', 'bronze', 'silver', 'custom'],
         help='只运行特定级别的模板'
+    )
+    parser.add_argument(
+        '--category',
+        choices=['fundamental', 'option', 'model', 'sentiment', 'earnings', 'news', 'pv',
+                 'analyst', 'institutions', 'short_interest', 'insider', 'macro',
+                 'social_media'],
+        help='只运行特定数据集类别的模板，例如 fundamental'
+    )
+    parser.add_argument(
+        '--template-prefix',
+        help='只运行名称以该前缀开头的模板，例如 fnd7_'
     )
     parser.add_argument(
         '--delay-between', '-d', type=int, default=15,
@@ -1703,7 +2789,7 @@ def main():
 
     miner = OfficialDocsMiner(
         credential_file=args.credential,
-        max_concurrent=1,
+        max_concurrent=args.max_concurrent,
     )
     miner.submission_delay = args.delay_between
 
@@ -1726,6 +2812,8 @@ def main():
                     templates_per_round=args.templates_per_round,
                     variants_per_template=args.variants,
                     level_filter=args.level,
+                    category_filter=args.category,
+                    template_prefix=args.template_prefix,
                 )
                 if result is False:
                     # 认证失败 — 指数退避等待
@@ -1748,6 +2836,8 @@ def main():
             templates_per_round=args.templates_per_round,
             variants_per_template=args.variants,
             level_filter=args.level,
+            category_filter=args.category,
+            template_prefix=args.template_prefix,
         )
 
 
