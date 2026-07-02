@@ -39,6 +39,7 @@ LOG_DIR.mkdir(exist_ok=True)
 RESULTS_PATH = BASE_DIR / "consultant_miner_results.json"
 CACHE_PATH = BASE_DIR / "constants" / "consultant_simulation_cache.json"
 SUMMARY_PATH = BASE_DIR / "consultant_tips_summary.md"
+CONSULTANT_FIELDS_PATH = BASE_DIR / "constants" / "consultant_fields" / "consultant_expression_fields.json"
 # Pool of abandoned templates/fields (already submitted or spent -> high self-correlation).
 # Any generated variant whose expression contains a banned field or matches a banned
 # expression is dropped before submission, so the miner never re-mines a spent idea.
@@ -348,6 +349,9 @@ def load_field_rows(path: Path, dataset_category: str) -> list[dict[str, Any]]:
         if not isinstance(row, dict):
             continue
         dataset = row.get("dataset") or {}
+        dataset_id = row.get("dataset_id") or (dataset.get("id") if isinstance(dataset, dict) else dataset)
+        dataset_name = row.get("dataset_name") or (dataset.get("name") if isinstance(dataset, dict) else "")
+        source_category = row.get("category_name") or row.get("category") or dataset_category
         normalized.append(
             {
                 "id": row.get("id"),
@@ -357,12 +361,53 @@ def load_field_rows(path: Path, dataset_category: str) -> list[dict[str, Any]]:
                 "dateCoverage": row.get("dateCoverage"),
                 "alphaCount": row.get("alphaCount"),
                 "userCount": row.get("userCount"),
-                "dataset": dataset.get("id") if isinstance(dataset, dict) else dataset,
-                "datasetName": dataset.get("name") if isinstance(dataset, dict) else "",
+                "region": row.get("region"),
+                "delay": row.get("delay"),
+                "universe": row.get("universe"),
+                "dataset": dataset_id,
+                "datasetName": dataset_name,
+                "sourceCategory": source_category,
                 "category": dataset_category,
             }
         )
     return [row for row in normalized if row.get("id")]
+
+
+def text_matches(value: Any, wanted: str | None) -> bool:
+    if not wanted:
+        return True
+    return str(value or "").lower() == wanted.lower()
+
+
+def filter_field_rows(
+    rows: list[dict[str, Any]],
+    dataset_id: str | None = None,
+    category_name: str | None = None,
+    field_region: str | None = None,
+    field_delay: int | None = None,
+    field_universe: str | None = None,
+    matrix_only: bool = False,
+) -> list[dict[str, Any]]:
+    filtered: list[dict[str, Any]] = []
+    for row in rows:
+        if dataset_id and not text_matches(row.get("dataset"), dataset_id):
+            continue
+        if category_name and not text_matches(row.get("sourceCategory"), category_name):
+            continue
+        if field_region and not text_matches(row.get("region"), field_region):
+            continue
+        if field_delay is not None:
+            try:
+                if int(row.get("delay")) != int(field_delay):
+                    continue
+            except (TypeError, ValueError):
+                continue
+        if field_universe and not text_matches(row.get("universe"), field_universe):
+            continue
+        if matrix_only and row.get("type") != "MATRIX":
+            continue
+        filtered.append(row)
+    return filtered
 
 
 BAD_FIELD_TOKENS = {
@@ -406,6 +451,7 @@ GOOD_DESC_TOKENS = {
 def field_score(row: dict[str, Any]) -> float:
     field_id = str(row.get("id") or "").lower()
     desc = str(row.get("description") or "").lower()
+    source_category = str(row.get("sourceCategory") or row.get("category") or "").lower()
     if any(token in field_id or token in desc for token in BAD_FIELD_TOKENS):
         return -1e9
 
@@ -437,7 +483,7 @@ def field_score(row: dict[str, Any]) -> float:
             score -= min(0.8, math.log10(user_value / 75.0 + 1.0))
     if any(token in desc or token in field_id for token in GOOD_DESC_TOKENS):
         score += 1.0
-    if str(row.get("category")) == "earnings":
+    if "earn" in source_category:
         score += 0.7
     return score
 
@@ -532,9 +578,11 @@ def generate_field_probe_variants(
     for row in selected:
         fid = str(row["id"])
         category = str(row.get("category") or "field")
-        backfill = 252 if category == "earnings" else 63 if "fund" in category else 20
+        source_category = str(row.get("sourceCategory") or category or "").lower()
+        backfill = 252 if "earn" in source_category else 63 if "fund" in source_category else 20
         x = field_value(row, backfill)
-        tag = f"{category}_{fid}".replace("-", "_").replace(".", "_")[:80]
+        dataset_tag = str(row.get("dataset") or category or "field")
+        tag = f"{dataset_tag}_{fid}".replace("-", "_").replace(".", "_")[:80]
 
         add_variant(
             variants,
@@ -695,12 +743,29 @@ def build_queue(
     include_official: bool,
     field_source: str,
     allow_raw_earnings_fields: bool = False,
+    dataset_id: str | None = None,
+    category_name: str | None = None,
+    field_region: str | None = None,
+    field_delay: int | None = None,
+    field_universe: str | None = None,
+    matrix_only: bool = False,
 ) -> list[tuple[str, ParamVariant]]:
     rows: list[dict[str, Any]] = []
     if field_source in {"all", "earnings"}:
         rows.extend(load_field_rows(BASE_DIR / "constants" / "earnings4_fields.json", "earnings"))
     if field_source in {"all", "general"}:
         rows.extend(load_field_rows(BASE_DIR / "constants" / "data_fields_cache_USA_1_TOP3000.json", "general"))
+    if field_source in {"all", "consultant"}:
+        rows.extend(load_field_rows(CONSULTANT_FIELDS_PATH, "consultant"))
+    rows = filter_field_rows(
+        rows,
+        dataset_id=dataset_id,
+        category_name=category_name,
+        field_region=field_region,
+        field_delay=field_delay,
+        field_universe=field_universe,
+        matrix_only=matrix_only,
+    )
 
     variants = consultant_seed_variants()
     variants.extend(generate_field_probe_variants(rows, stage, max_fields, allow_raw_earnings_fields))
@@ -794,7 +859,13 @@ def main() -> int:
     parser.add_argument("--credential", default=str(BASE_DIR / "credential_4.txt"))
     parser.add_argument("--stage", choices=["probe", "refine", "exploit"], default="probe")
     parser.add_argument("--max-fields", type=int, default=20)
-    parser.add_argument("--field-source", choices=["all", "earnings", "general"], default="all")
+    parser.add_argument("--field-source", choices=["all", "earnings", "general", "consultant"], default="all")
+    parser.add_argument("--dataset-id", help="Only use fields from one dataset id, e.g. earnings4 or model77")
+    parser.add_argument("--category-name", help="Only use consultant fields from one category name, e.g. Earnings or Fundamental")
+    parser.add_argument("--field-region", help="Only use consultant fields from one region, e.g. USA")
+    parser.add_argument("--field-delay", type=int, help="Only use consultant fields from one delay")
+    parser.add_argument("--field-universe", help="Only use consultant fields from one universe, e.g. TOP3000")
+    parser.add_argument("--matrix-only", action="store_true", help="Restrict selected fields to MATRIX fields; useful for Python-alpha compatible research")
     parser.add_argument("--max-variants", type=int, default=50)
     parser.add_argument("--batch-size", type=int, default=3)
     parser.add_argument("--delay", type=float, default=8.0)
@@ -838,7 +909,19 @@ def main() -> int:
             print(f"diversity saved: {path}")
             return 0
 
-    queue = build_queue(args.stage, args.max_fields, args.include_official, args.field_source, args.allow_raw_earnings_fields)
+    queue = build_queue(
+        args.stage,
+        args.max_fields,
+        args.include_official,
+        args.field_source,
+        args.allow_raw_earnings_fields,
+        dataset_id=args.dataset_id,
+        category_name=args.category_name,
+        field_region=args.field_region,
+        field_delay=args.field_delay,
+        field_universe=args.field_universe,
+        matrix_only=args.matrix_only,
+    )
     prepared: list[tuple[str, ParamVariant, dict[str, Any], str]] = []
 
     for name, variant in queue:

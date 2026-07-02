@@ -14,6 +14,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+import requests
+
 from official_docs_miner import API_BASE, BASE_DIR, WQClient
 
 
@@ -100,7 +102,12 @@ def fetch_scope(
         if category_id:
             params["category.id"] = category_id
 
-        response = client.sess.get(f"{API_BASE}/data-fields", params=params, timeout=60)
+        try:
+            response = client.sess.get(f"{API_BASE}/data-fields", params=params, timeout=60)
+        except requests.RequestException as exc:
+            print(f"network error {region} D{delay} {universe} offset={offset}: {str(exc)[:180]}; sleep 15s")
+            time.sleep(15)
+            continue
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
             wait = float(retry_after) if retry_after else 60.0
@@ -135,7 +142,12 @@ def fetch_datasets(client: WQClient, region: str, delay: int, universe: str, lim
             "limit": limit,
             "offset": offset,
         }
-        response = client.sess.get(f"{API_BASE}/data-sets", params=params, timeout=60)
+        try:
+            response = client.sess.get(f"{API_BASE}/data-sets", params=params, timeout=60)
+        except requests.RequestException as exc:
+            print(f"network error datasets {region} D{delay} {universe} offset={offset}: {str(exc)[:180]}; sleep 15s")
+            time.sleep(15)
+            continue
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
             wait = float(retry_after) if retry_after else 60.0
@@ -199,6 +211,27 @@ def load_existing_caches() -> list[dict[str, Any]]:
         if isinstance(data, list):
             print(f"loaded cache {path.name}: {len(data)}")
             rows.extend(data)
+    return rows
+
+
+def load_raw_shards() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    if not RAW_DIR.exists():
+        return rows
+    for path in sorted(RAW_DIR.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            print(f"skip raw shard {path.name}: {exc}")
+            continue
+        if isinstance(data, list):
+            print(f"loaded raw shard {path.name}: {len(data)}")
+            rows.extend(data)
+        elif isinstance(data, dict):
+            results = data.get("results")
+            if isinstance(results, list):
+                print(f"loaded raw shard {path.name}: {len(results)}")
+                rows.extend(results)
     return rows
 
 
@@ -277,10 +310,14 @@ def main() -> int:
     parser.add_argument("--datasets-only", action="store_true", help="Only fetch dataset catalogs for the selected scopes")
     parser.add_argument("--skip-existing", action="store_true", help="Reuse already fetched raw dataset shards")
     parser.add_argument("--from-existing-caches", action="store_true")
+    parser.add_argument("--from-raw-shards", action="store_true", help="Merge constants/consultant_fields/raw/*.json without hitting the API")
     args = parser.parse_args()
 
     if args.from_existing_caches:
         write_outputs(load_existing_caches())
+        return 0
+    if args.from_raw_shards:
+        write_outputs(load_raw_shards())
         return 0
 
     client = WQClient(args.credential)
