@@ -25,6 +25,7 @@ DATASET_DIR = OUT_DIR / "datasets"
 COMBINED_PATH = OUT_DIR / "consultant_data_fields_combined.json"
 SUMMARY_PATH = OUT_DIR / "consultant_data_fields_summary.json"
 EXPRESSION_PATH = OUT_DIR / "consultant_expression_fields.json"
+EXPRESSION_JSONL_PATH = OUT_DIR / "consultant_expression_fields.jsonl"
 
 
 DEFAULT_SCOPES = {
@@ -277,11 +278,21 @@ def write_outputs(rows: list[dict[str, Any]]) -> None:
         },
     }
 
-    COMBINED_PATH.write_text(json.dumps(clean, indent=2, ensure_ascii=False), encoding="utf-8")
-    EXPRESSION_PATH.write_text(json.dumps(expression, indent=2, ensure_ascii=False), encoding="utf-8")
+    with EXPRESSION_JSONL_PATH.open("w", encoding="utf-8") as handle:
+        for row in expression:
+            handle.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
+    try:
+        COMBINED_PATH.write_text(json.dumps(clean, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError as exc:
+        print(f"warning: failed to write {COMBINED_PATH}: {exc}")
+    try:
+        EXPRESSION_PATH.write_text(json.dumps(expression, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError as exc:
+        print(f"warning: failed to write {EXPRESSION_PATH}: {exc}")
     SUMMARY_PATH.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"saved combined={len(clean)} -> {COMBINED_PATH}")
     print(f"saved expression={len(expression)} -> {EXPRESSION_PATH}")
+    print(f"saved expression jsonl={len(expression)} -> {EXPRESSION_JSONL_PATH}")
     print(f"saved summary -> {SUMMARY_PATH}")
 
 

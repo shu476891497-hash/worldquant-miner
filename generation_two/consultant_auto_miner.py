@@ -9,6 +9,7 @@ queues instead of broad random parameter sweeps.
 from __future__ import annotations
 
 import argparse
+import heapq
 import hashlib
 import json
 import logging
@@ -40,6 +41,7 @@ RESULTS_PATH = BASE_DIR / "consultant_miner_results.json"
 CACHE_PATH = BASE_DIR / "constants" / "consultant_simulation_cache.json"
 SUMMARY_PATH = BASE_DIR / "consultant_tips_summary.md"
 CONSULTANT_FIELDS_PATH = BASE_DIR / "constants" / "consultant_fields" / "consultant_expression_fields.json"
+CONSULTANT_FIELDS_JSONL_PATH = BASE_DIR / "constants" / "consultant_fields" / "consultant_expression_fields.jsonl"
 # Pool of abandoned templates/fields (already submitted or spent -> high self-correlation).
 # Any generated variant whose expression contains a banned field or matches a banned
 # expression is dropped before submission, so the miner never re-mines a spent idea.
@@ -335,42 +337,66 @@ def normalize_field_type(raw: str | None) -> str:
     return "MATRIX"
 
 
-def load_field_rows(path: Path, dataset_category: str) -> list[dict[str, Any]]:
+def normalize_field_row(row: dict[str, Any], dataset_category: str) -> dict[str, Any] | None:
+    if not isinstance(row, dict):
+        return None
+    dataset = row.get("dataset") or {}
+    dataset_id = row.get("dataset_id") or (dataset.get("id") if isinstance(dataset, dict) else dataset)
+    dataset_name = row.get("dataset_name") or (dataset.get("name") if isinstance(dataset, dict) else "")
+    source_category = row.get("category_name") or row.get("category") or dataset_category
+    field_id = row.get("id")
+    if not field_id:
+        return None
+    return {
+        "id": field_id,
+        "description": row.get("description") or "",
+        "type": normalize_field_type(row.get("type")),
+        "coverage": row.get("coverage"),
+        "dateCoverage": row.get("dateCoverage"),
+        "alphaCount": row.get("alphaCount"),
+        "userCount": row.get("userCount"),
+        "region": row.get("region"),
+        "delay": row.get("delay"),
+        "universe": row.get("universe"),
+        "dataset": dataset_id,
+        "datasetName": dataset_name,
+        "sourceCategory": source_category,
+        "category": dataset_category,
+    }
+
+
+def iter_field_rows(path: Path, dataset_category: str) -> Iterable[dict[str, Any]]:
     if not path.exists():
-        return []
+        return
+    if path.suffix == ".jsonl":
+        with path.open("r", encoding="utf-8") as handle:
+            for line_no, line in enumerate(handle, 1):
+                text = line.strip()
+                if not text:
+                    continue
+                try:
+                    row = json.loads(text)
+                except Exception as exc:
+                    log.warning("failed to load %s:%d: %s", path, line_no, exc)
+                    continue
+                normalized = normalize_field_row(row, dataset_category)
+                if normalized:
+                    yield normalized
+        return
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
         log.warning("failed to load %s: %s", path, exc)
-        return []
+        return
     rows = data if isinstance(data, list) else data.get("results", []) if isinstance(data, dict) else []
-    normalized = []
     for row in rows:
-        if not isinstance(row, dict):
-            continue
-        dataset = row.get("dataset") or {}
-        dataset_id = row.get("dataset_id") or (dataset.get("id") if isinstance(dataset, dict) else dataset)
-        dataset_name = row.get("dataset_name") or (dataset.get("name") if isinstance(dataset, dict) else "")
-        source_category = row.get("category_name") or row.get("category") or dataset_category
-        normalized.append(
-            {
-                "id": row.get("id"),
-                "description": row.get("description") or "",
-                "type": normalize_field_type(row.get("type")),
-                "coverage": row.get("coverage"),
-                "dateCoverage": row.get("dateCoverage"),
-                "alphaCount": row.get("alphaCount"),
-                "userCount": row.get("userCount"),
-                "region": row.get("region"),
-                "delay": row.get("delay"),
-                "universe": row.get("universe"),
-                "dataset": dataset_id,
-                "datasetName": dataset_name,
-                "sourceCategory": source_category,
-                "category": dataset_category,
-            }
-        )
-    return [row for row in normalized if row.get("id")]
+        normalized = normalize_field_row(row, dataset_category)
+        if normalized:
+            yield normalized
+
+
+def load_field_rows(path: Path, dataset_category: str) -> list[dict[str, Any]]:
+    return list(iter_field_rows(path, dataset_category))
 
 
 def text_matches(value: Any, wanted: str | None) -> bool:
@@ -388,26 +414,47 @@ def filter_field_rows(
     field_universe: str | None = None,
     matrix_only: bool = False,
 ) -> list[dict[str, Any]]:
-    filtered: list[dict[str, Any]] = []
-    for row in rows:
-        if dataset_id and not text_matches(row.get("dataset"), dataset_id):
-            continue
-        if category_name and not text_matches(row.get("sourceCategory"), category_name):
-            continue
-        if field_region and not text_matches(row.get("region"), field_region):
-            continue
-        if field_delay is not None:
-            try:
-                if int(row.get("delay")) != int(field_delay):
-                    continue
-            except (TypeError, ValueError):
-                continue
-        if field_universe and not text_matches(row.get("universe"), field_universe):
-            continue
-        if matrix_only and row.get("type") != "MATRIX":
-            continue
-        filtered.append(row)
-    return filtered
+    return [
+        row
+        for row in rows
+        if field_row_matches(
+            row,
+            dataset_id=dataset_id,
+            category_name=category_name,
+            field_region=field_region,
+            field_delay=field_delay,
+            field_universe=field_universe,
+            matrix_only=matrix_only,
+        )
+    ]
+
+
+def field_row_matches(
+    row: dict[str, Any],
+    dataset_id: str | None = None,
+    category_name: str | None = None,
+    field_region: str | None = None,
+    field_delay: int | None = None,
+    field_universe: str | None = None,
+    matrix_only: bool = False,
+) -> bool:
+    if dataset_id and not text_matches(row.get("dataset"), dataset_id):
+        return False
+    if category_name and not text_matches(row.get("sourceCategory"), category_name):
+        return False
+    if field_region and not text_matches(row.get("region"), field_region):
+        return False
+    if field_delay is not None:
+        try:
+            if int(row.get("delay")) != int(field_delay):
+                return False
+        except (TypeError, ValueError):
+            return False
+    if field_universe and not text_matches(row.get("universe"), field_universe):
+        return False
+    if matrix_only and row.get("type") != "MATRIX":
+        return False
+    return True
 
 
 BAD_FIELD_TOKENS = {
@@ -519,6 +566,52 @@ def select_fields(rows: list[dict[str, Any]], max_fields: int, allow_raw_earning
         if len(chosen) >= max_fields:
             break
     return chosen
+
+
+def load_ranked_consultant_rows(
+    max_fields: int,
+    allow_raw_earnings_fields: bool = False,
+    dataset_id: str | None = None,
+    category_name: str | None = None,
+    field_region: str | None = None,
+    field_delay: int | None = None,
+    field_universe: str | None = None,
+    matrix_only: bool = False,
+) -> list[dict[str, Any]]:
+    source = CONSULTANT_FIELDS_JSONL_PATH if CONSULTANT_FIELDS_JSONL_PATH.exists() else CONSULTANT_FIELDS_PATH
+    max_candidates = max(max_fields * 60, 1000)
+    heap: list[tuple[float, int, dict[str, Any]]] = []
+    seen_ids: set[tuple[Any, ...]] = set()
+    scanned = 0
+    for idx, row in enumerate(iter_field_rows(source, "consultant")):
+        scanned += 1
+        if not field_row_matches(
+            row,
+            dataset_id=dataset_id,
+            category_name=category_name,
+            field_region=field_region,
+            field_delay=field_delay,
+            field_universe=field_universe,
+            matrix_only=matrix_only,
+        ):
+            continue
+        if not is_expression_safe_field(row, allow_raw_earnings_fields):
+            continue
+        key = (row.get("id"), row.get("dataset"), row.get("region"), row.get("delay"), row.get("universe"))
+        if key in seen_ids:
+            continue
+        seen_ids.add(key)
+        score = field_score(row)
+        if score <= 0:
+            continue
+        entry = (score, idx, row)
+        if len(heap) < max_candidates:
+            heapq.heappush(heap, entry)
+        elif entry > heap[0]:
+            heapq.heapreplace(heap, entry)
+    rows = [row for _score, _idx, row in sorted(heap, reverse=True)]
+    log.info("consultant field stream source=%s scanned=%d matched_candidates=%d", source.name, scanned, len(rows))
+    return rows
 
 
 def field_value(row: dict[str, Any], backfill_days: int) -> str:
@@ -756,7 +849,18 @@ def build_queue(
     if field_source in {"all", "general"}:
         rows.extend(load_field_rows(BASE_DIR / "constants" / "data_fields_cache_USA_1_TOP3000.json", "general"))
     if field_source in {"all", "consultant"}:
-        rows.extend(load_field_rows(CONSULTANT_FIELDS_PATH, "consultant"))
+        rows.extend(
+            load_ranked_consultant_rows(
+                max_fields=max_fields,
+                allow_raw_earnings_fields=allow_raw_earnings_fields,
+                dataset_id=dataset_id,
+                category_name=category_name,
+                field_region=field_region,
+                field_delay=field_delay,
+                field_universe=field_universe,
+                matrix_only=matrix_only,
+            )
+        )
     rows = filter_field_rows(
         rows,
         dataset_id=dataset_id,
