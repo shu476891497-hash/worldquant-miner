@@ -39,6 +39,10 @@ LOG_DIR.mkdir(exist_ok=True)
 RESULTS_PATH = BASE_DIR / "consultant_miner_results.json"
 CACHE_PATH = BASE_DIR / "constants" / "consultant_simulation_cache.json"
 SUMMARY_PATH = BASE_DIR / "consultant_tips_summary.md"
+# Pool of abandoned templates/fields (already submitted or spent -> high self-correlation).
+# Any generated variant whose expression contains a banned field or matches a banned
+# expression is dropped before submission, so the miner never re-mines a spent idea.
+ABANDONED_PATH = BASE_DIR / "constants" / "abandoned_templates.json"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -569,6 +573,37 @@ def generate_field_probe_variants(
     return variants
 
 
+def _load_abandoned_pool() -> tuple[list[str], set[str]]:
+    """Return (banned_field_substrings, banned_normalized_expressions)."""
+    if not ABANDONED_PATH.exists():
+        return [], set()
+    try:
+        data = json.loads(ABANDONED_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:
+        log.warning("could not read abandoned pool %s: %s", ABANDONED_PATH, exc)
+        return [], set()
+    fields = [str(f).replace(" ", "") for f in data.get("banned_fields", []) if str(f).strip()]
+    exprs = {str(e).replace(" ", "") for e in data.get("banned_expressions", []) if str(e).strip()}
+    return fields, exprs
+
+
+def filter_abandoned(variants: list[tuple[str, ParamVariant]]) -> list[tuple[str, ParamVariant]]:
+    banned_fields, banned_exprs = _load_abandoned_pool()
+    if not banned_fields and not banned_exprs:
+        return variants
+    kept: list[tuple[str, ParamVariant]] = []
+    dropped = 0
+    for name, variant in variants:
+        norm = variant.expression.replace(" ", "")
+        if norm in banned_exprs or any(bf in norm for bf in banned_fields):
+            dropped += 1
+            continue
+        kept.append((name, variant))
+    if dropped:
+        log.info("abandoned pool: dropped %d spent variant(s)", dropped)
+    return kept
+
+
 def dedup_variants(variants: list[tuple[str, ParamVariant]]) -> list[tuple[str, ParamVariant]]:
     seen: set[tuple[Any, ...]] = set()
     unique: list[tuple[str, ParamVariant]] = []
@@ -678,7 +713,7 @@ def build_queue(
         except Exception as exc:
             log.warning("could not load ern4 official variants: %s", exc)
 
-    return dedup_variants(variants)
+    return filter_abandoned(dedup_variants(variants))
 
 
 def result_from_alpha(name: str, variant: ParamVariant, desc: str, alpha_id: str, alpha: dict[str, Any]) -> SimResult:

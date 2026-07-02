@@ -1,0 +1,13 @@
+{
+  "_comment": "Abandoned/spent templates. Any generated variant whose expression contains a banned_field substring, or exactly matches a banned_expression (whitespace-insensitive), is dropped before submission. Add fields/expressions here to stop the miner re-mining ideas that are already submitted (high self-correlation).",
+  "banned_fields": [
+    "est_eps"
+  ],
+  "banned_expressions": [
+    "group_rank(ts_rank(est_eps/close, 60), industry)",
+    "group_rank(ts_zscore(est_eps/close, 60), industry)",
+    "group_rank(ts_rank(est_eps/close, 60), subindustry)",
+    "group_rank(ts_zscore(est_eps/close, 60), subindustry)",
+    "group_rank(ts_rank(est_eps/close, 120), industry)"
+  ]
+}
