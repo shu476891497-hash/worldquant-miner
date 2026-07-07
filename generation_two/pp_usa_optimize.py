@@ -129,6 +129,25 @@ def submit_multi(batch):
 
 best = {}  # field -> (returns, sharpe, turnover, id, expr, neut, decay)
 
+def is_robust(alpha_id):
+    """Reject overfit blowups: any out-of-sample (TEST) year with returns<-15% or sharpe<-1."""
+    for _ in range(3):
+        try:
+            r = s.get(f"{API}/alphas/{alpha_id}/recordsets/yearly-stats", timeout=20)
+            if r.status_code == 200 and r.text.strip():
+                recs = r.json().get("records", [])
+                test = [row for row in recs if row and row[-1] == "TEST"] or recs
+                for row in test:
+                    yr_sh = row[6] if len(row) > 6 and isinstance(row[6], (int, float)) else 0
+                    yr_ret = row[7] if len(row) > 7 and isinstance(row[7], (int, float)) else 0
+                    if yr_ret < -0.15 or yr_sh < -1.0:
+                        return False
+                return True
+        except Exception:
+            pass
+        time.sleep(2)
+    return True  # if unavailable, don't block
+
 def eval_alpha(alpha_id, field, dc, neut):
     try:
         a = s.get(f"{API}/alphas/{alpha_id}", timeout=15).json(); iss = a.get("is") or {}
@@ -136,7 +155,7 @@ def eval_alpha(alpha_id, field, dc, neut):
         sh = iss.get("sharpe", 0) or 0; to = iss.get("turnover", 0) or 0; ret = iss.get("returns", 0) or 0
         fails = [c.get("name") for c in (iss.get("checks") or [])
                  if c.get("result") == "FAIL" and c.get("name") != "OLD_SIMULATION"]
-        if sh >= 1.0 and 0.01 < to <= MAX_TURNOVER and not fails:
+        if sh >= 1.0 and 0.01 < to <= MAX_TURNOVER and not fails and is_robust(alpha_id):
             cur = best.get(field)
             if cur is None or ret > cur[0]:
                 best[field] = (ret, sh, to, alpha_id, expr, neut, dc)
