@@ -55,7 +55,12 @@ def main() -> int:
     results: list[dict[str, Any]] = []
 
     for alpha_id in ids:
-        detail = session.get(f"{API}/alphas/{alpha_id}", timeout=30)
+        try:
+            detail = session.get(f"{API}/alphas/{alpha_id}", timeout=30)
+        except requests.RequestException as error:
+            results.append({"id": alpha_id, "checked_at": time.time(), "result": "detail_request_error", "error": str(error)})
+            print(f"{alpha_id}: detail request failed: {error}", flush=True)
+            continue
         row: dict[str, Any] = {"id": alpha_id, "checked_at": time.time(), "detail_status": detail.status_code}
         if detail.status_code != 200:
             row["result"] = "detail_failed"
@@ -75,7 +80,15 @@ def main() -> int:
             results.append(row)
             print(f"{alpha_id}: ready", flush=True)
             continue
-        response = session.post(f"{API}/alphas/{alpha_id}/submit", timeout=30)
+        try:
+            response = session.post(f"{API}/alphas/{alpha_id}/submit", timeout=30)
+        except requests.RequestException as error:
+            row["result"] = "submit_request_error"
+            row["error"] = str(error)
+            results.append(row)
+            Path(args.results).write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+            print(f"{alpha_id}: submit request failed: {error}", flush=True)
+            continue
         row["submit_status"] = response.status_code
         row["body"] = body(response)
         if response.status_code in {200, 201, 202}:
