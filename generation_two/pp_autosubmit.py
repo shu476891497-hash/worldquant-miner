@@ -221,7 +221,14 @@ def alpha_quality_ok(alpha: dict[str, Any]) -> bool:
     is_data = alpha.get("is") or {}
     turnover = to_float(is_data.get("turnover"))
     expression = alpha_expression(alpha)
-    return turnover is not None and MIN_TURNOVER <= turnover <= MAX_TURNOVER and shape_ok(expression)
+    checks = is_data.get("checks") or []
+    has_blocking_check = any(check.get("result") in {"FAIL", "ERROR"} for check in checks)
+    return (
+        turnover is not None
+        and MIN_TURNOVER <= turnover <= MAX_TURNOVER
+        and shape_ok(expression)
+        and not has_blocking_check
+    )
 
 
 def load_state() -> dict[str, Any]:

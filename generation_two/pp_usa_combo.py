@@ -259,7 +259,7 @@ def alpha_metrics(alpha: dict[str, Any]) -> dict[str, Any]:
     fails = [
         check.get("name")
         for check in checks
-        if check.get("result") == "FAIL" and check.get("name") != "OLD_SIMULATION"
+        if check.get("result") in {"FAIL", "ERROR"} and check.get("name") != "OLD_SIMULATION"
     ]
     return {
         "alpha_id": alpha.get("id"),
@@ -491,6 +491,7 @@ def build_single_payloads(fields: list[dict[str, Any]], max_payloads: int) -> li
             (f"delta120:{field}", f"rank(ts_delta({field}, 120))", "STATISTICAL", 5),
             (f"grp_delta120:{field}", f"group_rank(ts_delta({field}, 120), industry)", "SLOW", 5),
             (f"z60:{field}", f"group_rank(ts_zscore({field}, 60), industry)", "FAST", 0),
+            (f"crowd_delta120:{field}", f"rank(ts_delta({field}, 120))", "CROWDING", 5),
         ]
         for label, expression, neutralization, decay in templates:
             if shape_ok(expression):
