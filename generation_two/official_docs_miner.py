@@ -1434,9 +1434,9 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fnd6_liability_fair_value_mix",
-        expression="-group_rank(ts_zscore(fnd6_newqeventv110_lol2q, 252), sector)",
+        expression="-group_rank(ts_zscore(ts_backfill(vec_avg(fnd6_newqeventv110_lol2q), 63), 252), sector)",
         hypothesis="Level-2 liabilities high versus Level-1 liabilities increase valuation uncertainty.",
-        hint="Fair-value hierarchy mix, using low-crowding FND6 fields.",
+        hint="Quarterly event-vector fair-value hierarchy signal, stabilized before annual normalization.",
         dataset_category="fundamental",
         level="custom",
         neutralization="SECTOR", decay=10, truncation=0.08,
