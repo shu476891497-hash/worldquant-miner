@@ -1484,7 +1484,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fnd6_debt_due_1y_pressure",
-        expression="-group_rank(ts_rank(fnd6_eventv110_dd1q / ts_backfill(vec_avg(fnd6_newqeventv110_lltq), 63), 252), sector)",
+        expression="-group_rank(ts_rank(ts_backfill(vec_avg(fnd6_eventv110_dd1q), 63) / ts_backfill(vec_avg(fnd6_newqeventv110_lltq), 63), 252), sector)",
         hypothesis="Debt due within one year relative to long-term liabilities flags refinancing pressure.",
         hint="Debt maturity stress template using low-crowding FND6 fields.",
         dataset_category="fundamental",

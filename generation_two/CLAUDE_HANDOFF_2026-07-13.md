@@ -55,6 +55,8 @@ The same event-vector audit also corrected direct FND6 event usages in
 `pnciaq`, `rcaq`, `gdwlipq`, `invfgq`, `invwipq`, and the `lltq` denominator
 inside the debt-due template. Do a static scan for
 `fnd6_newqeventv110_` without `vec_avg(` before launching any new sweep.
+The older `fnd6_eventv110_dd1q` field is also a vector and must be reduced
+with `vec_avg` before it is used in a ratio.
 
 Do not introduce arbitrary epsilon denominators into new fundamental templates.
 For quarterly event data, use quarterly state holding (`63`) and economically
