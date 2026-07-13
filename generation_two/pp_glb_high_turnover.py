@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -115,6 +116,44 @@ def theme_checks(session: Any, alpha_id: str) -> list[dict[str, Any]]:
     return [check for check in checks if check.get("name") == "MATCHES_THEMES"]
 
 
+def run_single_probe(session: Any, payload: dict[str, Any], poll_sleep: int) -> dict[str, Any] | None:
+    """Run one ordinary GLB simulation and retain its alpha result.
+
+    GLB probes use the normal single-simulation endpoint. Its completion body
+    contains `alpha`, unlike multi-simulation responses which contain
+    `children`, so it cannot reuse pp_usa_combo.run_multi unchanged.
+    """
+    response = session.post(
+        f"{base.API}/simulations",
+        json=glb_config(payload["expression"], payload["neutralization"], payload["decay"]),
+        timeout=45,
+    )
+    if response.status_code != 201:
+        print(f"submit_failed label={payload['label']} HTTP={response.status_code} {response.text[:300]}", flush=True)
+        return None
+    location = response.headers.get("Location")
+    if not location:
+        return None
+
+    deadline = time.monotonic() + 600
+    while time.monotonic() < deadline:
+        progress = session.get(location, timeout=30)
+        if progress.status_code != 200:
+            time.sleep(poll_sleep)
+            continue
+        retry_after = float(progress.headers.get("Retry-After", "0") or 0)
+        data = progress.json()
+        alpha_id = data.get("alpha")
+        if alpha_id:
+            alpha_response = session.get(f"{base.API}/alphas/{alpha_id}", timeout=30)
+            if alpha_response.status_code != 200:
+                return None
+            return {**payload, **base.alpha_metrics(alpha_response.json())}
+        time.sleep(max(poll_sleep, retry_after))
+    print(f"simulation_timeout label={payload['label']}", flush=True)
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="GLB High Turnover theme probe")
     parser.add_argument("--credential", default=str(ROOT / "credential_4.txt"))
@@ -135,18 +174,11 @@ def main() -> int:
         return 0
 
     session = base.make_session(Path(args.credential))
-    original_make_config = base.make_config
-    try:
-        base.make_config = glb_config
-        results = base.run_multi(
-            session,
-            payloads,
-            concurrent_multi=1,
-            multi_size=1,
-            poll_sleep=args.poll_sleep,
-        )
-    finally:
-        base.make_config = original_make_config
+    results = []
+    for payload in payloads:
+        result = run_single_probe(session, payload, args.poll_sleep)
+        if result:
+            results.append(result)
 
     for row in results:
         alpha_id = row.get("alpha_id")
