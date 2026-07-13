@@ -65,9 +65,11 @@ invalid template fields rather than restarting the whole miner.
 
 - The strict `pp_autosubmit.py` path is intentionally limited to platform
   `POWER_POOL_ELIGIBLE` alphas.
-- A user-authorized normal submission batch may include other UI-submittable
-  alphas, but must record every ID/result and stop immediately on HTTP `429`
-  (`THROTTLED`). Do not retry a throttled request in a loop.
-- Never assume that a `UNSUBMITTED` table row has already passed every
-  pre-submission check. Submit once, preserve the API response, and let the
-  platform report any remaining gate.
+- A POST response of HTTP `201` means only `REQUEST_ACCEPTED`; it is not pool
+  entry. The authoritative confirmation is `GET /alphas/<id>` returning
+  `status == ACTIVE`.
+- Submit only candidates already marked `POWER_POOL_ELIGIBLE`, one request at
+  a time. Persist `REQUEST_ACCEPTED` so an in-progress alpha is never posted
+  again. Poll its status rather than submitting more copies.
+- Stop immediately on HTTP `429` (`THROTTLED`). Do not retry a throttled
+  request in a loop.

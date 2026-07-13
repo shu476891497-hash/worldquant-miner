@@ -332,6 +332,33 @@ def submit_alpha(session: requests.Session, alpha_id: str) -> bool:
     return response.status_code in {200, 201, 202}
 
 
+def wait_for_active(
+    session: requests.Session,
+    alpha_id: str,
+    timeout_seconds: int,
+    poll_interval: int,
+) -> str:
+    """Return the authoritative post-submit platform status.
+
+    A successful POST only means the submission request was accepted.  It is
+    not a successful pool entry until the alpha detail endpoint says ACTIVE.
+    """
+    deadline = time.monotonic() + timeout_seconds
+    last_status = "REQUEST_ACCEPTED"
+    while time.monotonic() < deadline:
+        alpha = fetch_alpha(session, alpha_id)
+        if not alpha:
+            last_status = "DETAIL_UNAVAILABLE"
+        else:
+            last_status = str(alpha.get("status") or "UNKNOWN").upper()
+            if last_status == "ACTIVE":
+                return last_status
+            if last_status in {"REJECTED", "FAILED", "ERROR"}:
+                return last_status
+        time.sleep(poll_interval)
+    return last_status
+
+
 def select_submit_ready(session: requests.Session, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ready = []
     for alpha in candidates:
@@ -367,11 +394,13 @@ def run_once(args: argparse.Namespace, session: requests.Session, state: dict[st
     ready = select_submit_ready(session, candidates)
     print(f"power_pool_ready={len(ready)}", flush=True)
 
-    submitted = 0
+    confirmed_active = 0
+    requests_sent = 0
     for alpha in ready:
         alpha_id = str(alpha.get("id"))
-        if alpha_id in state.get("submitted", {}):
-            print(f"skip already submitted/tracked {alpha_id}", flush=True)
+        tracked = state.get("submitted", {}).get(alpha_id)
+        if tracked:
+            print(f"skip already tracked {alpha_id} status={tracked.get('status')}", flush=True)
             continue
         is_data = alpha.get("is") or {}
         print(
@@ -386,13 +415,28 @@ def run_once(args: argparse.Namespace, session: requests.Session, state: dict[st
         if not submit_alpha(session, alpha_id):
             print(f"submit failed {alpha_id}", flush=True)
             continue
-        state.setdefault("submitted", {})[alpha_id] = {"ts": time.time(), "status": "SUBMITTED"}
+        requests_sent += 1
+        state.setdefault("submitted", {})[alpha_id] = {
+            "ts": time.time(),
+            "status": "REQUEST_ACCEPTED",
+        }
         save_state(state)
-        print(f"AUTO-SUBMITTED {alpha_id}", flush=True)
-        submitted += 1
-        if submitted >= args.max_submit:
+        final_status = wait_for_active(
+            session,
+            alpha_id,
+            timeout_seconds=args.active_timeout,
+            poll_interval=args.poll_interval,
+        )
+        state["submitted"][alpha_id].update({"checked_at": time.time(), "status": final_status})
+        save_state(state)
+        if final_status == "ACTIVE":
+            print(f"ACTIVE_CONFIRMED {alpha_id}", flush=True)
+            confirmed_active += 1
+        else:
+            print(f"REQUEST_ACCEPTED_NOT_ACTIVE {alpha_id} status={final_status}", flush=True)
+        if requests_sent >= args.max_submit:
             break
-    return submitted
+    return confirmed_active
 
 
 def main() -> int:
@@ -401,6 +445,8 @@ def main() -> int:
     parser.add_argument("--winners", default=str(WINNERS_PATH))
     parser.add_argument("--max-submit", type=int, default=1)
     parser.add_argument("--interval", type=int, default=300)
+    parser.add_argument("--active-timeout", type=int, default=600)
+    parser.add_argument("--poll-interval", type=int, default=30)
     parser.add_argument("--loop", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

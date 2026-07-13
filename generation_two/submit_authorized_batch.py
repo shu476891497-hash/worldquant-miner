@@ -92,7 +92,7 @@ def main() -> int:
         row["submit_status"] = response.status_code
         row["body"] = body(response)
         if response.status_code in {200, 201, 202}:
-            row["result"] = "submitted"
+            row["result"] = "request_accepted_not_verified_active"
         elif response.status_code == 429:
             row["result"] = "throttled"
         else:

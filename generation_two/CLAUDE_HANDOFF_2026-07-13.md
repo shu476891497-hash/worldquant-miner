@@ -69,13 +69,15 @@ matched denominators.
 
 - `pp_autosubmit.py` is intentionally strict: it only submits platform-labeled
   `POWER_POOL_ELIGIBLE` candidates.
-- `submit_authorized_batch.py` handles an explicit user-approved list, records
-  every response, and stops on HTTP 429. It is not a bypass for platform checks.
-- Previous successful manual-batch API submissions were `XgnWrL6m`,
-  `MPQ1WXor`, and `rKl53Lvd` (HTTP 201). A later request hit platform throttling.
-- On 2026-07-13, the refreshed-cookie batch received HTTP 201 for
-  `2rLO8v8P`, `vRlkw5wd`, and `WjGP1NkO`; the next request (`YP07erlM`) hit
-  HTTP 429 and the batch stopped immediately.
+- Do not use `submit_authorized_batch.py` for normal operation. Use
+  `pp_autosubmit.py`, which filters for `POWER_POOL_ELIGIBLE` and now polls
+  until the authoritative status is `ACTIVE`.
+- HTTP 201 from `/submit` means only `REQUEST_ACCEPTED`, not successful entry.
+  Never describe an alpha as submitted into the pool until a subsequent
+  `GET /alphas/<id>` returns `status == ACTIVE`.
+- Historical POST requests for `XgnWrL6m`, `MPQ1WXor`, `rKl53Lvd`,
+  `2rLO8v8P`, `vRlkw5wd`, and `WjGP1NkO` returned HTTP 201, but their final
+  ACTIVE/PENDING states were not verified before the account hit 429/401.
 - Never retry HTTP 429 in a loop.
 
 ## Current Candidate Audit
