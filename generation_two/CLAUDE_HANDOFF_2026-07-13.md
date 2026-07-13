@@ -107,3 +107,6 @@ not post stale IDs and expect the platform to accept them.
 - `pp_usa_combo.py`: correlation-aware two-signal miner.
 - `pp_autosubmit.py`: strict PP-only submission guard.
 - `submit_authorized_batch.py`: explicit-ID, audit-recorded submission tool.
+- `pp_glb_high_turnover.py`: GLB/TOP3000/D1/Country-neutral high-turnover
+  probe. It uses one GLB simulation at a time (two account slots), records
+  `MATCHES_THEMES`, and never submits alphas.

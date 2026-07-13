@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""Small, evidence-first probe for the GLB High Turnover Power Pool theme.
+
+GLB simulations occupy two account slots, so this script deliberately submits
+one simulation at a time. It focuses on short-horizon model signals, records
+the platform's MATCHES_THEMES check, and does not submit alpha requests.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import random
+from collections import defaultdict
+from pathlib import Path
+from typing import Any
+
+import pp_usa_combo as base
+
+
+ROOT = Path(__file__).resolve().parent
+FIELDS = ROOT / "constants" / "consultant_fields" / "consultant_expression_fields.jsonl"
+RESULTS = ROOT / "pp_glb_high_turnover_probe_results.json"
+
+PRIORITY_DATASETS = {
+    "predictive_starmine",
+    "global_seasonal_model",
+    "tech_chart_model",
+    "chart_cnn_alpha",
+    "analyst_revision_horizons",
+    "model77",
+    "model219",
+    "model264",
+}
+
+
+def stream_glb_fields(max_fields: int, per_dataset: int) -> list[dict[str, str]]:
+    grouped: dict[str, list[dict[str, str]]] = defaultdict(list)
+    with FIELDS.open(encoding="utf-8") as handle:
+        for line in handle:
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if row.get("region") != "GLB" or row.get("delay") != 1 or row.get("type") != "MATRIX":
+                continue
+            dataset = str(row.get("dataset_id") or row.get("dataset") or "").lower()
+            field = str(row.get("id") or "")
+            if not field or dataset not in PRIORITY_DATASETS or len(grouped[dataset]) >= per_dataset:
+                continue
+            grouped[dataset].append({"id": field, "dataset": dataset})
+
+    selected: list[dict[str, str]] = []
+    for dataset in sorted(PRIORITY_DATASETS):
+        selected.extend(grouped[dataset])
+    return selected[:max_fields]
+
+
+def glb_config(expression: str, neutralization: str, decay: int = 0) -> dict[str, Any]:
+    return {
+        "type": "REGULAR",
+        "settings": {
+            "instrumentType": "EQUITY",
+            "region": "GLB",
+            "universe": "TOP3000",
+            "delay": 1,
+            "decay": decay,
+            "neutralization": neutralization,
+            "truncation": 0.08,
+            "pasteurization": "ON",
+            "unitHandling": "VERIFY",
+            "nanHandling": "OFF",
+            "language": "FASTEXPR",
+            "visualization": False,
+            "testPeriod": "P5Y0M0D",
+        },
+        "regular": expression,
+    }
+
+
+def build_probe_payloads(fields: list[dict[str, str]], maximum: int) -> list[dict[str, Any]]:
+    payloads: list[dict[str, Any]] = []
+    for item in fields:
+        field = item["id"]
+        dataset = item["dataset"]
+        candidates = [
+            ("delta5", f"rank(ts_delta({field}, 5))", "COUNTRY", 0),
+            ("delta20", f"rank(ts_delta({field}, 20))", "COUNTRY", 0),
+            ("z20", f"group_rank(ts_zscore({field}, 20), country)", "COUNTRY", 0),
+            ("rank20", f"group_rank(ts_rank({field}, 20), country)", "COUNTRY", 1),
+        ]
+        for label, expression, neutralization, decay in candidates:
+            if base.shape_ok(expression):
+                payloads.append(
+                    {
+                        "stage": "glb_high_turnover_probe",
+                        "label": f"{label}:{field}",
+                        "expression": expression,
+                        "neutralization": neutralization,
+                        "decay": decay,
+                        "fields": [field],
+                        "datasets": [dataset],
+                    }
+                )
+    random.shuffle(payloads)
+    return payloads[:maximum]
+
+
+def theme_checks(session: Any, alpha_id: str) -> list[dict[str, Any]]:
+    response = session.get(f"{base.API}/alphas/{alpha_id}", timeout=30)
+    if response.status_code != 200:
+        return []
+    alpha = response.json()
+    checks = (alpha.get("is") or {}).get("checks") or []
+    return [check for check in checks if check.get("name") == "MATCHES_THEMES"]
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="GLB High Turnover theme probe")
+    parser.add_argument("--credential", default=str(ROOT / "credential_4.txt"))
+    parser.add_argument("--max-fields", type=int, default=8)
+    parser.add_argument("--fields-per-dataset", type=int, default=1)
+    parser.add_argument("--max-payloads", type=int, default=12)
+    parser.add_argument("--poll-sleep", type=int, default=12)
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    random.seed(713)
+    fields = stream_glb_fields(args.max_fields, args.fields_per_dataset)
+    payloads = build_probe_payloads(fields, args.max_payloads)
+    print(f"glb_fields={len(fields)} payloads={len(payloads)}", flush=True)
+    if args.dry_run:
+        for item in payloads:
+            print(f"{item['label']} -> {item['expression']}", flush=True)
+        return 0
+
+    session = base.make_session(Path(args.credential))
+    original_make_config = base.make_config
+    try:
+        base.make_config = glb_config
+        results = base.run_multi(
+            session,
+            payloads,
+            concurrent_multi=1,
+            multi_size=1,
+            poll_sleep=args.poll_sleep,
+        )
+    finally:
+        base.make_config = original_make_config
+
+    for row in results:
+        alpha_id = row.get("alpha_id")
+        row["theme_checks"] = theme_checks(session, alpha_id) if alpha_id else []
+        print(
+            f"id={alpha_id} S={row.get('sharpe', 0):.2f} TO={row.get('turnover', 0):.1%} "
+            f"F={row.get('fitness', 0):.2f} themes={row['theme_checks']}",
+            flush=True,
+        )
+    RESULTS.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"saved={RESULTS.name} results={len(results)}", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
