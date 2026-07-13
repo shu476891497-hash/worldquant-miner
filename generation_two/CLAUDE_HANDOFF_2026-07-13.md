@@ -57,6 +57,9 @@ inside the debt-due template. Do a static scan for
 `fnd6_newqeventv110_` without `vec_avg(` before launching any new sweep.
 The older `fnd6_eventv110_dd1q` field is also a vector and must be reduced
 with `vec_avg` before it is used in a ratio.
+This applies to all FND6 field names containing `eventv110`, including
+`fnd6_cptnewqeventv110_rectq`; scan the generic substring, not just one
+prefix family.
 
 Do not introduce arbitrary epsilon denominators into new fundamental templates.
 For quarterly event data, use quarterly state holding (`63`) and economically

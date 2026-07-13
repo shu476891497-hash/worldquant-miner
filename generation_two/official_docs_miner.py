@@ -1221,7 +1221,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fnd6_working_capital_stress",
-        expression="-group_rank(ts_delta(fnd6_cptnewqeventv110_rectq, 120), subindustry)",
+        expression="-group_rank(ts_delta(ts_backfill(vec_avg(fnd6_cptnewqeventv110_rectq), 63), 63), subindustry)",
         hypothesis="Receivables rising faster than payables and sales can reveal cash conversion stress.",
         hint="Receivables/payables event fields are less crowded than generic fundamentals.",
         dataset_category="fundamental",
@@ -1454,7 +1454,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fnd6_receivable_payable_balance",
-        expression="-group_rank(ts_zscore(fnd6_cptnewqeventv110_rectq, 252), subindustry)",
+        expression="-group_rank(ts_zscore(ts_backfill(vec_avg(fnd6_cptnewqeventv110_rectq), 63), 252), subindustry)",
         hypothesis="Receivables high versus payables can imply weaker cash conversion.",
         hint="Event-version working-capital detail, less crowded than generic ratios.",
         dataset_category="fundamental",
