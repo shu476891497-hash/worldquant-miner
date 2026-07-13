@@ -1231,9 +1231,9 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fnd6_level3_liability_risk",
-        expression="-group_rank(ts_zscore(fnd6_newqeventv110_lul3q, 252), sector)",
+        expression="-group_rank(ts_zscore(ts_backfill(vec_avg(fnd6_newqeventv110_lul3q), 63), 252), sector)",
         hypothesis="High Level-3 liability share increases valuation uncertainty and downside risk.",
-        hint="Fair-value hierarchy signal; sector rank keeps financial exposure comparable.",
+        hint="Quarterly event-vector fair-value hierarchy signal; sector rank keeps exposure comparable.",
         dataset_category="fundamental",
         level="custom",
         neutralization="SECTOR", decay=10, truncation=0.08,
