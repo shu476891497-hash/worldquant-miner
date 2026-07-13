@@ -57,20 +57,27 @@ def stream_glb_fields(max_fields: int, per_dataset: int) -> list[dict[str, str]]
     return selected[:max_fields]
 
 
-def glb_config(expression: str, neutralization: str, decay: int = 0) -> dict[str, Any]:
+def glb_config(
+    expression: str,
+    neutralization: str,
+    decay: int = 0,
+    universe: str = "TOP3000",
+    truncation: float = 0.08,
+    nan_handling: str = "OFF",
+) -> dict[str, Any]:
     return {
         "type": "REGULAR",
         "settings": {
             "instrumentType": "EQUITY",
             "region": "GLB",
-            "universe": "TOP3000",
+            "universe": universe,
             "delay": 1,
             "decay": decay,
             "neutralization": neutralization,
-            "truncation": 0.08,
+            "truncation": truncation,
             "pasteurization": "ON",
             "unitHandling": "VERIFY",
-            "nanHandling": "OFF",
+            "nanHandling": nan_handling,
             "language": "FASTEXPR",
             "visualization": False,
             "testPeriod": "P5Y0M0D",
@@ -107,13 +114,40 @@ def build_probe_payloads(fields: list[dict[str, str]], maximum: int) -> list[dic
     return payloads[:maximum]
 
 
+def build_kp9_rescue_payloads() -> list[dict[str, Any]]:
+    growth = "mdl110_growth"
+    sentiment = "mdl110_analyst_sentiment"
+    windows = [(90, 90), (60, 60), (40, 40), (20, 20), (60, 120), (120, 60)]
+    payloads: list[dict[str, Any]] = []
+    for left, right in windows:
+        payloads.append(
+            {
+                "stage": "glb_kp9_high_turnover_rescue",
+                "label": f"kp9_delta_{left}_{right}",
+                "expression": f"rank(ts_delta({growth},{left}))+rank(ts_delta({sentiment},{right}))",
+                "neutralization": "INDUSTRY",
+                "decay": 0,
+                "universe": "MINVOL1M",
+                "truncation": 0.01,
+                "nan_handling": "ON",
+                "fields": [growth, sentiment],
+                "datasets": ["model110"],
+            }
+        )
+    return payloads
+
+
 def theme_checks(session: Any, alpha_id: str) -> list[dict[str, Any]]:
     response = session.get(f"{base.API}/alphas/{alpha_id}", timeout=30)
     if response.status_code != 200:
         return []
     alpha = response.json()
     checks = (alpha.get("is") or {}).get("checks") or []
-    return [check for check in checks if check.get("name") == "MATCHES_THEMES"]
+    return [
+        check
+        for check in checks
+        if check.get("name") == "MATCHES_THEMES" or str(check.get("name") or "").startswith("HT_")
+    ]
 
 
 def run_single_probe(session: Any, payload: dict[str, Any], poll_sleep: int) -> dict[str, Any] | None:
@@ -125,7 +159,14 @@ def run_single_probe(session: Any, payload: dict[str, Any], poll_sleep: int) -> 
     """
     response = session.post(
         f"{base.API}/simulations",
-        json=glb_config(payload["expression"], payload["neutralization"], payload["decay"]),
+        json=glb_config(
+            payload["expression"],
+            payload["neutralization"],
+            payload["decay"],
+            universe=payload.get("universe", "TOP3000"),
+            truncation=payload.get("truncation", 0.08),
+            nan_handling=payload.get("nan_handling", "OFF"),
+        ),
         timeout=45,
     )
     if response.status_code != 201:
@@ -162,11 +203,12 @@ def main() -> int:
     parser.add_argument("--max-payloads", type=int, default=12)
     parser.add_argument("--poll-sleep", type=int, default=12)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--kp9-rescue", action="store_true")
     args = parser.parse_args()
 
     random.seed(713)
-    fields = stream_glb_fields(args.max_fields, args.fields_per_dataset)
-    payloads = build_probe_payloads(fields, args.max_payloads)
+    fields = [] if args.kp9_rescue else stream_glb_fields(args.max_fields, args.fields_per_dataset)
+    payloads = build_kp9_rescue_payloads() if args.kp9_rescue else build_probe_payloads(fields, args.max_payloads)
     print(f"glb_fields={len(fields)} payloads={len(payloads)}", flush=True)
     if args.dry_run:
         for item in payloads:
