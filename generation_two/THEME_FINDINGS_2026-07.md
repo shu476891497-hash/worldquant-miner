@@ -90,3 +90,21 @@ rank(ts_delta(mdl110_growth,120))
 下一步只缩短两个趋势窗口到 90/60/40/20 日及非对称 60/120，保留
 GLB/MINVOL1M/D1/INDUSTRY/decay0，目标是将换手推入 20%-70%，同时保持
 三大区域 Sharpe 并把 returns ratio 提升至 0.75。
+
+## 7. 2026-07-13 提交通道纠正
+
+`POWER_POOL_ELIGIBLE` 是 Power Pool 快速通道的分类章，不能把它误写成
+所有 Regular Alpha 的统一提交前置条件。GLB Regular 应独立按 API 暴露的
+Regular checks 判断。
+
+本次逐条复核发现：
+
+- `blqGvzPr`：总 Sharpe 1.64、Fitness 1.30、Amer/EMEA/APAC 分别为
+  1.04/1.03/1.83、2Y Sharpe 2.77，全部静态 Regular 门槛 PASS。
+- `RR8jdzGb`：总 Sharpe 1.61、Fitness 1.22、Amer/EMEA/APAC 分别为
+  1.04/1.00/1.78、2Y Sharpe 2.76，全部静态 Regular 门槛 PASS。
+- `KP9lkrE8`：Fitness 0.91、2Y Sharpe -0.04，仍不是完整 Regular 候选。
+
+前两条各发起了一次提交请求并收到 HTTP 201，但最后轮询时仍为
+`UNSUBMITTED`，且 self/prod correlation 与 `REGULAR_SUBMISSION` 仍为
+`PENDING`。因此只能记录为“请求已接受、等待平台检查”，不能记录为 ACTIVE。

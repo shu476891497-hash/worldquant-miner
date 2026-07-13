@@ -68,7 +68,15 @@ matched denominators.
 ## Submission Policy
 
 - `pp_autosubmit.py` is intentionally strict: it only submits platform-labeled
-  `POWER_POOL_ELIGIBLE` candidates.
+  `POWER_POOL_ELIGIBLE` candidates. This is the Power Pool fast-path policy,
+  not a universal prerequisite for every Regular alpha submission.
+- Evaluate GLB Regular candidates separately from Power Pool candidates. A GLB
+  Regular alpha can be worth submitting when its static Regular checks pass
+  (total Sharpe, fitness, three regional Sharpes, turnover, concentration,
+  sub-universe Sharpe, and 2Y Sharpe), even before it has a
+  `POWER_POOL_ELIGIBLE` classification. Correlation and Regular submission
+  checks may remain `PENDING` until a submission request starts server-side
+  evaluation.
 - Do not use `submit_authorized_batch.py` for normal operation. Use
   `pp_autosubmit.py`, which filters for `POWER_POOL_ELIGIBLE` and now polls
   until the authoritative status is `ACTIVE`.
@@ -79,6 +87,17 @@ matched denominators.
   `2rLO8v8P`, `vRlkw5wd`, and `WjGP1NkO` returned HTTP 201, but their final
   ACTIVE/PENDING states were not verified before the account hit 429/401.
 - Never retry HTTP 429 in a loop.
+
+### GLB audit on 2026-07-13
+
+- `GET /users/self/alphas?settings.region=GLB` returned 8 existing GLB alphas
+  before the targeted rescue produced a ninth alpha.
+- `blqGvzPr` and `RR8jdzGb` passed every available static GLB Regular quality
+  threshold, including 2Y Sharpe. One submit request was sent for each; both
+  returned HTTP 201 but remained `UNSUBMITTED` with server checks `PENDING` at
+  the last poll. They are not yet confirmed `ACTIVE`.
+- `KP9lkrE8` is promising but not Regular-ready: fitness is 0.91 and 2Y Sharpe
+  is -0.04. Its static total and regional Sharpe checks pass.
 
 ## Current Candidate Audit
 
