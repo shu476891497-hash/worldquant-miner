@@ -51,6 +51,11 @@ Two official templates were corrected accordingly:
 - `fnd6_liability_fair_value_mix` (`lol2q`)
 - `fnd6_level3_liability_risk` (`lul3q`)
 
+The same event-vector audit also corrected direct FND6 event usages in
+`pnciaq`, `rcaq`, `gdwlipq`, `invfgq`, `invwipq`, and the `lltq` denominator
+inside the debt-due template. Do a static scan for
+`fnd6_newqeventv110_` without `vec_avg(` before launching any new sweep.
+
 Do not introduce arbitrary epsilon denominators into new fundamental templates.
 For quarterly event data, use quarterly state holding (`63`) and economically
 matched denominators.

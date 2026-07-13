@@ -1161,7 +1161,7 @@ def get_official_templates() -> List[AlphaTemplate]:
     # --- FND6: industry/special-item fields with low crowding in cache ---
     templates.append(AlphaTemplate(
         name="fnd6_core_pension_quality",
-        expression="group_rank(ts_rank(fnd6_newqeventv110_pnciaq, 252), subindustry)",
+        expression="group_rank(ts_rank(ts_backfill(vec_avg(fnd6_newqeventv110_pnciaq), 63), 252), subindustry)",
         hypothesis="Favorable after-tax pension adjustment versus pretax drag can improve reported quality.",
         hint="Low-crowding FND6 pension event fields.",
         dataset_category="fundamental",
@@ -1171,7 +1171,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fnd6_restructuring_cost_reversal",
-        expression="-group_rank(ts_zscore(fnd6_newqeventv110_rcaq, 252), subindustry)",
+        expression="-group_rank(ts_zscore(ts_backfill(vec_avg(fnd6_newqeventv110_rcaq), 63), 252), subindustry)",
         hypothesis="Large restructuring costs are often followed by near-term uncertainty and margin pressure.",
         hint="FND6 restructuring after-tax field has low user and alpha counts.",
         dataset_category="fundamental",
@@ -1201,7 +1201,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fnd6_goodwill_impairment_warning",
-        expression="-group_rank(ts_zscore(fnd6_newqeventv110_gdwlipq, 252), subindustry)",
+        expression="-group_rank(ts_zscore(ts_backfill(vec_avg(fnd6_newqeventv110_gdwlipq), 63), 252), subindustry)",
         hypothesis="Goodwill impairment events reveal overpaid acquisitions and weak capital allocation.",
         hint="Combines pretax and EPS-effect impairment fields.",
         dataset_category="fundamental",
@@ -1211,7 +1211,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fnd6_inventory_finished_goods_alert",
-        expression="-group_rank(ts_delta(fnd6_newqeventv110_invfgq, 120), subindustry)",
+        expression="-group_rank(ts_delta(ts_backfill(vec_avg(fnd6_newqeventv110_invfgq), 63), 63), subindustry)",
         hypothesis="Finished-goods inventory growing faster than raw materials can signal demand slowdown.",
         hint="Low-crowding FND6 inventory detail.",
         dataset_category="fundamental",
@@ -1444,7 +1444,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fnd6_wip_inventory_buildup",
-        expression="-group_rank(ts_delta(fnd6_newqeventv110_invwipq, 120), subindustry)",
+        expression="-group_rank(ts_delta(ts_backfill(vec_avg(fnd6_newqeventv110_invwipq), 63), 63), subindustry)",
         hypothesis="Work-in-process inventory buildup versus finished goods can flag production bottlenecks.",
         hint="Industry-specific inventory composition signal.",
         dataset_category="fundamental",
@@ -1484,7 +1484,7 @@ def get_official_templates() -> List[AlphaTemplate]:
 
     templates.append(AlphaTemplate(
         name="fnd6_debt_due_1y_pressure",
-        expression="-group_rank(ts_rank(fnd6_eventv110_dd1q / (fnd6_newqeventv110_lltq + 0.000001), 252), sector)",
+        expression="-group_rank(ts_rank(fnd6_eventv110_dd1q / ts_backfill(vec_avg(fnd6_newqeventv110_lltq), 63), 252), sector)",
         hypothesis="Debt due within one year relative to long-term liabilities flags refinancing pressure.",
         hint="Debt maturity stress template using low-crowding FND6 fields.",
         dataset_category="fundamental",
