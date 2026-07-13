@@ -73,6 +73,9 @@ matched denominators.
   every response, and stops on HTTP 429. It is not a bypass for platform checks.
 - Previous successful manual-batch API submissions were `XgnWrL6m`,
   `MPQ1WXor`, and `rKl53Lvd` (HTTP 201). A later request hit platform throttling.
+- On 2026-07-13, the refreshed-cookie batch received HTTP 201 for
+  `2rLO8v8P`, `vRlkw5wd`, and `WjGP1NkO`; the next request (`YP07erlM`) hit
+  HTTP 429 and the batch stopped immediately.
 - Never retry HTTP 429 in a loop.
 
 ## Current Candidate Audit
